@@ -85,11 +85,12 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       config.parallax,
     );
     const y = lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
+    const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
     if (frame) {
       const baseScale = layer === "far" ? 0.52 : layer === "mid" ? 0.72 : 1;
       const drawn = drawAtlasFrame(ctx, assets, frame[0], frame[1], x, y, {
-        flipX: entity.direction < 0,
+        flipX: visualDirection < 0,
         scale: baseScale * entity.scale,
         alpha: layer === "far" ? 0.68 : 0.94,
       });
@@ -100,14 +101,14 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
           entity.message,
           x,
           y,
-          entity.direction,
+          visualDirection,
           palette,
           baseScale * entity.scale,
           entity.animationTime,
           settings,
         );
       }
-      drawTrafficActivity(ctx, entity, assets, palette, x, y, baseScale * entity.scale);
+      drawTrafficActivity(ctx, entity, assets, palette, x, y, baseScale * entity.scale, visualDirection);
     } else {
       drawTrafficFallback(ctx, entity, x, y, palette, layer);
     }
@@ -279,6 +280,23 @@ function interpolatedCamera(world, alpha) {
   );
 }
 
+/**
+ * Traffic faces its actual on-screen motion. This keeps a slow watercraft from
+ * appearing to reverse when the surfer's camera overtakes it, while preserving
+ * world-space parallax and simulation direction.
+ */
+export function trafficScreenDirection(entity, world, layer) {
+  const config = WORLD_LAYER_CONFIG[layer];
+  if (!config) return entity?.direction < 0 ? -1 : 1;
+  const previousCamera = world?.context?.previousCameraWorldX ?? world?.lastCameraWorldX ?? 0;
+  const currentCamera = world?.context?.cameraWorldX ?? world?.lastCameraWorldX ?? previousCamera;
+  const previousX = projectWorldX(entity?.previousWorldX ?? entity?.worldX ?? 0, previousCamera, config.parallax);
+  const currentX = projectWorldX(entity?.worldX ?? entity?.previousWorldX ?? 0, currentCamera, config.parallax);
+  const delta = currentX - previousX;
+  if (Math.abs(delta) > 1e-6) return delta < 0 ? -1 : 1;
+  return entity?.direction < 0 ? -1 : 1;
+}
+
 function trafficBob(entity, settings) {
   if (settings.reducedMotion) return 0;
   const seed = (entity.eventSeed & 31) * 0.17;
@@ -304,10 +322,10 @@ function trafficFrame(entity) {
   return TRAFFIC_FRAMES[entity.kind];
 }
 
-function drawTrafficActivity(ctx, entity, assets, palette, x, y, scale) {
+function drawTrafficActivity(ctx, entity, assets, palette, x, y, scale, visualDirection = entity.direction) {
   const courier = entity.activity === "courier" || String(entity.phase).startsWith("courier");
   if (courier && entity.payload) {
-    const pickupX = x - entity.direction * 4 * scale;
+    const pickupX = x - visualDirection * 4 * scale;
     const pickupY = y + 8 * scale;
     const drawn = drawAtlasFrame(ctx, assets, "powerups", entity.payload, pickupX, pickupY, {
       scale: Math.max(0.42, scale * 0.58),
@@ -316,7 +334,7 @@ function drawTrafficActivity(ctx, entity, assets, palette, x, y, scale) {
     if (!drawn) drawPowerupFallback(ctx, entity.payload, pickupX, pickupY, palette, Math.max(0.42, scale * 0.58));
   }
   if (entity.activity === "race" || String(entity.phase).startsWith("race")) {
-    const wakeDirection = entity.direction < 0 ? 1 : -1;
+    const wakeDirection = visualDirection < 0 ? 1 : -1;
     ctx.save();
     ctx.globalAlpha = 0.72;
     ctx.fillStyle = palette.foamShade;
@@ -328,7 +346,7 @@ function drawTrafficActivity(ctx, entity, assets, palette, x, y, scale) {
     ctx.restore();
   }
   if (entity.activity === "aircraftDrop" && DROP_DRAW_PHASES.has(entity.phase)) {
-    const dropX = x - entity.direction * 7;
+    const dropX = x - visualDirection * 7;
     const dropY = y + 17;
     const drawn = drawAtlasFrame(ctx, assets, "airTraffic", "parachuteDrop", dropX, dropY, {
       scale: Math.max(0.44, scale * 0.68),

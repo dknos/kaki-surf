@@ -39,5 +39,7 @@ for scene in "${scenes[@]}"; do
     "$base_url?qa=$scene&capture=20260719" >/dev/null 2>&1
 done
 
+cp "$capture_dir/menu.png" "$project_root/docs/images/menu.png"
+cp "$capture_dir/neutral.png" "$project_root/docs/images/ride.png"
 python3 "$project_root/tools/qa/build-contact-sheet.py"
 echo "Captured ${#scenes[@]} deterministic browser QA scenes."

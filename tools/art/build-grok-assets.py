@@ -32,6 +32,7 @@ class Family:
     anchor: tuple[float, float]
     colors: int = 28
     padding: int = 2
+    foam_only: bool = False
 
 
 FAMILIES = (
@@ -54,6 +55,7 @@ FAMILIES = (
         anchor=(0.5, 1.0),
         colors=30,
         padding=4,
+        foam_only=True,
     ),
     Family(
         source="dolphin-source.png",
@@ -281,6 +283,36 @@ def remove_chroma(image: Image.Image) -> Image.Image:
     return rgba
 
 
+def isolate_wave_foam(image: Image.Image) -> Image.Image:
+    """Keep organic foam and its nearby ink while dropping rectangular water fill."""
+    rgba = image.convert("RGBA")
+    pixels = list(rgba.get_flattened_data())
+    foam_core: list[int] = []
+    for red, green, blue, alpha in pixels:
+        if not alpha:
+            foam_core.append(0)
+            continue
+        _hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+        foam_core.append(255 if value >= 0.58 and saturation <= 0.34 else 0)
+
+    core_mask = Image.new("L", rgba.size, 0)
+    core_mask.putdata(foam_core)
+    nearby_mask = core_mask.filter(ImageFilter.MaxFilter(9))
+    nearby = list(nearby_mask.get_flattened_data())
+
+    isolated: list[tuple[int, int, int, int]] = []
+    for (red, green, blue, alpha), core, close_to_foam in zip(pixels, foam_core, nearby):
+        if not alpha or not close_to_foam:
+            isolated.append((0, 0, 0, 0))
+            continue
+        _hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+        keep_edge = value <= 0.36 or saturation <= 0.55
+        isolated.append((red, green, blue, 255 if core or keep_edge else 0))
+
+    rgba.putdata(isolated)
+    return rgba
+
+
 def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image:
     column = index % family.columns
     row = index // family.columns
@@ -289,6 +321,8 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     right = round(source.width * (column + 1) / family.columns)
     bottom = round(source.height * (row + 1) / family.rows)
     keyed = remove_chroma(source.crop((left, top, right, bottom)))
+    if family.foam_only:
+        keyed = isolate_wave_foam(keyed)
     alpha = keyed.getchannel("A")
     bounds = alpha.getbbox()
     if not bounds:
