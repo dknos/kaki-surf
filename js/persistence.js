@@ -7,7 +7,9 @@ export function createDefaultSave() {
     bestFlow: 0,
     totalRuns: 0,
     selectedBoard: "foamPuff",
+    selectedCondition: "goldenCoast",
     unlockedBoards: ["foamPuff", "mangoFish", "moonLog"],
+    tutorialSeen: false,
     settings: { ...DEFAULT_SETTINGS },
     lastRun: null,
   };
@@ -56,6 +58,7 @@ export function recordRun(save, result) {
     flow,
     rank: result.rank.grade,
     board: result.board,
+    condition: result.condition ?? save.selectedCondition,
     at: new Date().toISOString(),
   };
   return score > previousBest;

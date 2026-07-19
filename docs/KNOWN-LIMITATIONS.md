@@ -1,17 +1,17 @@
-# Known limitations and next improvements
+# Known limitations
+
+The shipped code includes four contextual trick actions, compositional aerials, three mechanically and visually distinct boards, three finished visual conditions, keyboard/gamepad/touch mappings, access settings, and a static-host adapter. The remaining limitations are validation and rights boundaries rather than placeholder gameplay features.
 
 ## Current limitations
 
-- One beach/wave profile and one finished Kitty Kaki hero are included.
-- Three boards ship, but broader tuning still needs hands-on sessions with several players and physical controllers.
-- The Web Audio score is original and reactive but intentionally compact; it is not a produced multi-track soundtrack.
-- Touch controls are provided, but physical multi-touch/orientation testing remains outstanding.
-- Controls support parallel keyboard/controller/touch mappings but do not yet expose a remapping UI.
-- Town entry, Survivor rewards, ghosts, daily waves, additional characters, and wallet/on-chain features are intentionally outside this vertical slice.
-- Character/rightsholder confirmation is required before commercial or collectible release.
+- **Physical input coverage:** browser-level automated tests cover standard gamepad mappings and independent touch pointers, but the release still needs a representative physical-device pass across multiple controllers, trigger layouts, rumble implementations, phones, tablets, multi-touch stacks, orientation changes, and safe-area insets.
+- **Assistive-technology coverage:** the menu, settings, focus targets, Canvas label, and live announcements are present, but hands-on audits with major desktop and mobile screen readers, switch control, voice control, and high-zoom/reflow combinations remain outstanding. The action game itself is not currently designed for screen-reader-only play.
+- **Low-powered hardware coverage:** the fixed-step cap, bounded particle/callout pools, reduced-motion path, and compact Web Audio graph are implemented, but extended thermal, battery, audio-latency, and frame-pacing tests on older phones, integrated GPUs, and power-saving browser modes remain outstanding.
+- **Character and reference rights:** written rightsholder confirmation is required before a public commercial, merchandising, or collectible release. The reference-only GLB/JPG and Kitty Kaki identity metadata are not proof of commercial character-art permission.
 
-## Recommended next three improvements, ranked by effect on fun
+## Release follow-up
 
-1. **Five-player handling lab and ghost traces.** Record where beginners launch, experts preserve speed, and landing errors cluster; tune carve response, pump rhythm, and recovery windows from those traces. This most directly improves the restart impulse.
-2. **A true pocket/tube sequence.** Add one short, highly readable tube opportunity that changes camera framing and score temptation without changing the stable collision surface.
-3. **Second animation/audio pass.** Add hand-cleaned anticipation, two extra carve poses, a board-flex landing frame, two more affectionate wipeouts, and a longer reactive surf-rock/chiptune arrangement.
+1. Run and record a physical controller/mobile matrix, including simultaneous direction plus held trick input and B's gameplay-versus-results context.
+2. Complete a screen-reader, keyboard-only, switch/voice, focus, and zoom audit; log concrete issues rather than assuming Canvas labels provide gameplay equivalence.
+3. Profile long runs on representative low-powered devices in all three conditions, with Web Audio, touch, Reduced Motion, High Contrast, and Full Wave Read enabled.
+4. Archive the rights grant and permitted-use scope alongside the reference provenance before commercial distribution.

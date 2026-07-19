@@ -3,7 +3,8 @@ import { createKakiSurf } from "./integration-adapter.js";
 const host = document.querySelector("#kaki-surf-root");
 
 try {
-  const game = await createKakiSurf({ host });
+  const qaScene = new URLSearchParams(location.search).get("qa");
+  const game = await createKakiSurf({ host, qaScene });
   game.start();
   globalThis.kakiSurf = game;
 } catch (error) {
