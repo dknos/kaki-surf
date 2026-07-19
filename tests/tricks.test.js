@@ -8,6 +8,8 @@ import { TRICK_CATALOG } from "../js/trick-catalog.js";
 import {
   buildTrickSignature,
   formatTrickName,
+  quantizeRotationDegrees,
+  scoreAerialManifest,
 } from "../js/trick-scoring.js";
 import { AerialTrickSession, normalizeTrickInput } from "../js/tricks.js";
 
@@ -155,6 +157,12 @@ test("names quantize actual final rotation and preserve ordered identities", () 
 
   const unwound = manifest([completedEntry("tailGrab")], Math.PI * 2 - Math.PI * 2);
   assert.equal(formatTrickName(unwound), "TAIL GRAB");
+
+  for (const degrees of [180, 360, 540, 720]) {
+    const radians = degrees * Math.PI / 180;
+    assert.equal(quantizeRotationDegrees(radians), degrees);
+    assert.equal(quantizeRotationDegrees(-radians), -degrees);
+  }
 });
 
 test("aerial value remains provisional until landing and wipeout loses it", () => {
@@ -220,6 +228,30 @@ test("repeat decay keys the full directional, rotational, ordered signature", ()
   assert.ok(second.total < first.total);
 });
 
+test("switch takeoff and opposite-tangent landing are distinct scoreable variations", () => {
+  const regular = manifest([completedEntry("tailGrab")], Math.PI * 2, {
+    landed: true,
+    switchTakeoff: false,
+    switchLanding: false,
+  });
+  const switchPop = manifest([completedEntry("tailGrab")], Math.PI * 2, {
+    landed: true,
+    switchTakeoff: true,
+    switchLanding: false,
+  });
+  const switchBoth = manifest([completedEntry("tailGrab")], Math.PI * 2, {
+    landed: true,
+    switchTakeoff: true,
+    switchLanding: true,
+  });
+
+  assert.notEqual(buildTrickSignature(regular), buildTrickSignature(switchPop));
+  assert.notEqual(buildTrickSignature(switchPop), buildTrickSignature(switchBoth));
+  assert.match(buildTrickSignature(switchBoth), /switch-pop\+switch-land$/);
+  assert.ok(scoreAerialManifest(switchPop).total > scoreAerialManifest(regular).total);
+  assert.ok(scoreAerialManifest(switchBoth).total > scoreAerialManifest(switchPop).total);
+});
+
 test("varial completion and landed-orientation gates prevent partial awards", () => {
   const partial = new AerialTrickSession({ launchData: { potential: 10 } });
   runFor(partial, 0.1, {}, context({ maxHeight: 8 }));
@@ -245,7 +277,7 @@ test("varial completion and landed-orientation gates prevent partial awards", ()
 test("invalid contextual maneuvers emit restrained rejection and award no move score", () => {
   const simulation = new SurfSimulation();
   simulation.tutorialEnabled = false;
-  simulation.reset({ board: BOARDS.foamPuff });
+  simulation.reset({ board: BOARDS.foamPuff, controlMode: "advanced" });
   simulation.begin();
   simulation.player.state = "riding";
   simulation.player.stateTime = 1;
@@ -268,4 +300,3 @@ test("invalid contextual maneuvers emit restrained rejection and award no move s
   assert.equal(typeof simulation.player.landingPreview.error, "number");
   assert.equal(typeof simulation.player.flowTier, "string");
 });
-

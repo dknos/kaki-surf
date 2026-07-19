@@ -12,6 +12,7 @@ test("fresh profiles keep the backward-compatible v1 shape and current defaults"
   assert.deepEqual(save.unlockedBoards, Object.keys(BOARDS));
   assert.equal(save.selectedBoard, "foamPuff");
   assert.equal(save.selectedCondition, "goldenCoast");
+  assert.equal(save.settings.controlMode, "simple");
   assert.equal(save.settings.waveReadAssist, "full");
   assert.deepEqual(save.settings, DEFAULT_SETTINGS);
 
@@ -20,7 +21,7 @@ test("fresh profiles keep the backward-compatible v1 shape and current defaults"
   assert.notStrictEqual(anotherSave.unlockedBoards, save.unlockedBoards, "board lists must be independently mutable");
 });
 
-test("valid legacy v1 payloads retain saved values while receiving new defaults", () => {
+test("legacy v1 payloads retain progress and settings while migrating missing controlMode to Advanced", () => {
   const legacy = {
     version: 1,
     bestScore: 4380,
@@ -49,8 +50,27 @@ test("valid legacy v1 payloads retain saved values while receiving new defaults"
   assert.deepEqual(save.settings, {
     ...DEFAULT_SETTINGS,
     ...legacy.settings,
+    controlMode: "advanced",
   });
+  assert.equal(save.settings.controlMode, "advanced");
   assert.equal(save.settings.waveReadAssist, "full");
+});
+
+test("v1 payloads with an explicit valid control mode preserve that choice", () => {
+  for (const controlMode of ["simple", "advanced"]) {
+    const saved = createDefaultSave();
+    saved.bestScore = 9123;
+    saved.selectedBoard = "moonLog";
+    saved.selectedCondition = "stormbreak";
+    saved.settings.controlMode = controlMode;
+    const storage = new MemoryStorage({ [SAVE_KEY]: JSON.stringify(saved) });
+
+    const loaded = loadSave(storage);
+    assert.equal(loaded.settings.controlMode, controlMode);
+    assert.equal(loaded.bestScore, 9123);
+    assert.equal(loaded.selectedBoard, "moonLog");
+    assert.equal(loaded.selectedCondition, "stormbreak");
+  }
 });
 
 test("malformed, old, and future-version saves each fall back to a fresh profile", () => {

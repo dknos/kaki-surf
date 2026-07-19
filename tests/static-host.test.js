@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
+import { GENERATED_ASSET_MANIFEST } from "../js/asset-manifest.js";
 import { createKakiSurf } from "../js/integration-adapter.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -127,6 +128,25 @@ test("QA page references only present local files", () => {
   }
 
   assertAllPageAssetsExist(QA_PATH, tags);
+});
+
+test("every generated production atlas is local, dimension-checked, and compact", () => {
+  const requiredFamilies = [
+    "waveBreaker", "dolphin", "shark", "whale", "birds", "boats",
+    "airTraffic", "powerups", "boards", "carrier", "uiOrnaments",
+  ];
+  assert.deepEqual(Object.keys(GENERATED_ASSET_MANIFEST), requiredFamilies);
+
+  for (const [family, descriptor] of Object.entries(GENERATED_ASSET_MANIFEST)) {
+    const file = path.join(ROOT, "assets", "generated", descriptor.filename);
+    assert.ok(isFile(file), `${family} atlas should be checked in locally`);
+    const bytes = readFileSync(file);
+    assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `${family} should be a PNG`);
+    assert.equal(bytes.readUInt32BE(16), descriptor.width, `${family} manifest width`);
+    assert.equal(bytes.readUInt32BE(20), descriptor.height, `${family} manifest height`);
+    assert.ok(bytes.byteLength < 512 * 1024, `${family} stays within the compact runtime budget`);
+    assert.ok(Object.keys(descriptor.frames).length >= 8, `${family} publishes reusable frame metadata`);
+  }
 });
 
 function read(file) {

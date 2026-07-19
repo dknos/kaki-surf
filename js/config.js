@@ -12,6 +12,12 @@ export const TUNING = {
   carveAcceleration: 3.65,
   carveFriction: 4,
   faceEdgeBounce: 0.28,
+  downhillAcceleration: 104,
+  uphillSpeedCost: 40,
+  traverseDrive: 3.2,
+  reversalCommitTime: 0.085,
+  reversalCommitSpeed: 7,
+  reversalScrub: 13.5,
   wavePush: 15.5,
   curlSpeed: 2.35,
   curlCatchDelay: 0.58,
@@ -33,6 +39,13 @@ export const TUNING = {
   perfectTolerance: 0.115,
   landingCoyote: 0.095,
   launchCoyote: 0.11,
+  simpleAutoLevelStart: 18,
+  simpleTrickBuffer: 0.34,
+  simpleGrabHold: 0.115,
+  simpleSpinImpulse: 1.8,
+  perfectLandingCarry: 0.58,
+  cleanLandingCarry: 0.4,
+  wobbleLandingCarry: 0.18,
   wipeoutThreshold: 1.18,
   cameraResponse: 5.8,
   juiceIntensity: 1,
@@ -59,6 +72,7 @@ export const BOARDS = {
     airControl: 1.08,
     landing: 1.28,
     recovery: 1.24,
+    simpleAutoLevel: 1.35,
     style: 0.94,
     shape: "puff",
     specialty: "RECOVERY + QUICK GRABS",
@@ -82,6 +96,7 @@ export const BOARDS = {
     airControl: 1,
     landing: 0.94,
     recovery: 0.96,
+    simpleAutoLevel: 0.9,
     style: 1.08,
     shape: "fish",
     specialty: "SNAPS + COMBO CHAINS",
@@ -105,6 +120,7 @@ export const BOARDS = {
     airControl: 0.8,
     landing: 1.02,
     recovery: 0.88,
+    simpleAutoLevel: 0.5,
     style: 1.14,
     shape: "log",
     specialty: "BIG POP + LONG HOLDS",
@@ -157,6 +173,8 @@ export const SCORE = {
   repeatDecay: 0.58,
   comboStep: 0.18,
   comboMax: 4.2,
+  switchTakeoff: 80,
+  switchLanding: 135,
 };
 
 export const DEFAULT_SETTINGS = {
@@ -171,6 +189,7 @@ export const DEFAULT_SETTINGS = {
   landingAssist: false,
   touchControls: true,
   waveReadAssist: "full",
+  controlMode: "simple",
 };
 
 export const SAVE_KEY = "kaki-surf-meta-v1";

@@ -3,6 +3,11 @@ import { clamp } from "./math.js";
 export const DEAD_ZONE = 0.18;
 export const BUFFER_WINDOW = 0.12;
 
+export const CONTROL_MODES = Object.freeze({
+  SIMPLE: "simple",
+  ADVANCED: "advanced",
+});
+
 const TRICK1_KEYS = Object.freeze(["KeyQ", "KeyX", "KeyC"]);
 
 export const KEY_BINDINGS = Object.freeze({
@@ -11,6 +16,10 @@ export const KEY_BINDINGS = Object.freeze({
   up: Object.freeze(["ArrowUp", "KeyW"]),
   down: Object.freeze(["ArrowDown", "KeyS"]),
   edge: Object.freeze(["Space", "KeyZ"]),
+  trick: Object.freeze(["KeyF", "KeyX"]),
+  special: Object.freeze(["KeyT", "ShiftLeft", "ShiftRight"]),
+  spinLeft: Object.freeze(["KeyQ"]),
+  spinRight: Object.freeze(["KeyE"]),
   trick1: TRICK1_KEYS,
   trick2: Object.freeze(["KeyE"]),
   trick3: Object.freeze(["KeyF"]),
@@ -22,7 +31,21 @@ export const KEY_BINDINGS = Object.freeze({
   debug: Object.freeze(["Backquote"]),
 });
 
-const STEP_ACTIONS = Object.freeze(["edge", "trick1", "trick2", "trick3", "trick4"]);
+const ADVANCED_ACTIONS = Object.freeze(["edge", "trick1", "trick2", "trick3", "trick4"]);
+const SIMPLE_ACTIONS = Object.freeze(["edge", "trick", "special", "spinLeft", "spinRight"]);
+const STEP_ACTIONS = Object.freeze([
+  "edge",
+  "trick1",
+  "trick2",
+  "trick3",
+  "trick4",
+  "trick",
+  "special",
+  "spinLeft",
+  "spinRight",
+]);
+const ADVANCED_ACTION_SET = new Set(ADVANCED_ACTIONS);
+const SIMPLE_ACTION_SET = new Set(SIMPLE_ACTIONS);
 const META_ACTIONS = Object.freeze(["restart", "pause", "retry", "debug"]);
 const DIRECTION_CONTROLS = new Set(["left", "right", "up", "down"]);
 const TOUCH_ACTIONS = new Set(STEP_ACTIONS);
@@ -49,6 +72,18 @@ export function createInputStep() {
     style: false,
     stylePressed: false,
     styleReleased: false,
+    trick: false,
+    trickPressed: false,
+    trickReleased: false,
+    special: false,
+    specialPressed: false,
+    specialReleased: false,
+    spinLeft: false,
+    spinLeftPressed: false,
+    spinLeftReleased: false,
+    spinRight: false,
+    spinRightPressed: false,
+    spinRightReleased: false,
   };
 }
 
@@ -57,9 +92,12 @@ export class InputManager {
     target = globalThis.window ?? null,
     touchRoot = null,
     getGamepads = defaultGetGamepads,
+    controlMode = CONTROL_MODES.SIMPLE,
   } = {}) {
     this.target = target;
     this.getGamepads = getGamepads;
+    this.controlMode = normalizeControlMode(controlMode);
+    this.activeActions = actionsForMode(this.controlMode);
     this.keys = new Set();
     this.touch = createTouchState();
     this.touchPointers = new Map();
@@ -110,13 +148,14 @@ export class InputManager {
     const options = { signal: this.abort.signal };
     const controls = root.querySelectorAll?.("[data-control]") ?? [];
     controls.forEach((button) => {
-      const control = normalizeTouchControl(button.dataset.control);
-      if (!control || !button.addEventListener) return;
+      const rawControl = button.dataset.control;
+      if (!isTouchControl(rawControl) || !button.addEventListener) return;
       this.touchButtons.add(button);
 
       button.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         if (!this.enabled) return;
+        const control = normalizeTouchControl(rawControl, this.controlMode);
         this.activateTouchPointer(event.pointerId, button, control);
         try {
           button.setPointerCapture?.(event.pointerId);
@@ -233,20 +272,30 @@ export class InputManager {
     return meta;
   }
 
+  setControlMode(mode) {
+    const nextMode = normalizeControlMode(mode);
+    if (nextMode === this.controlMode) return this.controlMode;
+    this.controlMode = nextMode;
+    this.activeActions = actionsForMode(nextMode);
+    this.clear();
+    return this.controlMode;
+  }
+
   isDown(action) {
     return (KEY_BINDINGS[action] ?? []).some((code) => this.keys.has(code));
   }
 
   isActionHeld(action) {
+    if (!this.activeActions.has(action)) return false;
     return this.isDown(action) || this.touch[action] || this.gamepad[action];
   }
 
   hasKeyboardAction() {
-    return STEP_ACTIONS.some((action) => this.isDown(action));
+    return Array.from(this.activeActions).some((action) => this.isDown(action));
   }
 
   hasTouchAction() {
-    return STEP_ACTIONS.some((action) => this.touch[action]);
+    return Array.from(this.activeActions).some((action) => this.touch[action]);
   }
 
   refreshEdges() {
@@ -343,6 +392,10 @@ export function pollGamepad(getGamepads = defaultGetGamepads) {
     x: dpadX || applyDeadZone(pad.axes?.[0] ?? 0),
     y: dpadY || applyDeadZone(pad.axes?.[1] ?? 0),
     edge: buttonPressed(pad, 0) || buttonPressed(pad, 7),
+    trick: buttonPressed(pad, 2) || buttonPressed(pad, 1),
+    special: buttonPressed(pad, 3),
+    spinLeft: buttonPressed(pad, 4),
+    spinRight: buttonPressed(pad, 5),
     trick1: buttonPressed(pad, 2) || buttonPressed(pad, 4),
     trick2: buttonPressed(pad, 3) || buttonPressed(pad, 5),
     trick3: buttonPressed(pad, 1),
@@ -357,6 +410,10 @@ export const DISCONNECTED_GAMEPAD = Object.freeze({
   x: 0,
   y: 0,
   edge: false,
+  trick: false,
+  special: false,
+  spinLeft: false,
+  spinRight: false,
   trick1: false,
   trick2: false,
   trick3: false,
@@ -380,6 +437,10 @@ function createTouchState() {
     x: 0,
     y: 0,
     edge: false,
+    trick: false,
+    special: false,
+    spinLeft: false,
+    spinRight: false,
     trick1: false,
     trick2: false,
     trick3: false,
@@ -396,9 +457,24 @@ function createActionBuffers() {
   return Object.fromEntries(STEP_ACTIONS.map((action) => [action, { pressed: 0, released: 0 }]));
 }
 
-function normalizeTouchControl(control) {
-  if (control === "style") return "trick1";
-  if (DIRECTION_CONTROLS.has(control) || TOUCH_ACTIONS.has(control)) return control;
+function isTouchControl(control) {
+  return control === "style" || DIRECTION_CONTROLS.has(control) || TOUCH_ACTIONS.has(control);
+}
+
+function normalizeTouchControl(control, mode) {
+  if (DIRECTION_CONTROLS.has(control) || control === "edge") return control;
+  if (mode === CONTROL_MODES.ADVANCED) {
+    if (control === "style" || control === "spinLeft") return "trick1";
+    if (control === "spinRight") return "trick2";
+    if (control === "trick") return "trick3";
+    if (control === "special") return "trick4";
+    if (TOUCH_ACTIONS.has(control)) return control;
+    return null;
+  }
+  if (control === "style" || control === "trick" || control === "trick3") return "trick";
+  if (control === "special" || control === "trick4") return "special";
+  if (control === "spinLeft" || control === "trick1") return "spinLeft";
+  if (control === "spinRight" || control === "trick2") return "spinRight";
   return null;
 }
 
@@ -408,4 +484,14 @@ function selectDirection(...sources) {
 
 function isGamepadActive(gamepad) {
   return gamepad.x || gamepad.y || STEP_ACTIONS.some((action) => gamepad[action]) || gamepad.pause || gamepad.retry;
+}
+
+export function normalizeControlMode(mode) {
+  return String(mode).toLowerCase() === CONTROL_MODES.ADVANCED
+    ? CONTROL_MODES.ADVANCED
+    : CONTROL_MODES.SIMPLE;
+}
+
+function actionsForMode(mode) {
+  return mode === CONTROL_MODES.ADVANCED ? ADVANCED_ACTION_SET : SIMPLE_ACTION_SET;
 }

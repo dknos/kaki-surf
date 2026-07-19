@@ -23,11 +23,17 @@ export function loadSave(storage = globalThis.localStorage) {
     if (!raw) return fallback;
     const saved = JSON.parse(raw);
     if (!saved || saved.version !== 1) return fallback;
+    const savedSettings = saved.settings && typeof saved.settings === "object"
+      ? saved.settings
+      : {};
+    const controlMode = savedSettings.controlMode === "simple" || savedSettings.controlMode === "advanced"
+      ? savedSettings.controlMode
+      : "advanced";
     return {
       ...fallback,
       ...saved,
       unlockedBoards: Array.isArray(saved.unlockedBoards) ? saved.unlockedBoards : fallback.unlockedBoards,
-      settings: { ...DEFAULT_SETTINGS, ...saved.settings },
+      settings: { ...DEFAULT_SETTINGS, ...savedSettings, controlMode },
     };
   } catch (error) {
     console.warn("Kaki Surf save could not be read; using a fresh local profile.", error);

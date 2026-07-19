@@ -1,5 +1,6 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from "./config.js";
 import { clamp } from "./math.js";
+import { drawAtlasFrame } from "./asset-drawing.js";
 
 const EDGE_STEPS = Object.freeze([0, 1, 0, -1, 0, 2, 1, 0, -2, -1, 1, 0, 2, 0, -1, 0, 1, -2, 0, 1, 0, -1, 2, 1]);
 const RIBBON_LENGTHS = Object.freeze([8, 15, 5, 22, 11, 18, 7, 26, 13, 9, 20, 6, 17, 12, 24, 10]);
@@ -32,7 +33,7 @@ export function waveGuideAt(wave, player, board, options = {}) {
   });
 }
 
-export function drawLayeredWave(ctx, simulation, palette, settings, time, conditionId) {
+export function drawLayeredWave(ctx, simulation, palette, settings, time, conditionId, assets = null) {
   const wave = simulation.wave;
   const player = simulation.player;
   const speedCap = publishedSpeedCap(simulation);
@@ -48,7 +49,7 @@ export function drawLayeredWave(ctx, simulation, palette, settings, time, condit
   drawDeepSwellMasses(ctx, wave, palette, time, settings, speedRatio, momentum);
   drawCurrentRibbons(ctx, wave, palette, time, settings, speedRatio, momentum);
   drawPowerSeam(ctx, wave, player, palette, time, settings);
-  drawCurlMass(ctx, wave, palette, time, conditionId, settings);
+  drawCurlMass(ctx, wave, palette, time, conditionId, settings, assets);
   drawCrestAndLip(ctx, wave, player, palette, time, conditionId, settings, speedRatio, momentum);
   drawWaveReadAssist(ctx, wave, player, simulation.board, palette, settings, time);
 }
@@ -127,14 +128,13 @@ function drawCurrentRibbons(ctx, wave, p, time, settings, speedRatio, momentum) 
 }
 
 function drawPowerSeam(ctx, wave, player, p, time, settings) {
-  const assist = String(settings.waveReadAssist ?? "full").toLowerCase();
-  const strong = settings.highContrast || assist === "full";
+  const strong = Boolean(settings.highContrast);
   const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
   const start = Math.max(0, Math.floor(wave.curlX + 49));
   const phase = settings.reducedMotion ? 0 : Math.floor((wave.travel * 0.4 + time * (13 + momentum * 20)) % 19);
-  for (let index = 0; index < 28; index += 1) {
+  for (let index = 0; index < 18; index += 1) {
     const pattern = (index * 5 + 3) % RIBBON_LENGTHS.length;
-    const x = start + index * 18 + EDGE_STEPS[(pattern + index) % EDGE_STEPS.length] * 2 - phase;
+    const x = start + index * 27 + EDGE_STEPS[(pattern + index) % EDGE_STEPS.length] * 2 - phase;
     if (x < start || x >= LOGICAL_WIDTH) continue;
     const face = powerSeamFaceAt(wave, x);
     const y = Math.round(wave.ridingY(x, face));
@@ -143,17 +143,21 @@ function drawPowerSeam(ctx, wave, player, p, time, settings) {
       ctx.fillStyle = p.waterDeep;
       ctx.fillRect(x - 1, y + 1, length + 2, 1);
     }
-    ctx.fillStyle = index % 4 === 0 ? p.gold : index % 3 === 0 ? p.foam : p.crest;
+    ctx.globalAlpha = strong ? 0.78 : 0.34;
+    ctx.fillStyle = index % 3 === 0 ? p.foam : p.crest;
     ctx.fillRect(x, y, length, 1);
     ctx.fillRect(x + 2, y - 1, Math.max(2, length - 5), 1);
     if (momentum > 0.72 && index % 5 === 0) ctx.fillRect(x + length - 2, y - 3, 2, 2);
   }
+  ctx.globalAlpha = 1;
 }
 
-function drawCurlMass(ctx, wave, p, time, conditionId, settings) {
+function drawCurlMass(ctx, wave, p, time, conditionId, settings, assets) {
   const curl = Math.round(wave.curlX);
   const crest = Math.round(wave.crestY(curl));
   const pulse = settings.reducedMotion ? 0 : EDGE_STEPS[Math.floor(time * 7) % EDGE_STEPS.length];
+
+  if (drawGeneratedCurl(ctx, wave, p, time, settings, assets, curl, crest, pulse)) return;
 
   // Connected foam islands create mass without the old horizontal barcode.
   ctx.fillStyle = p.foamShade;
@@ -239,6 +243,62 @@ function drawCurlMass(ctx, wave, p, time, conditionId, settings) {
   ctx.fillRect(curl - 15, crest + 51, 5, 1);
 }
 
+function drawGeneratedCurl(ctx, wave, p, time, settings, assets, curl, crest, pulse) {
+  const hasAtlas = Boolean(assets?.generated?.waveBreaker && assets?.generatedManifest?.waveBreaker);
+  if (!hasAtlas) return false;
+
+  // Simulation geometry still owns the danger boundary; generated modular
+  // water pieces supply the readable feather, fold, impact, and recovery.
+  ctx.save();
+  ctx.globalAlpha = settings.highContrast ? 0.92 : 0.74;
+  ctx.fillStyle = p.waterDeep;
+  ctx.beginPath();
+  ctx.moveTo(curl - 39, crest + 3);
+  ctx.bezierCurveTo(curl + 30, crest - 5, curl + 34, crest + 29, curl + 9, crest + 56);
+  ctx.bezierCurveTo(curl - 15, crest + 81, curl - 31, crest + 112, curl - 43, LOGICAL_HEIGHT);
+  ctx.lineTo(curl - 78, LOGICAL_HEIGHT);
+  ctx.bezierCurveTo(curl - 55, crest + 105, curl - 48, crest + 38, curl - 39, crest + 3);
+  ctx.fill();
+  ctx.restore();
+
+  const phase = settings.reducedMotion ? 0 : Math.floor((time * 5 + wave.pressure * 7) % 4);
+  drawAtlasFrame(ctx, assets, "waveBreaker", phase < 2 ? "crestFeatherA" : "crestFeatherB", curl - 5 + pulse, crest - 5, {
+    scale: 0.82,
+    scaleX: 1.14,
+    alpha: 0.94,
+  });
+  drawAtlasFrame(ctx, assets, "waveBreaker", "risingCurl", curl - 3, crest + 23, {
+    scale: 1.05,
+    scaleX: 1.12,
+    scaleY: 1.22,
+  });
+  drawAtlasFrame(ctx, assets, "waveBreaker", "impact", curl - 29 - pulse, crest + 70, {
+    scale: 1.08,
+    scaleX: 1.12,
+  });
+  drawAtlasFrame(ctx, assets, "waveBreaker", "whitewaterChurn", curl - 35, crest + 112, {
+    scale: 1.14,
+    scaleX: 1.22,
+  });
+  drawAtlasFrame(ctx, assets, "waveBreaker", "foamTendrils", curl + 12 + pulse, crest + 91, {
+    scale: 0.86,
+    scaleY: 1.18,
+    alpha: 0.9,
+  });
+  if (!settings.reducedMotion) {
+    drawAtlasFrame(ctx, assets, "waveBreaker", "sprayBurst", curl + 8, crest + 4 - phase * 2, {
+      scale: 0.72,
+      alpha: 0.72,
+    });
+    drawAtlasFrame(ctx, assets, "waveBreaker", "seaMist", curl + 22, crest + 49 + pulse, {
+      scale: 0.86,
+      scaleX: 1.2,
+      alpha: 0.42,
+    });
+  }
+  return true;
+}
+
 function drawCrestAndLip(ctx, wave, player, p, time, conditionId, settings, speedRatio, momentum) {
   const phase = settings.reducedMotion ? 0 : Math.floor((time * 9 + wave.travel * 0.12) % 31);
   ctx.fillStyle = p.crest;
@@ -276,7 +336,7 @@ function drawCrestAndLip(ctx, wave, player, p, time, conditionId, settings, spee
 }
 
 function drawWaveReadAssist(ctx, wave, player, board, p, settings, time) {
-  if (String(settings.waveReadAssist ?? "full").toLowerCase() !== "full") return;
+  if (!settings.highContrast || String(settings.waveReadAssist ?? "full").toLowerCase() !== "full") return;
   if (!player || player.state === "airborne" || player.state === "wipeout" || player.state === "complete") return;
   const guide = player.speedPotential ?? waveGuideAt(wave, player, board);
   const x = clamp(Math.round(player.x + (player.x > 310 ? -30 : 29)), 24, LOGICAL_WIDTH - 24);

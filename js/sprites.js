@@ -1,4 +1,5 @@
 import { clamp } from "./math.js";
+import { drawAtlasFrame } from "./asset-drawing.js";
 
 const BOARD_PROFILES = Object.freeze({
   foamPuff: Object.freeze({ half: 17, thickness: 6, wake: 0.86, spray: "round", flex: 1.25 }),
@@ -157,6 +158,7 @@ export function drawBoardWake(ctx, x, y, angle, board, player, palette, time = 0
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   ctx.rotate(snapped);
+  ctx.scale(Math.sign(player?.travelDirection ?? 1) || 1, 1);
   ctx.fillStyle = palette.foamShade;
   for (let offset = 5 + pulse; offset < length; offset += step) {
     const size = profile.spray === "round" ? 2 : 1;
@@ -176,10 +178,20 @@ export function drawBoardSprite(ctx, x, y, angle, board, palette, options = {}) 
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   ctx.rotate(snapAngle(angle + Number(options.relativeAngle ?? 0)));
+  ctx.scale(Math.sign(options.direction ?? 1) || 1, 1);
 
-  if (id === "mangoFish") drawFishBoard(ctx, board, palette, flex);
-  else if (id === "moonLog") drawLogBoard(ctx, board, palette, flex);
-  else drawPuffBoard(ctx, board, palette, flex);
+  const family = id === "mangoFish" ? "mangoFish" : id === "moonLog" ? "moonLog" : "foamPuff";
+  const view = options.airborne || options.underside ? "Underside" : "Top";
+  const atlasScale = id === "moonLog" ? 0.72 : id === "mangoFish" ? 0.62 : 0.6;
+  const drawn = drawAtlasFrame(ctx, options.assets, "boards", `${family}${view}`, 0, 1 + flex * 0.35, {
+    scale: atlasScale,
+  });
+
+  if (!drawn) {
+    if (id === "mangoFish") drawFishBoard(ctx, board, palette, flex);
+    else if (id === "moonLog") drawLogBoard(ctx, board, palette, flex);
+    else drawPuffBoard(ctx, board, palette, flex);
+  }
 
   ctx.restore();
 }
@@ -240,7 +252,7 @@ function drawLogBoard(ctx, board, p, flex) {
   ctx.fillRect(12, -1 + flex, 5, 1);
 }
 
-export function drawKittySprite(ctx, x, y, angle, player, palette) {
+export function drawKittySprite(ctx, x, y, angle, player, palette, options = {}) {
   const poseId = resolveKakiPose(player);
   const poseData = POSES[poseId] ?? POSES.neutralRide;
   const wobble = poseId === "wobble" ? Math.round(Math.sin((player.stateTime ?? 0) * 30) * 3) : 0;
@@ -248,6 +260,7 @@ export function drawKittySprite(ctx, x, y, angle, player, palette) {
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   ctx.rotate(snapAngle(angle + poseData.lean * 0.035 + (poseData.loose ? Math.sin((player.stateTime ?? 0) * 17) * 0.16 : 0)));
+  ctx.scale(Math.sign(options.direction ?? player?.travelDirection ?? 1) || 1, 1);
   ctx.translate(0, -poseData.float);
 
   // Tail and independent legs keep the plush silhouette readable at speed.

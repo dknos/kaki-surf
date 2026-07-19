@@ -20,6 +20,14 @@ const MANEUVER_CUES = Object.freeze({
   tubeTuck: { start: 92, end: 122, duration: 0.2 },
 });
 
+const EMPTY_EVENT_PAYLOAD = Object.freeze({});
+
+const POWERUP_TONES = Object.freeze({
+  mangoRush: Object.freeze({ start: 196, end: 784, type: "sawtooth", accent: 988 }),
+  moonPop: Object.freeze({ start: 330, end: 990, type: "triangle", accent: 1320 }),
+  starFoam: Object.freeze({ start: 523, end: 698, type: "sine", accent: 1047 }),
+});
+
 export class SurfAudio {
   constructor(settings = {}) {
     this.settings = settings;
@@ -30,6 +38,8 @@ export class SurfAudio {
     this.waveGain = null;
     this.waveFilter = null;
     this.waveSource = null;
+    this.effectNoiseBuffer = null;
+    this.noiseCursor = 0;
     this.nextBeat = 0;
     this.beatIndex = 0;
     this.started = false;
@@ -39,6 +49,13 @@ export class SurfAudio {
     this.lastSpeedTier = -1;
     this.lastFinalSecond = -1;
     this.inPowerLine = false;
+    this.beatReactive = {
+      speedTier: 0,
+      risk: 0,
+      airborne: false,
+      combo: 1,
+      finalSeconds: false,
+    };
   }
 
   async unlock() {
@@ -67,6 +84,7 @@ export class SurfAudio {
     this.master.connect(this.context.destination);
     this.applySettings();
     this.createWaveNoise();
+    this.createEffectNoiseBuffer();
   }
 
   createWaveNoise() {
@@ -87,6 +105,21 @@ export class SurfAudio {
     source.connect(this.waveGain);
     source.start();
     this.waveSource = source;
+  }
+
+  createEffectNoiseBuffer() {
+    if (!this.context || this.effectNoiseBuffer) return;
+    const sampleRate = this.context.sampleRate;
+    const length = sampleRate;
+    const buffer = this.context.createBuffer(1, length, sampleRate);
+    const channel = buffer.getChannelData(0);
+    let brown = 0;
+    for (let index = 0; index < length; index += 1) {
+      const white = Math.random() * 2 - 1;
+      brown = brown * 0.92 + white * 0.08;
+      channel[index] = clamp(white * 0.78 + brown * 0.62, -1, 1);
+    }
+    this.effectNoiseBuffer = buffer;
   }
 
   applySettings(settings = this.settings) {
@@ -126,8 +159,14 @@ export class SurfAudio {
       this.tone(now, seconds <= 3 ? 880 : 660, 0.045, "square", seconds <= 3 ? 0.07 : 0.045, this.musicGain, seconds <= 3 ? 1320 : 770);
     }
 
+    const reactive = this.beatReactive;
+    reactive.speedTier = speedTier;
+    reactive.risk = risk;
+    reactive.airborne = airborne;
+    reactive.combo = combo;
+    reactive.finalSeconds = seconds <= 10;
     while (this.nextBeat < now + 0.16) {
-      this.scheduleBeat(this.nextBeat, { speedTier, risk, airborne, combo, finalSeconds: seconds <= 10 });
+      this.scheduleBeat(this.nextBeat, reactive);
       this.nextBeat += clamp(0.146 - speedTier * 0.006 - (combo > 2.5 ? 0.008 : 0) - (seconds <= 10 ? 0.009 : 0), 0.1, 0.15);
     }
   }
@@ -151,9 +190,12 @@ export class SurfAudio {
   onEvent(event, simulation = null) {
     if (!this.started || !this.context || this.destroyed) return;
     if (simulation) this.conditionId = conditionIdFor(simulation, this.settings);
-    const payload = event.payload ?? {};
+    const type = typeof event === "string" ? event : event?.type;
+    const payload = typeof event === "string"
+      ? EMPTY_EVENT_PAYLOAD
+      : event?.payload ?? event ?? EMPTY_EVENT_PAYLOAD;
     const now = this.context.currentTime;
-    switch (event.type) {
+    switch (type) {
       case "pumpCharge":
         this.tone(now, 105 + (payload.charge ?? 0) * 75, 0.055, "triangle", 0.035, this.effectsGain, 145 + (payload.charge ?? 0) * 110);
         break;
@@ -162,6 +204,17 @@ export class SurfAudio {
         break;
       case "pump":
         this.tone(now, 132, 0.075, "square", 0.07 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.07, this.effectsGain, 220 + (payload.efficiency ?? payload.strength ?? 0.5) * 160);
+        break;
+      case "directionChange":
+      case "reversal":
+      case "switch":
+        this.playDirectionChange(now, payload);
+        break;
+      case "speedTier":
+      case "speedBurst":
+      case "downhill":
+      case "downhillDrive":
+        this.playSpeedEvent(now, payload, type);
         break;
       case "powerLineEnter":
         this.inPowerLine = true;
@@ -190,7 +243,7 @@ export class SurfAudio {
       case "cutback":
       case "floater":
       case "tubeTuck":
-        this.playManeuver(now, event.type);
+        this.playManeuver(now, type);
         break;
       case "trickStarted":
       case "trickStart":
@@ -208,10 +261,86 @@ export class SurfAudio {
         this.playTrick(now, "kakiTwist", true);
         break;
       case "land":
-        this.playLanding(now, payload.quality);
+        this.playLanding(now, payload.quality, payload);
+        break;
+      case "wildlifePhase":
+        this.playWildlifePhase(now, payload);
+        break;
+      case "dolphinMounted":
+      case "dolphinRide":
+        this.playAnimalMount(now, "dolphin");
+        break;
+      case "whaleMounted":
+      case "whaleRide":
+        this.playAnimalMount(now, "whale");
+        break;
+      case "animalDismount":
+        this.playAnimalDismount(now, payload);
+        break;
+      case "sharkCollision":
+        this.playSharkCollision(now);
+        break;
+      case "sharkThread":
+        this.playSharkThread(now);
+        break;
+      case "birdReaction":
+        if (["scatter", "dodge", "bank"].includes(String(payload.phase ?? "").toLowerCase())) {
+          this.noiseTick(now, 0.045, 0.026, this.effectsGain, 2200);
+          this.chirp(now + 0.02, 740, 1180, 0.08, 0.045);
+        }
+        break;
+      case "featherThread":
+        this.chirp(now, 620, 1680, 0.16, 0.095);
+        this.noiseTick(now + 0.05, 0.06, 0.03, this.effectsGain, 2600);
+        break;
+      case "courierPhase":
+        if (payload.phase === "carry" || payload.phase === "drop") {
+          this.chirp(now, payload.phase === "drop" ? 440 : 660, payload.phase === "drop" ? 1320 : 1100, 0.11, 0.06);
+        }
+        break;
+      case "aircraftDropPhase":
+        if (payload.phase === "approach" || payload.phase === "drop") {
+          this.tone(now, payload.phase === "drop" ? 880 : 176, 0.14, "triangle", 0.055, this.effectsGain, payload.phase === "drop" ? 1320 : 264);
+        }
+        break;
+      case "racePhase":
+        if (payload.phase === "racing") this.chirp(now, 196, 587, 0.16, 0.08);
+        else if (payload.phase === "won") this.chirp(now, 392, 1175, 0.2, 0.11);
+        else if (payload.phase === "lost") this.tone(now, 294, 0.16, "triangle", 0.045, this.effectsGain, 220);
+        break;
+      case "speedboatRaceWon":
+        this.chirp(now, 523, 1568, 0.18, 0.1);
+        break;
+      case "foamGateCleared":
+        this.tone(now, 784 + Math.min(3, Number(payload.value ?? 1)) * 110, 0.1, "sine", 0.075, this.effectsGain, 1175);
+        break;
+      case "foamGateSeriesCompleted":
+        this.chirp(now, 523, 1760, 0.22, 0.12);
+        break;
+      case "powerupPhase":
+        this.playPowerupPhase(now, payload);
+        break;
+      case "powerupCollected":
+        this.playPowerup(now, payload, "collected");
+        break;
+      case "powerupConsumed":
+        this.playPowerup(now, payload, "consumed");
+        break;
+      case "powerupExpired":
+        this.playPowerup(now, payload, "expired");
+        break;
+      case "trafficSpawned":
+      case "trafficPhase":
+        this.playTrafficEvent(now, payload);
+        break;
+      case "carrierPhase":
+        this.playCarrierPhase(now, payload.phase);
+        break;
+      case "fleetAirshowCompleted":
+        this.playFleetAirshow(now, payload);
         break;
       case "wipeout":
-        this.noiseBurst(now, 0.34, 0.26);
+        this.noiseBurst(now, 0.34, 0.26, "lowpass", 980, 260);
         this.tone(now, 160, 0.33, "square", 0.11, this.effectsGain, 52);
         break;
       case "combo":
@@ -245,16 +374,192 @@ export class SurfAudio {
     if (completed) this.tone(time + 0.06, cue.accent, 0.1, "triangle", volume * 0.62, this.effectsGain, cue.accent * 1.2);
   }
 
-  playLanding(time, quality = "clean") {
+  playDirectionChange(time, payload) {
+    const direction = Math.sign(Number(payload.to ?? payload.direction ?? 1)) || 1;
+    const speed = clamp(Number(payload.speed ?? payload.velocity ?? 70), 0, 150);
+    const turnForce = clamp(Math.abs(Number(payload.turnForce ?? payload.strength ?? 0.6)), 0, 1);
+    const start = direction > 0 ? 294 : 392;
+    const bottom = direction > 0 ? 196 : 247;
+    const finish = direction > 0 ? 587 : 494;
+    this.tone(time, start, 0.11 + turnForce * 0.05, "triangle", 0.085, this.effectsGain, bottom);
+    this.tone(time + 0.075, bottom, 0.13, "square", 0.07, this.effectsGain, finish);
+    this.noiseBurst(time, 0.08 + speed / 1200, 0.025 + speed / 1800, "highpass", 1450, 2800);
+    if (payload.switch || payload.switchStance) {
+      this.tone(time + 0.15, 740, 0.075, "sine", 0.055, this.effectsGain, 988);
+    }
+  }
+
+  playSpeedEvent(time, payload, type) {
+    const tier = clamp(Number(payload.tier ?? payload.speedTier ?? 3), 0, 5);
+    const strength = clamp(Number(payload.strength ?? payload.drive ?? payload.potential ?? tier / 5), 0, 1);
+    const downhill = type === "downhill" || type === "downhillDrive";
+    const start = downhill ? 118 + strength * 48 : 180 + tier * 34;
+    const end = downhill ? 360 + strength * 420 : start * 1.65;
+    this.noiseBurst(time, 0.12 + strength * 0.1, 0.022 + strength * 0.04, "highpass", 720 + tier * 150, 2600 + tier * 230);
+    this.tone(time, start, 0.1 + strength * 0.08, "triangle", 0.055 + strength * 0.035, this.effectsGain, end);
+  }
+
+  playWildlifePhase(time, payload) {
+    const kind = normalizeWorldKind(payload.kind ?? payload.animal ?? payload.id);
+    const phase = String(payload.phase ?? "").toLowerCase();
+    if (kind === "dolphin") {
+      if (phase === "telegraph" || phase === "approach") {
+        this.chirp(time, 540, phase === "telegraph" ? 940 : 1180, 0.12, 0.075);
+      } else if (phase === "catchable") {
+        this.chirp(time, 660, 1480, 0.18, 0.11);
+        this.tone(time + 0.11, 1760, 0.07, "sine", 0.045, this.effectsGain, 1320);
+      } else if (phase === "depart") {
+        this.tone(time, 720, 0.12, "triangle", 0.038, this.effectsGain, 360);
+      }
+      return;
+    }
+    if (kind === "shark") {
+      if (phase === "telegraph") {
+        this.tone(time, 124, 0.24, "sawtooth", 0.105, this.effectsGain, 62);
+        this.tone(time + 0.09, 185, 0.13, "square", 0.045, this.effectsGain, 92);
+      } else if (phase === "crossing") {
+        this.noiseBurst(time, 0.2, 0.09, "bandpass", 760, 1320);
+        this.tone(time, 78, 0.18, "triangle", 0.07, this.effectsGain, 148);
+      }
+      return;
+    }
+    if (kind !== "whale") return;
+    if (phase === "distant") {
+      this.tone(time, 46, 0.48, "triangle", 0.12, this.effectsGain, 34);
+    } else if (phase === "blow") {
+      this.tone(time, 38, 0.34, "sine", 0.13, this.effectsGain, 64);
+      this.noiseBurst(time + 0.08, 0.3, 0.08, "highpass", 420, 1500);
+    } else if (phase === "breach") {
+      this.tone(time, 52, 0.42, "triangle", 0.15, this.effectsGain, 104);
+      this.noiseBurst(time + 0.12, 0.28, 0.1, "lowpass", 720, 260);
+    } else if (phase === "ramp") {
+      this.tone(time, 82, 0.3, "sine", 0.09, this.effectsGain, 220);
+    } else if (phase === "splash") {
+      this.noiseBurst(time, 0.5, 0.24, "lowpass", 920, 170);
+      this.tone(time, 58, 0.42, "triangle", 0.16, this.effectsGain, 29);
+    }
+  }
+
+  playAnimalMount(time, kind) {
+    if (kind === "whale") {
+      this.tone(time, 48, 0.28, "triangle", 0.15, this.effectsGain, 96);
+      this.chirp(time + 0.08, 196, 784, 0.22, 0.11);
+      return;
+    }
+    this.chirp(time, 440, 1568, 0.24, 0.16);
+    this.tone(time + 0.12, 988, 0.16, "sine", 0.075, this.effectsGain, 1319);
+  }
+
+  playAnimalDismount(time, payload) {
+    const kind = normalizeWorldKind(payload.kind ?? payload.animal ?? payload.reason ?? payload.id);
+    if (kind === "whale") {
+      this.tone(time, 72, 0.22, "triangle", 0.12, this.effectsGain, 210);
+      this.noiseBurst(time + 0.07, 0.18, 0.09, "lowpass", 760, 330);
+    } else {
+      this.chirp(time, 320, 1040, 0.2, 0.13);
+    }
+    this.tone(time + 0.13, 1320, 0.09, "sine", 0.06, this.effectsGain, 1760);
+  }
+
+  playSharkCollision(time) {
+    this.noiseBurst(time, 0.3, 0.24, "lowpass", 1050, 180);
+    this.tone(time, 112, 0.3, "sawtooth", 0.14, this.effectsGain, 36);
+  }
+
+  playSharkThread(time) {
+    this.tone(time, 165, 0.09, "square", 0.085, this.effectsGain, 660);
+    this.chirp(time + 0.055, 523, 1175, 0.12, 0.09);
+  }
+
+  playPowerupPhase(time, payload) {
+    const phase = String(payload.phase ?? "").toLowerCase();
+    if (phase !== "telegraph" && phase !== "available") return;
+    const cue = powerupToneFor(payload);
+    const volume = phase === "available" ? 0.055 : 0.035;
+    this.tone(time, cue.start * 1.5, 0.08, "sine", volume, this.effectsGain, cue.end * 1.25);
+  }
+
+  playPowerup(time, payload, stage) {
+    const cue = powerupToneFor(payload);
+    if (stage === "expired") {
+      this.tone(time, cue.accent, 0.2, "triangle", 0.065, this.effectsGain, cue.start * 0.7);
+      return;
+    }
+    if (stage === "consumed") {
+      this.tone(time, cue.accent, 0.13, cue.type, 0.1, this.effectsGain, cue.end);
+      this.tone(time + 0.065, cue.end, 0.09, "sine", 0.05, this.effectsGain, cue.start);
+      return;
+    }
+    this.tone(time, cue.start, 0.18, cue.type, 0.14, this.effectsGain, cue.end);
+    this.tone(time + 0.075, cue.accent, 0.13, "sine", 0.09, this.effectsGain, cue.accent * 1.5);
+    this.noiseBurst(time, 0.09, 0.045, "highpass", 1100, 3200);
+  }
+
+  playTrafficEvent(time, payload) {
+    const kind = normalizeWorldKind(payload.kind ?? payload.id);
+    const phase = String(payload.phase ?? "").toLowerCase();
+    if (kind === "bannerplane") {
+      if (!phase || phase === "approach") {
+        this.tone(time, 146, 0.22, "triangle", 0.04, this.effectsGain, 164);
+        this.tone(time + 0.1, 587, 0.09, "sine", 0.03, this.effectsGain, 784);
+      } else if (phase === "tow") {
+        this.tone(time, 330, 0.1, "triangle", 0.035, this.effectsGain, 440);
+      }
+    } else if (kind === "helicopter") {
+      this.tone(time, 88, 0.18, "square", 0.035, this.effectsGain, 92);
+      this.noiseTick(time + 0.06, 0.025, 0.018, this.effectsGain, 460);
+    } else if (kind === "propplane" || kind === "seaplane") {
+      this.tone(time, kind === "seaplane" ? 116 : 132, 0.2, "triangle", 0.03, this.effectsGain, 154);
+    } else if (kind === "cargoship") {
+      this.tone(time, 55, 0.48, "sine", 0.055, this.effectsGain, 46);
+    }
+  }
+
+  playCarrierPhase(time, phaseValue) {
+    const phase = String(phaseValue ?? "").toLowerCase();
+    if (phase === "haze") {
+      this.tone(time, 41, 0.52, "triangle", 0.07, this.effectsGain, 52);
+    } else if (phase === "arrival") {
+      this.tone(time, 55, 0.44, "sine", 0.1, this.effectsGain, 73);
+      this.tone(time + 0.2, 110, 0.25, "triangle", 0.04, this.effectsGain, 82);
+    } else if (phase === "deckactivity") {
+      this.tone(time, 440, 0.07, "sine", 0.045, this.effectsGain, 880);
+      this.tone(time + 0.12, 660, 0.07, "sine", 0.035, this.effectsGain, 990);
+    } else if (phase === "launch") {
+      this.noiseBurst(time, 0.32, 0.08, "highpass", 520, 2800);
+      this.tone(time, 82, 0.32, "sawtooth", 0.08, this.effectsGain, 440);
+    } else if (phase === "airshow") {
+      this.chirp(time, 220, 880, 0.24, 0.12);
+      this.tone(time + 0.12, 1175, 0.18, "triangle", 0.075, this.effectsGain, 1760);
+    } else if (phase === "depart") {
+      this.tone(time, 164, 0.36, "triangle", 0.06, this.effectsGain, 55);
+    }
+  }
+
+  playFleetAirshow(time, payload) {
+    const success = payload.reason === "success" || Number(payload.value) > 0 || payload.success === true;
+    if (!success) {
+      this.tone(time, 330, 0.22, "triangle", 0.055, this.effectsGain, 147);
+      return;
+    }
+    this.chirp(time, 262, 1047, 0.3, 0.15);
+    this.tone(time + 0.11, 1319, 0.16, "square", 0.09, this.effectsGain, 2093);
+    this.tone(time + 0.22, 2637, 0.15, "sine", 0.065, this.effectsGain, 2093);
+  }
+
+  playLanding(time, quality = "clean", payload = EMPTY_EVENT_PAYLOAD) {
     if (quality === "perfect") {
       this.chirp(time, 330, 990, 0.2, 0.2);
       this.tone(time + 0.08, 1320, 0.08, "square", 0.08, this.effectsGain);
-    } else if (quality === "wobble" || quality === "sketchy") {
+      this.noiseBurst(time, 0.065, 0.045, "highpass", 1200, 2600);
+    } else if (quality === "wobble" || quality === "sketchy" || quality === "rough") {
       this.tone(time, 115, 0.14, "sawtooth", 0.1, this.effectsGain, 82);
-      this.noiseBurst(time, 0.1, 0.08);
+      this.noiseBurst(time, 0.13, 0.1, "lowpass", 820, 230);
     } else {
       this.tone(time, 280, 0.11, "square", 0.13, this.effectsGain, 440);
+      this.noiseBurst(time, 0.075, 0.05, "bandpass", 620, 900);
     }
+    if (payload.switch || payload.switchLanding) this.tone(time + 0.12, 698, 0.07, "sine", 0.045, this.effectsGain, 1047);
   }
 
   tone(time, frequency, duration, type, volume, destination, endFrequency = frequency) {
@@ -277,32 +582,44 @@ export class SurfAudio {
     this.tone(time + 0.025, start * 1.5, duration * 0.72, "triangle", volume * 0.42, this.effectsGain, end * 1.5);
   }
 
-  noiseTick(time, duration, volume) {
-    if (!this.context || !this.musicGain || this.destroyed) return;
+  noiseTick(time, duration, volume, destination = this.musicGain, frequency = null) {
+    if (!this.context || !destination || this.destroyed) return;
     const oscillator = this.context.createOscillator();
     const gain = this.context.createGain();
     oscillator.type = "square";
-    oscillator.frequency.setValueAtTime(1800 + (this.beatIndex % 3) * 420, time);
+    oscillator.frequency.setValueAtTime(frequency ?? 1800 + (this.beatIndex % 3) * 420, time);
     gain.gain.setValueAtTime(Math.max(0.0001, volume), time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-    oscillator.connect(gain).connect(this.musicGain);
+    oscillator.connect(gain).connect(destination);
     oscillator.start(time);
     oscillator.stop(time + duration);
   }
 
-  noiseBurst(time, duration, volume) {
+  noiseBurst(time, duration, volume, filterType = "", startFrequency = 1200, endFrequency = startFrequency) {
     if (!this.context || !this.effectsGain || this.destroyed) return;
-    const length = Math.floor(this.context.sampleRate * duration);
-    const buffer = this.context.createBuffer(1, length, this.context.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let index = 0; index < length; index += 1) data[index] = (Math.random() * 2 - 1) * (1 - index / length);
+    this.createEffectNoiseBuffer();
+    if (!this.effectNoiseBuffer) return;
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     gain.gain.setValueAtTime(Math.max(0.0001, volume), time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-    source.buffer = buffer;
-    source.connect(gain).connect(this.effectsGain);
-    source.start(time);
+    source.buffer = this.effectNoiseBuffer;
+    source.connect(gain);
+    if (filterType && this.context.createBiquadFilter) {
+      const filter = this.context.createBiquadFilter();
+      filter.type = filterType;
+      filter.Q.value = filterType === "bandpass" ? 1.2 : 0.7;
+      filter.frequency.setValueAtTime(Math.max(20, startFrequency), time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), time + duration);
+      gain.connect(filter).connect(this.effectsGain);
+    } else {
+      gain.connect(this.effectsGain);
+    }
+    const availableOffset = Math.max(0, this.effectNoiseBuffer.duration - duration - 0.01);
+    const offset = availableOffset > 0 ? (this.noiseCursor * 0.173) % availableOffset : 0;
+    this.noiseCursor += 1;
+    source.start(time, offset);
+    source.stop(time + duration + 0.01);
   }
 
   setVisibility(hidden) {
@@ -325,6 +642,7 @@ export class SurfAudio {
     this.effectsGain = null;
     this.musicGain = null;
     this.master = null;
+    this.effectNoiseBuffer = null;
     this.context = null;
     if (context && context.state !== "closed") {
       try { context.close()?.catch?.(() => {}); } catch {}
@@ -347,4 +665,15 @@ function normalizeCueId(id) {
   if (value.includes("tube")) return "tubeTuck";
   if (value.includes("snap")) return "snap";
   return "frontRail";
+}
+
+function normalizeWorldKind(kind) {
+  return String(kind ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function powerupToneFor(payload) {
+  const kind = normalizeWorldKind(payload.kind ?? payload.powerup ?? payload.id);
+  if (kind.includes("moonpop") || kind.includes("moon")) return POWERUP_TONES.moonPop;
+  if (kind.includes("starfoam") || kind.includes("star")) return POWERUP_TONES.starFoam;
+  return POWERUP_TONES.mangoRush;
 }

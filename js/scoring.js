@@ -32,6 +32,7 @@ export class ScoreSystem {
     };
     this.bestChain = 1;
     this.flow = 0;
+    this.flowPeak = 0;
     this.lastCarveSign = 0;
     this.carveCooldown = 0;
     this.provisionalAerial = null;
@@ -64,8 +65,9 @@ export class ScoreSystem {
       const pocket = (risk - SCORE.pocketStart) / (1 - SCORE.pocketStart);
       this.add("pocket", SCORE.pocketMax * pocket * dt * 30 * scales.pocket, multiplier);
     }
-    this.flow = clamp(this.flow + dt * flowScale * scales.flow - dt * 0.055, 0, 1);
-    this.comboHeat = Math.max(0, this.comboHeat - dt * 0.08);
+    const stalling = speed < 52 ? 0.12 : 0;
+    const delta = dt * (flowScale * scales.flow - 0.055 - stalling);
+    this.addFlow(delta);
     this.carveCooldown = Math.max(0, this.carveCooldown - dt);
   }
 
@@ -74,7 +76,7 @@ export class ScoreSystem {
     if (!sign || sign === this.lastCarveSign || this.carveCooldown > 0) return null;
     this.lastCarveSign = sign;
     this.carveCooldown = 0.18;
-    this.bumpCombo(0.08);
+    this.addFlow(0.08);
     this.add("carves", SCORE.carvePoints, multiplier);
     return sign < 0 ? "HIGH LINE" : "POWER CARVE";
   }
@@ -145,14 +147,12 @@ export class ScoreSystem {
     this.add("style", result.buckets.style);
     this.add("landings", result.buckets.landings);
 
-    if (quality === "perfect") {
-      this.bumpCombo(0.34);
-    } else if (quality === "clean") {
-      this.bumpCombo(0.2);
-    } else {
-      this.comboHeat *= 0.55;
-      this.bumpCombo(0.05);
+    const landingFlow = quality === "perfect" ? 0.34 : quality === "clean" ? 0.2 : 0.05;
+    if (quality === "wobble" || quality === "sketchy") {
+      this.flow *= 0.55;
     }
+    this.addFlow(landingFlow * (0.4 + decay * 0.6));
+    if (decay < 1) this.addFlow(-(1 - decay) * 0.38);
 
     this.pushHistory(result.signature);
     this.provisionalAerial = null;
@@ -162,7 +162,7 @@ export class ScoreSystem {
 
   registerManeuver({ points, multiplier = 1, bucket = "maneuvers", combo = 0.07 } = {}) {
     const awarded = this.add(bucket, Math.max(0, Number(points) || 0), multiplier);
-    if (awarded > 0) this.bumpCombo(combo);
+    if (awarded > 0) this.addFlow(combo);
     return awarded;
   }
 
@@ -173,7 +173,7 @@ export class ScoreSystem {
       seconds * 58 * (1 + clamp(Number(risk) || 0, 0, 1) * 0.55),
       multiplier,
     );
-    if (awarded > 0) this.bumpCombo(seconds * 0.025);
+    if (awarded > 0) this.addFlow(seconds * 0.025);
     return awarded;
   }
 
@@ -181,13 +181,32 @@ export class ScoreSystem {
     this.combo = 1;
     this.comboHeat = 0;
     this.flow *= 0.25;
+    this.syncCombo();
     this.provisionalAerial = null;
     this.pendingLaunchPotential = 0;
   }
 
   bumpCombo(amount) {
-    this.comboHeat = clamp(this.comboHeat + amount, 0, 1);
-    this.combo = clamp(1 + this.comboHeat * 3.2, 1, SCORE.comboMax);
+    return this.addFlow(amount);
+  }
+
+  addFlow(amount) {
+    this.flow = clamp(this.flow + (Number(amount) || 0), 0, 1);
+    this.flowPeak = Math.max(this.flowPeak, this.flow);
+    this.syncCombo();
+    return this.flow;
+  }
+
+  registerDirectionChange({ speed = 0, turnForce = 0, switchStance = false } = {}) {
+    const speedFactor = clamp((Number(speed) - 42) / 102, 0, 1);
+    const force = clamp(Number(turnForce) || 0, 0, 1);
+    this.addFlow(0.045 + speedFactor * 0.055 + force * 0.045 + Number(switchStance) * 0.025);
+    return this.flow;
+  }
+
+  syncCombo() {
+    this.comboHeat = this.flow;
+    this.combo = clamp(1 + this.flow * (SCORE.comboMax - 1), 1, SCORE.comboMax);
     this.bestChain = Math.max(this.bestChain, this.combo);
   }
 

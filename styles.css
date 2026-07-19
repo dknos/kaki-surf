@@ -1313,3 +1313,96 @@ input[type="range"]::-moz-range-thumb {
   transform: rotate(-7deg);
   box-shadow: inset -7px 0 var(--board-accent);
 }
+
+/* Generated production ornaments retain code/CSS fallbacks if a PNG is ever
+   unavailable, but take over when the checked-in atlases resolve. */
+.board-card .board-art {
+  left: 8px;
+  top: 36px;
+  width: 64px;
+  height: 24px;
+  border: 0;
+  clip-path: none;
+  background-color: transparent;
+  background-image: url("./assets/generated/boards-atlas.png");
+  background-repeat: no-repeat;
+  background-size: 256px 72px;
+  image-rendering: pixelated;
+  box-shadow: none;
+  transform: rotate(-8deg) scale(1.16);
+}
+
+.board-card .board-art--puff { background-position: 0 0; }
+.board-card .board-art--fish { background-position: 0 -24px; }
+.board-card .board-art--log { background-position: 0 -48px; }
+.board-card .board-art i,
+.board-card .board-art em { display: none; }
+
+.title-wave {
+  width: 80px;
+  height: 52px;
+  border: 0;
+  background: transparent url("./assets/generated/ui-ornaments-atlas.png") 0 0 / 320px 104px no-repeat;
+  image-rendering: pixelated;
+}
+
+.rank-badge {
+  width: 80px;
+  height: 52px;
+  border: 0;
+  background-color: transparent;
+  background-image: url("./assets/generated/ui-ornaments-atlas.png");
+  background-position: -240px -52px;
+  background-size: 320px 104px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  box-shadow: none;
+  text-shadow: 2px 2px 0 var(--ink);
+}
+
+.touch-actions {
+  width: 244px;
+  height: 132px;
+}
+
+.touch-actions .touch-action,
+.touch-actions [data-control="edge"] {
+  right: 0;
+  bottom: 4px;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+}
+
+.touch-actions .touch-trick {
+  right: 82px;
+  bottom: 7px;
+  left: auto;
+  top: auto;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+}
+
+.touch-actions .touch-special {
+  right: 54px;
+  top: 0;
+  width: 58px;
+  height: 42px;
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.touch-actions .touch-spin {
+  bottom: 5px;
+  width: 40px;
+  height: 40px;
+  opacity: 0.86;
+}
+
+.touch-actions .touch-spin--left { left: 0; top: auto; }
+.touch-actions .touch-spin--right { left: 42px; top: auto; }
+
+#kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin span::after {
+  content: " TRICK";
+}

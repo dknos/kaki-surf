@@ -1,6 +1,6 @@
 # Kaki Surf offline art pipeline
 
-The environment art is produced offline and checked into the static game as compact local PNG files. Image generation and Blender are reference/source tools only; neither is called by the browser at runtime.
+Environment art and modular sprite sheets are produced offline and checked into the static game as compact local PNG files. Image generation and Blender are reference/source tools only; neither is called by the browser at runtime.
 
 ## Generated environment sources
 
@@ -87,6 +87,34 @@ The case-sensitive output names intentionally match the condition IDs used by th
 
 The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. The live gameplay wave remains a separate layer and stays readable over the scenic strip.
 
+## Grok modular atlas build
+
+Eleven modular source families were generated with the local Grok Imagine workflow at 1280 x 720, visually reviewed at source and atlas size, and preserved without modification under `docs/art-source/grok`. Corrected second passes were selected for the wave-breaker, birds, and UI-ornament families; the rejected UI first pass is also preserved for auditability. The rejected first wave and bird outputs were not promoted into the repository.
+
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source name, 4 x 2 or 4 x 3 grid, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta, extracts and tightly crops each cell, reduces with Lanczos, thresholds alpha, quantizes and sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`.
+
+```console
+python3 tools/art/build-grok-assets.py
+```
+
+Outputs are the 11 PNGs under `assets/generated`:
+
+| Family | Atlas dimensions |
+| --- | ---: |
+| Wave breaker | 288 x 128 |
+| Dolphin | 224 x 80 |
+| Shark | 224 x 72 |
+| Whale | 352 x 108 |
+| Birds | 136 x 48 |
+| Boats | 256 x 68 |
+| Air traffic | 288 x 64 |
+| Powerups | 96 x 48 |
+| Boards | 256 x 72 |
+| Carrier | 384 x 100 |
+| UI ornaments | 320 x 104 |
+
+The source sheets, SHA-256 values, selected/rejected decisions, and every Grok prompt are in [Grok asset provenance](./GROK-ASSET-PROVENANCE.md). The runtime/frame mapping is in [Asset manifest](./ASSET-MANIFEST.md).
+
 ## Blender wave/curl study
 
 `tools/blender/build-wave-reference.py` builds a fully procedural orthographic Eevee scene with a readable side silhouette, layered face bands, foam crown, barrel pocket, gold power-seam guide, directional spray arcs, droplets, toon lighting, and dark line work. It saves both the editable source and a 768 x 432 reference render.
@@ -110,10 +138,10 @@ Generated reference files:
 
 ## Runtime policy
 
-- The browser may load the compact files under `assets/backgrounds`; it must never read the Codex generated-image store.
-- Each strip is optional presentation: a failed image uses the code-authored fallback, and High Contrast intentionally bypasses the raster strip for palette-safe readability.
+- The browser may load the compact files under `assets/backgrounds` and `assets/generated`; it must never read a Grok session store or other authoring cache.
+- Each background and atlas family is optional presentation. A failed or dimension-invalid image uses its code-authored fallback without suppressing unrelated families; High Contrast may bypass raster background art for palette-safe readability.
 - Menu backgrounds may be preloaded for CSS/cache use, but a missing menu image must not block launch or gameplay.
 - `docs/art-source/blender` is offline source/reference material and is never gameplay geometry, collision truth, or a runtime dependency.
-- The canonical wave surface, power seam, curl risk, and momentum remain simulation-owned. Art consumes those semantics and cannot redefine them.
+- The canonical ride surface, fast-line guidance, slope drive, curl risk, signed world travel, wildlife/powerup phases, and Flow remain simulation-owned. Art consumes those semantics and cannot redefine them.
 - No image-generation API, Blender executable, remote asset host, or build server is required at runtime.
 - Source generation is curated: generated pixels are cropped, reduced, palette-checked, visually reviewed, and rebuilt through a checked-in script before use.
