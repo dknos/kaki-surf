@@ -8,11 +8,12 @@ const PARTICLE_COUNT = 176;
 const CALLOUT_COUNT = 4;
 
 export class KakiRenderer {
-  constructor(canvas, settings) {
+  constructor(canvas, settings, visualAssets = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
     this.ctx.imageSmoothingEnabled = false;
     this.settings = settings;
+    this.visualAssets = visualAssets;
     this.palette = settings.highContrast ? PALETTES.contrast : PALETTES.standard;
     this.conditionId = "goldenCoast";
     this.currentBoard = null;
@@ -53,6 +54,13 @@ export class KakiRenderer {
       case "powerLineEnter":
         this.spawnSeamGlints(player.x, ridingY, 9);
         if (String(this.settings.waveReadAssist ?? "full").toLowerCase() === "full") this.pushCallout("POWER LINE", "RELEASE INTO FLOW", "perfect");
+        break;
+      case "fullPower":
+        this.spawnSeamGlints(player.x, ridingY, 18);
+        this.spawnSpray(player.x - 9, ridingY, 12, 1.35);
+        this.impact = Math.max(this.impact, 0.9);
+        if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.055);
+        this.pushCallout("FULL POWER", "THE LINE IS LOADED", "perfect");
         break;
       case "powerLineLeave":
         this.spawnSpray(player.x - 8, ridingY, 4, 0.55);
@@ -192,6 +200,7 @@ export class KakiRenderer {
     ctx.translate(0, cameraY);
     this.drawBackWater(simulation);
     this.drawWave(simulation);
+    this.drawMaxSpeedFeedback(simulation);
     this.drawImpactCavity(simulation);
     this.drawParticles(false);
     this.drawSurfer(simulation, alpha);
@@ -212,6 +221,7 @@ export class KakiRenderer {
   drawSky(simulation) {
     const ctx = this.ctx;
     const p = this.palette;
+    if (this.drawBackgroundAsset()) return;
     if (this.conditionId === "twilightGlass") {
       this.drawTwilightSky(simulation);
       return;
@@ -239,6 +249,14 @@ export class KakiRenderer {
     drawSteppedHill(ctx, 250 - islandShift * 0.04, 73, 152, 12);
     drawPalm(ctx, 42 - islandShift * 0.08, 61, p.deepInk, p.distant);
     drawBirds(ctx, 116 - islandShift * 0.025, 31, p.deepInk, 3);
+  }
+
+  drawBackgroundAsset() {
+    if (this.settings.highContrast) return false;
+    const image = this.visualAssets?.backgrounds?.[this.conditionId];
+    if (!image?.complete || !(image.naturalWidth > 0)) return false;
+    this.ctx.drawImage(image, 0, 0, LOGICAL_WIDTH, 80);
+    return true;
   }
 
   drawTwilightSky(simulation) {
@@ -292,20 +310,70 @@ export class KakiRenderer {
   drawBackWater(simulation) {
     const ctx = this.ctx;
     const p = this.palette;
+    const player = simulation.player;
+    const speedCap = rideSpeedCapFor(simulation);
+    const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
+    const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
     ctx.fillStyle = p.waterDeep;
     ctx.fillRect(0, 78, LOGICAL_WIDTH, LOGICAL_HEIGHT - 78);
-    const shift = Math.floor(simulation.wave.travel * 0.14) % 28;
-    ctx.fillStyle = this.conditionId === "twilightGlass" ? p.violet : this.conditionId === "stormbreak" ? p.foamShade : p.waterLight;
-    for (let row = 0; row < 4; row += 1) {
-      const y = 84 + row * 8;
-      for (let x = -32 + shift + row * 9; x < LOGICAL_WIDTH; x += 42) {
-        ctx.fillRect(x, y, 12 + (row % 2) * 5, 1);
+
+    const clock = this.settings.reducedMotion ? 0 : simulation.wave.travel + this.time * (6 + speedRatio * 18);
+    const horizonColor = this.conditionId === "twilightGlass" ? p.violet : this.conditionId === "stormbreak" ? p.foamShade : p.crest;
+    ctx.fillStyle = horizonColor;
+    for (let segment = 0; segment < 18; segment += 1) {
+      const length = 7 + ((segment * 11 + 5) % 19);
+      const x = Math.round(((segment * 31 - clock * 0.018) % 430 + 430) % 430) - 24;
+      const y = 79 + ((segment * 7) % 3);
+      ctx.fillRect(x, y, length, 1);
+      if (segment % 4 === 0) ctx.fillRect(x + 3, y - 1, Math.max(2, length - 8), 1);
+    }
+
+    for (let row = 0; row < 6; row += 1) {
+      const baseY = 86 + row * 9;
+      const rowClock = clock * (0.026 + row * 0.006);
+      ctx.fillStyle = row < 2 ? p.waterLight : row < 4 ? p.water : p.crest;
+      for (let segment = 0; segment < 10; segment += 1) {
+        const x = Math.round(((segment * 53 + row * 19 - rowClock) % 470 + 470) % 470) - 46;
+        const length = 10 + ((segment * 13 + row * 17) % 27) + Math.round(momentum * 7);
+        const step = ((segment * 5 + row * 3) % 5) - 2;
+        ctx.fillRect(x, baseY + step, length, 1);
+        if ((segment + row) % 3 === 0) ctx.fillRect(x + 4, baseY + step + 2, Math.max(3, length - 11), 1);
       }
     }
   }
 
   drawWave(simulation) {
     drawLayeredWave(this.ctx, simulation, this.palette, this.settings, this.time, this.conditionId);
+  }
+
+  drawMaxSpeedFeedback(simulation) {
+    const player = simulation.player;
+    const speedCap = rideSpeedCapFor(simulation);
+    const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
+    const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
+    const intensity = smoothstep(0.68, 0.98, speedRatio) * smoothstep(0.28, 0.92, momentum);
+    if (intensity <= 0.03 || player?.state === "complete") return;
+
+    const ctx = this.ctx;
+    const p = this.palette;
+    const reduced = this.settings.reducedMotion;
+    const fullPower = speedRatio >= 0.94 && momentum >= 0.86;
+    const streakCount = reduced ? 5 : 7 + Math.round(intensity * 7);
+    const phase = reduced ? 0 : Math.floor((simulation.wave.travel * 0.7 + this.time * 44) % 83);
+    ctx.save();
+    ctx.globalAlpha = 0.34 + intensity * 0.52;
+    for (let index = 0; index < streakCount; index += 1) {
+      const lane = (index * 5 + 2) % 13;
+      const y = 92 + lane * 8 + ((index * 7) % 3);
+      const travel = (index * 61 + phase * (1 + index % 3)) % 470;
+      const x = LOGICAL_WIDTH - travel;
+      const length = 9 + ((index * 17) % 22) + Math.round(intensity * 16);
+      ctx.fillStyle = fullPower && index % 4 === 0 ? p.gold : index % 3 === 0 ? p.foam : p.crest;
+      ctx.fillRect(x, y, length, 1);
+      ctx.fillRect(x + Math.round(length * 0.28), y + 2, Math.max(3, Math.round(length * 0.52)), 1);
+      if (fullPower && index % 3 === 0) ctx.fillRect(x + length - 3, y - 1, 2, 1);
+    }
+    ctx.restore();
   }
 
   drawImpactCavity(simulation) {
@@ -408,11 +476,14 @@ export class KakiRenderer {
     const multiplier = simulation.currentMultiplier();
     const player = simulation.player;
     const guide = player.speedPotential ?? waveGuideAt(simulation.wave, player, simulation.board);
+    const speedCap = rideSpeedCapFor(simulation);
     const speedTier = flowTierFor(player, simulation);
 
     panel(ctx, 5, 5, 90, 19, p.deepInk, p.waterDeep);
     drawPixelText(ctx, "SCORE", 10, 9, { color: p.foamShade, shadow: p.ink });
     drawPixelText(ctx, score, 89, 9, { scale: 2, spacing: 1, align: "right", color: p.white, shadow: p.ink });
+
+    this.drawPowerMeter(player, speedCap);
 
     panel(ctx, 166, 5, 52, 19, p.deepInk, p.waterDeep);
     drawPixelText(ctx, `${seconds}`, 192, 9, { scale: 2, spacing: 1, align: "center", color: seconds <= 10 ? p.danger : p.sun, shadow: p.ink });
@@ -450,6 +521,28 @@ export class KakiRenderer {
       drawPixelText(ctx, "ASSIST", 270, 198, { align: "center", color: p.foamShade, shadow: p.ink });
     }
     this.drawTeachingOverlay(simulation, guide);
+  }
+
+  drawPowerMeter(player, speedCap) {
+    const ctx = this.ctx;
+    const p = this.palette;
+    const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
+    const speedRatio = clamp(Number(player?.speed ?? 0) / Math.max(1, speedCap), 0, 1);
+    const fullPower = momentum >= 0.9;
+    panel(ctx, 101, 5, 58, 19, p.deepInk, p.waterDeep);
+    drawPixelText(ctx, "POWER", 106, 8, { color: fullPower ? p.gold : p.foamShade, shadow: p.ink });
+    ctx.fillStyle = p.ink;
+    ctx.fillRect(106, 17, 48, 4);
+    ctx.fillStyle = fullPower ? p.gold : momentum >= 0.55 ? p.crest : p.foamShade;
+    ctx.fillRect(107, 18, Math.round(46 * momentum), 2);
+    const speedMarker = 107 + Math.round(45 * speedRatio);
+    ctx.fillStyle = p.white;
+    ctx.fillRect(speedMarker, 16, 2, 6);
+    if (fullPower) {
+      ctx.fillStyle = p.gold;
+      ctx.fillRect(153, 8, 2, 2);
+      ctx.fillRect(152, 9, 4, 1);
+    }
   }
 
   drawAerialHud(simulation) {
@@ -931,6 +1024,14 @@ function paletteForCondition(conditionId) {
   if (conditionId === "twilightGlass") return PALETTES.twilightGlass ?? PALETTES.standard;
   if (conditionId === "stormbreak") return PALETTES.stormbreak ?? PALETTES.standard;
   return PALETTES.standard;
+}
+
+function rideSpeedCapFor(simulation) {
+  const published = Number(simulation?.currentRideSpeedCap?.());
+  if (Number.isFinite(published) && published > 0) return published;
+  const tuningMax = Number(simulation?.tuning?.maxSpeed ?? TUNING.maxSpeed);
+  const boardMax = Number(simulation?.board?.maxSpeed ?? 1);
+  return Math.max(1, tuningMax * boardMax);
 }
 
 function flowTierFor(player, simulation) {

@@ -1217,3 +1217,99 @@ input[type="range"]::-moz-range-thumb {
     animation-duration: 0.001ms !important;
   }
 }
+
+/* Native-pixel presentation and authored condition art. */
+.stage-frame > canvas,
+.scanlines {
+  width: 384px;
+  height: 216px;
+  aspect-ratio: auto;
+}
+
+.scanlines {
+  display: none;
+}
+
+@media (min-width: 768px) and (min-height: 432px) {
+  .stage-frame > canvas,
+  .scanlines {
+    width: 768px;
+    height: 432px;
+  }
+}
+
+@media (min-width: 1152px) and (min-height: 648px) {
+  .stage-frame > canvas,
+  .scanlines {
+    width: 1152px;
+    height: 648px;
+  }
+}
+
+@media (min-width: 1536px) and (min-height: 864px) {
+  .stage-frame > canvas,
+  .scanlines {
+    width: 1536px;
+    height: 864px;
+  }
+}
+
+@media (max-width: 383px), (max-height: 431px) {
+  .stage-frame > canvas,
+  .scanlines {
+    width: min(100vw, 177.7778svh);
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+}
+
+.title-layer {
+  background-color: #0d1025;
+  background-image:
+    linear-gradient(rgb(9 13 33 / 30%), rgb(9 13 33 / 82%)),
+    url("./assets/backgrounds/goldenCoast-menu.png");
+  background-position: center;
+  background-size: cover;
+  image-rendering: pixelated;
+}
+
+#kaki-surf-root[data-condition="twilightGlass"] .title-layer {
+  background-image:
+    linear-gradient(rgb(9 9 28 / 28%), rgb(9 9 28 / 84%)),
+    url("./assets/backgrounds/twilightGlass-menu.png");
+}
+
+#kaki-surf-root[data-condition="stormbreak"] .title-layer {
+  background-image:
+    linear-gradient(rgb(6 11 20 / 24%), rgb(6 11 20 / 86%)),
+    url("./assets/backgrounds/stormbreak-menu.png");
+}
+
+.condition-card > span {
+  border: 2px solid var(--ink);
+  background-position: center;
+  background-size: cover;
+  image-rendering: pixelated;
+}
+
+.condition-card--goldenCoast > span {
+  background-image: url("./assets/backgrounds/goldenCoast-menu.png");
+}
+
+.condition-card--twilightGlass > span {
+  background-image: url("./assets/backgrounds/twilightGlass-menu.png");
+}
+
+.condition-card--stormbreak > span {
+  background-image: url("./assets/backgrounds/stormbreak-menu.png");
+}
+
+.board-card,
+.condition-card {
+  backdrop-filter: none;
+}
+
+.board-art {
+  transform: rotate(-7deg);
+  box-shadow: inset -7px 0 var(--board-accent);
+}

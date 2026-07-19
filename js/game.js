@@ -40,6 +40,7 @@ export class KakiSurfGame {
     onExit = null,
     onRunComplete = null,
     qaScene = null,
+    visualAssets = null,
   }) {
     this.host = host;
     this.storage = storage;
@@ -62,12 +63,13 @@ export class KakiSurfGame {
     this.host.innerHTML = gameMarkup();
     this.elements = collectElements(host);
     this.simulation = new SurfSimulation({ tuning: TUNING });
-    this.renderer = new KakiRenderer(this.elements.canvas, this.settings);
+    this.renderer = new KakiRenderer(this.elements.canvas, this.settings, visualAssets);
     this.ownsInput = !externalInput;
     this.input = externalInput ?? new InputManager({ touchRoot: this.elements.touchControls });
     this.audio = externalAudio ?? new SurfAudio(this.settings);
     this.selectedBoard = BOARDS[this.save.selectedBoard] ? this.save.selectedBoard : "foamPuff";
     this.selectedCondition = CONDITIONS[this.save.selectedCondition] ? this.save.selectedCondition : "goldenCoast";
+    this.host.dataset.condition = this.selectedCondition;
     this.bindUI();
     this.buildBoardCards();
     this.buildConditionCards();
@@ -369,6 +371,7 @@ export class KakiSurfGame {
   selectCondition(conditionId) {
     if (!CONDITIONS[conditionId]) return;
     this.selectedCondition = conditionId;
+    this.host.dataset.condition = conditionId;
     this.simulation.condition = CONDITIONS[conditionId];
     this.save.selectedCondition = conditionId;
     this.elements.conditionGrid.querySelectorAll("[data-condition]").forEach((button) => {
@@ -487,6 +490,7 @@ export class KakiSurfGame {
     if (scene === "menu") {
       this.selectedBoard = "foamPuff";
       this.selectedCondition = "goldenCoast";
+      this.host.dataset.condition = this.selectedCondition;
       this.buildBoardCards();
       this.buildConditionCards();
       this.updateMenuStats();
@@ -498,6 +502,7 @@ export class KakiSurfGame {
 
     if (scene === "results") {
       this.selectedCondition = "goldenCoast";
+      this.host.dataset.condition = this.selectedCondition;
       this.state = "results";
       this.renderResults({
         score: 18420,
@@ -522,6 +527,7 @@ export class KakiSurfGame {
     const conditionId = CONDITIONS[scene] ? scene : "goldenCoast";
     const boardId = scene === "maxSpeed" || scene === "tailGrab" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff";
     this.selectedCondition = conditionId;
+    this.host.dataset.condition = conditionId;
     this.selectedBoard = boardId;
     this.simulation.reset({ board: boardId, condition: conditionId, assists: { steering: false, landing: false } });
     this.simulation.condition = CONDITIONS[conditionId];
@@ -601,15 +607,18 @@ export class KakiSurfGame {
 
     switch (scene) {
       case "powerLine":
-        player.speed = 106;
+        player.waveMomentum = 0.82;
+        player.speed = Math.max(106, Math.round(this.simulation.currentRideSpeedCap?.() * 0.84 || 106));
         player.flowTier = "FLOWING";
         player.powerLine = true;
         this.renderer.onEvent({ type: "powerLineEnter", payload: { potential: 1 } }, this.simulation);
         break;
       case "maxSpeed":
-        player.speed = 151;
+        player.waveMomentum = 1;
+        player.speed = Math.round((this.simulation.currentRideSpeedCap?.() ?? this.simulation.tuning.maxSpeed * this.simulation.board.maxSpeed) * 0.985);
         player.flowTier = "MAX FLOW";
         player.powerLine = true;
+        this.renderer.onEvent({ type: "fullPower", payload: { momentum: 1 } }, this.simulation);
         break;
       case "pumpCompression":
         player.compression = 1;
