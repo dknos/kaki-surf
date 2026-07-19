@@ -2,7 +2,7 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { drawPixelText } from "./pixel-font.js";
 import { drawBoardSprite, drawBoardWake, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
-import { drawLayeredWave, waveGuideAt, waveVisualTravel } from "./wave-visuals.js";
+import { drawLayeredWave, waveGuideAt, waveSurfaceTravel, waveVisualTravel } from "./wave-visuals.js";
 import {
   drawActivePowerupHud,
   drawAtlasFrame,
@@ -14,7 +14,8 @@ import {
 } from "./world-visuals.js";
 
 const PARTICLE_COUNT = 176;
-const CALLOUT_COUNT = 4;
+const CALLOUT_QUEUE_LIMIT = 4;
+const CALLOUT_GAP = 0.14;
 
 export class KakiRenderer {
   constructor(canvas, settings, visualAssets = null) {
@@ -27,9 +28,10 @@ export class KakiRenderer {
     this.conditionId = "goldenCoast";
     this.currentBoard = null;
     this.particles = Array.from({ length: PARTICLE_COUNT }, createParticle);
-    this.callouts = Array.from({ length: CALLOUT_COUNT }, createCallout);
+    this.activeCallout = createCallout();
+    this.calloutQueue = [];
     this.particleCursor = 0;
-    this.calloutCursor = 0;
+    this.calloutGap = 0;
     this.cameraY = 0;
     this.shake = 0;
     this.impact = 0;
@@ -223,9 +225,12 @@ export class KakiRenderer {
       particle.vx *= 1 - particle.drag * dt;
     }
 
-    for (const callout of this.callouts) {
-      if (callout.life > 0) callout.life -= dt;
+    if (this.activeCallout.life > 0) {
+      this.activeCallout.life = Math.max(0, this.activeCallout.life - dt);
+      if (this.activeCallout.life === 0) this.calloutGap = CALLOUT_GAP;
     }
+    this.calloutGap = Math.max(0, this.calloutGap - dt);
+    if (this.activeCallout.life <= 0 && this.calloutGap <= 0) this.activateNextCallout();
 
     const riding = player.state === "riding" || player.state === "lip" || player.state === "landing" || player.state === "wobble";
     if (riding && player.speed > 54) {
@@ -388,7 +393,7 @@ export class KakiRenderer {
 
     const clock = this.settings.reducedMotion
       ? 0
-      : waveVisualTravel(simulation.wave) * (0.18 + speedRatio * 0.12);
+      : waveSurfaceTravel(simulation.wave) * (0.18 + speedRatio * 0.12);
     const horizonColor = this.conditionId === "twilightGlass" ? p.violet : this.conditionId === "stormbreak" ? p.foamShade : p.crest;
     ctx.save();
     ctx.strokeStyle = horizonColor;
@@ -442,7 +447,7 @@ export class KakiRenderer {
     const streakCount = reduced ? 4 : 5 + Math.round(intensity * 5);
     const phase = reduced
       ? 0
-      : waveVisualTravel(simulation.wave) * (0.54 + intensity * 0.36);
+      : waveSurfaceTravel(simulation.wave) * (0.54 + intensity * 0.36);
     ctx.save();
     ctx.globalAlpha = 0.22 + intensity * 0.42;
     for (let index = 0; index < streakCount; index += 1) {
@@ -690,42 +695,60 @@ export class KakiRenderer {
   drawCallouts() {
     const ctx = this.ctx;
     const p = this.palette;
-    for (let index = 0; index < this.callouts.length; index += 1) {
-      const callout = this.callouts[index];
-      if (callout.life <= 0) continue;
-      const age = callout.duration - callout.life;
-      const inAlpha = smoothstep(0, 0.1, age);
-      const outAlpha = smoothstep(0, 0.25, callout.life);
-      const alpha = inAlpha * outAlpha;
-      const rise = Math.round(age * 5);
-      const toneColor = callout.tone === "wipeout" ? p.danger : callout.tone === "perfect" ? p.gold : callout.tone === "risk" ? p.sun : p.white;
-      drawPixelText(ctx, callout.text, 192, 42 - rise + index * 2, {
-        scale: 2,
-        spacing: 2,
+    const callout = this.activeCallout;
+    if (callout.life <= 0) return;
+    const age = callout.duration - callout.life;
+    const outAlpha = smoothstep(0, 0.34, callout.life);
+    const alpha = outAlpha;
+    const rise = Math.round(smoothstep(0, 1.1, age) * 2);
+    const toneColor = callout.tone === "wipeout" ? p.danger : callout.tone === "perfect" ? p.gold : callout.tone === "risk" ? p.sun : p.white;
+    drawPixelText(ctx, callout.text, 192, 42 - rise, {
+      scale: 2,
+      spacing: 2,
+      align: "center",
+      color: toneColor,
+      shadow: p.ink,
+      alpha,
+    });
+    if (callout.subtext) {
+      drawPixelText(ctx, callout.subtext, 192, 56 - rise, {
         align: "center",
-        color: toneColor,
+        color: p.foam,
         shadow: p.ink,
         alpha,
       });
-      if (callout.subtext) {
-        drawPixelText(ctx, callout.subtext, 192, 55 - rise + index * 2, {
-          align: "center",
-          color: p.foam,
-          shadow: p.ink,
-          alpha,
-        });
-      }
     }
   }
 
   pushCallout(text, subtext = "", tone = "flow") {
-    const callout = this.callouts[this.calloutCursor];
-    callout.text = text;
-    callout.subtext = subtext;
+    const nextText = String(text).trim();
+    if (!nextText) return;
+    const nextSubtext = String(subtext).trim();
+    const duplicate = (callout) => callout.text === nextText && callout.subtext === nextSubtext;
+    if (this.activeCallout.life > 0 && duplicate(this.activeCallout)) {
+      this.activeCallout.life = Math.max(this.activeCallout.life, 1.1);
+      return;
+    }
+    if (this.calloutQueue.some(duplicate)) return;
+
+    const callout = createCallout();
+    callout.text = nextText;
+    callout.subtext = nextSubtext;
     callout.tone = tone;
-    callout.duration = tone === "hint" ? 2.2 : 1.25;
+    callout.duration = tone === "hint" ? 2.7 : tone === "perfect" || tone === "risk" || tone === "wipeout" ? 2.35 : 2.05;
     callout.life = callout.duration;
-    this.calloutCursor = (this.calloutCursor + 1) % this.callouts.length;
+    if (this.activeCallout.life <= 0 && this.calloutGap <= 0) {
+      this.activeCallout = callout;
+      return;
+    }
+    if (this.calloutQueue.length >= CALLOUT_QUEUE_LIMIT) this.calloutQueue.shift();
+    this.calloutQueue.push(callout);
+  }
+
+  activateNextCallout() {
+    const next = this.calloutQueue.shift();
+    if (!next) return;
+    this.activeCallout = next;
   }
 
   spawnSpray(x, y, count, force) {

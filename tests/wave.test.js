@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { BOARDS } from "../js/config.js";
 import { GameplayWave } from "../js/wave.js";
-import { powerSeamFaceAt, waveGuideAt, waveVisualTravel } from "../js/wave-visuals.js";
+import { powerSeamFaceAt, waveGuideAt, waveSurfaceTravel, waveVisualTravel } from "../js/wave-visuals.js";
 
 function snapshotWave(wave) {
   return JSON.parse(JSON.stringify(wave));
@@ -149,6 +149,12 @@ test("visual water travel follows signed world travel through reversals", () => 
   assert.equal(waveVisualTravel({ travel: 120, worldTravel: 34 }), 34);
   assert.equal(waveVisualTravel({ travel: 180, worldTravel: -12 }), -12);
   assert.equal(waveVisualTravel({ travel: 22 }), 22);
+});
+
+test("decorative surface flow stays monotonic when the rider reverses", () => {
+  assert.equal(waveSurfaceTravel({ travel: 180, worldTravel: 34 }), 180);
+  assert.equal(waveSurfaceTravel({ travel: 210, worldTravel: -12 }), 210);
+  assert.equal(waveSurfaceTravel({ worldTravel: -22 }), 22);
 });
 
 test("renderer guide reads the exact canonical power face", () => {

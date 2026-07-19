@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { BOARDS, FIXED_STEP } from "../js/config.js";
+import { KakiRenderer } from "../js/renderer.js";
 import { SurfSimulation } from "../js/simulation.js";
 import { resolveKakiPose } from "../js/sprites.js";
 
@@ -138,4 +139,30 @@ test("landing and result poses resolve from state the simulation actually publis
   strongRun.finishRun("time");
   assert.equal(strongRun.player.resultWon, true);
   assert.equal(resolveKakiPose(strongRun.player), "victory");
+});
+
+test("gameplay callouts queue one at a time and remain readable", () => {
+  const canvas = {
+    getContext() {
+      return { imageSmoothingEnabled: false };
+    },
+  };
+  const renderer = new KakiRenderer(canvas, {
+    highContrast: false,
+    reducedMotion: true,
+    reducedFlash: true,
+    screenShake: 0,
+  });
+  renderer.pushCallout("FIRST", "ONE", "flow");
+  renderer.pushCallout("SECOND", "TWO", "perfect");
+  renderer.pushCallout("THIRD", "THREE", "risk");
+
+  assert.equal(renderer.activeCallout.text, "FIRST");
+  assert.ok(renderer.activeCallout.duration >= 2, "ordinary messages stay up long enough to read");
+  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["SECOND", "THIRD"]);
+
+  renderer.activeCallout.life = 0;
+  renderer.activateNextCallout();
+  assert.equal(renderer.activeCallout.text, "SECOND");
+  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["THIRD"]);
 });

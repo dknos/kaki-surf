@@ -84,11 +84,12 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       camera,
       config.parallax,
     );
+    if (watercraft && !watercraftClearsBreaker(entity, x, simulation)) return;
     const y = lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
     const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
     if (frame) {
-      const baseScale = layer === "far" ? 0.52 : layer === "mid" ? 0.72 : 1;
+      const baseScale = layer === "far" ? 0.52 : layer === "mid" ? watercraft ? 0.58 : 0.72 : 1;
       const drawn = drawAtlasFrame(ctx, assets, frame[0], frame[1], x, y, {
         flipX: visualDirection < 0,
         scale: baseScale * entity.scale,
@@ -113,6 +114,16 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       drawTrafficFallback(ctx, entity, x, y, palette, layer);
     }
   });
+}
+
+export function watercraftClearsBreaker(entity, x, simulation) {
+  const curlX = Number(simulation?.wave?.curlX);
+  if (!Number.isFinite(curlX)) return true;
+  const race = entity?.activity === "race" || String(entity?.phase ?? "").startsWith("race");
+  const curlMargin = race ? 88 : 112;
+  if (x <= curlX + curlMargin) return false;
+  const playerX = Number(simulation?.player?.x);
+  return race || !Number.isFinite(playerX) || Math.abs(x - playerX) >= 64;
 }
 
 export function drawWorldFoamGates(ctx, simulation, assets, palette, alpha = 1, settings = {}) {
