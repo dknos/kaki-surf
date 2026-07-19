@@ -19,19 +19,37 @@ The game loop accumulates at most 14 fixed steps per frame. Render interpolation
 
 | Key | Default | Meaning |
 | --- | ---: | --- |
-| `speed` / `maxSpeed` | 72 / 138 | Base target and hard speed envelope before board modifiers |
-| `carveAcceleration` | 3.35 | Face-direction response before board grip and assists |
-| `carveFriction` | 4.8 | Rate at which face velocity settles |
+| `speed` / `maxSpeed` | 76 / 144 | Base target and hard speed envelope before board modifiers |
+| `carveAcceleration` | 3.65 | Face-direction response before board grip and assists |
+| `carveFriction` | 4 | Rate at which face velocity settles |
 | `faceEdgeBounce` | 0.28 | Trough-edge rebound retained from impact |
-| `wavePush` | 13.5 | Acceleration scaled by shared speed potential |
+| `wavePush` | 15.5 | Acceleration scaled by shared speed potential |
 | `curlSpeed` | 2.35 | Base advance of the breaking curl |
 | `curlCatchDelay` | 0.58 s | Continuous curl contact before a wipeout |
-| `pumpStrength` | 17 | Maximum pump impulse before line, rhythm, and board factors |
+| `pumpStrength` | 18.5 | Maximum pump impulse before line, rhythm, and board factors |
 | `pumpChargeRate` | 1.55/s | Hold-to-compress charge rate |
+| `rideSpeedResponse` | 0.82/s | Pull toward base target; lower values retain earned speed longer |
+| `waveMomentumBuild` / `waveMomentumDecay` | 1.9/s / 0.55/s | Seam acquisition and off-line reserve loss |
+| `waveMomentumPumpGain` | 0.14 | Reserve added by a fully charged, fully efficient release |
+| `offLineSpeedHeadroom` | 26 | Speed above board base available without stored seam momentum |
+| `lateralResponse` / `lateralCoast` | 12/s / 3/s | On-wave x-velocity input response and release inertia |
 
-`GameplayWave.powerFaceAt(x)` produces a moving target near face coordinate 0.405 and clamps it to 0.31-0.49. `speedPotential(x, face, options)` is the one authoritative query for physics and presentation. It returns target/error/correction data plus `safe`, `power`, or `critical` zone, risk, pocket pressure, line quality, pump efficiency, and a bounded 0.15-1.25 acceleration factor.
+`GameplayWave.powerFaceAt(x)` produces a moving target near face coordinate 0.405 and clamps it to 0.31-0.49. `speedPotential(x, face, options)` is the one authoritative query for physics and presentation. It returns target/error/correction data plus `safe`, `power`, or `critical` zone, risk, pocket pressure, broad line quality, narrow `seamDrive`, pump efficiency, and a bounded 0.15-1.25 acceleration factor.
 
 The power zone requires an absolute face error no greater than 0.12 and pocket value at least 0.16. Breaking water or pocket value at least 0.78 is critical; remaining positions are safe. These are strategic labels, not three fixed color strips.
+
+Top-end drive is stricter than the readable power zone. `seamDrive` has a glassy core through 0.025 face error, fades out by 0.115, enters across pocket values 0.16-0.34, and fades before the critical band across 0.68-0.82. The safe shoulder and critical curl can provide useful motion, but neither can return `maxFlowEligible` or the 1.25 sustainable acceleration ceiling.
+
+`player.waveMomentum` follows seam drive at 1.9/s, decays off line at 0.55/s, and receives up to 0.14 from a correctly timed full pump. The current ride cap is:
+
+```text
+baseTarget = speed * board.acceleration
+hardMax = maxSpeed * board.maxSpeed
+offLineCap = min(hardMax, baseTarget + offLineSpeedHeadroom)
+rideCap = offLineCap + (hardMax - offLineCap) * waveMomentum
+```
+
+This reserve persists long enough to climb from the seam to the lip. A missed pump keeps only a 0.22 timing floor; full efficiency reaches a 1.20 timing factor. Lateral movement stores a bounded velocity in `-48..48`, responds quickly while steered, coasts on release, and removes outward velocity at the playfield edge.
 
 ## Air and landing defaults
 
@@ -47,6 +65,17 @@ The power zone requires an absolute face error no greater than 0.12 and pocket v
 | `landingCoyote` | 0.095 s | Time to recover an initially bad contact |
 | `launchCoyote` | 0.11 s | Lip-memory window for a committed release |
 | `wipeoutThreshold` | 1.18 rad | Hard cap for the recovery band |
+
+Launch pop consumes actual speed and the previously earned reserve rather than pump charge alone:
+
+```text
+speedRatio = clamp((speed - baseTarget) / (hardMax - baseTarget), 0, 1)
+earnedDrive = min(speedRatio, waveMomentum)
+launchEnergy = clamp(0.72 + abs(faceVelocity) * 0.16
+  + charge * 0.10 + earnedDrive * 0.44, 0.72, 1.32)
+```
+
+The 0.72 floor keeps ordinary lip jumps available. Maximum vertical pop requires both high actual speed and line history. Launch horizontal velocity also inherits 22% of on-wave lateral velocity.
 
 At the apex, gravity is 42% while vertical speed is within 14 units/second. The resolved clean tolerance is:
 

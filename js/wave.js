@@ -69,11 +69,17 @@ export class GameplayWave {
     const pressure = clamp(this.pressure, 0, 1);
     const breaking = Boolean(options.breaking ?? this.curlContact(x));
 
-    // A broad enough window to be learned by feel, with a small glassy core.
+    // Keep broad guidance readable, but reserve top-end drive for the narrow,
+    // sustainable seam between the weak shoulder and the collapsing curl.
     const lineQuality = 1 - smoothstep(0.035, 0.27, absoluteError);
     const pocketDrive = 0.34 + smoothstep(0.06, 0.68, pocket) * 0.66;
     const criticalLoss = smoothstep(0.76, 1, pocket) * 0.38;
     const sustainablePocket = clamp(pocketDrive - criticalLoss, 0.24, 1);
+    const seamCore = 1 - smoothstep(0.025, 0.115, absoluteError);
+    const sustainableBand = smoothstep(0.16, 0.34, pocket)
+      * (1 - smoothstep(0.68, 0.82, pocket))
+      * Number(!breaking);
+    const seamDrive = clamp(seamCore * sustainableBand, 0, 1);
     const pressureContribution = 0.78 + pressure * 0.22;
     const breakingContribution = breaking ? 0.72 : 1;
 
@@ -83,8 +89,13 @@ export class GameplayWave {
     const pumpCharge = clamp(Number(options.pumpCharge ?? 0), 0, 1);
     const faceVelocity = clamp(Math.abs(Number(options.faceVelocity ?? 0)), 0, 1.5);
     const movementTiming = 0.78 + Math.min(0.22, faceVelocity * 0.2);
+    const pumpAccess = clamp(
+      lineQuality * sustainablePocket * 0.25 + seamDrive * 0.75,
+      0,
+      1,
+    );
     const pumpEfficiency = clamp(
-      lineQuality * sustainablePocket * (0.62 + pumpCharge * 0.38) * movementTiming * boardPump,
+      pumpAccess * (0.62 + pumpCharge * 0.38) * movementTiming * boardPump,
       0,
       1,
     );
@@ -93,12 +104,15 @@ export class GameplayWave {
       : 1;
 
     const potential = clamp(
-      lineQuality * 0.63 + sustainablePocket * 0.24 + pressure * 0.13,
+      lineQuality * 0.55
+        + sustainablePocket * 0.22
+        + pressure * 0.13
+        + seamDrive * 0.1,
       0,
       1,
     );
     const acceleration = clamp(
-      (0.15 + potential * 1.1)
+      (0.18 + potential * 0.7 + seamDrive * 0.38)
         * pressureContribution
         * breakingContribution
         * pumpContribution
@@ -129,6 +143,8 @@ export class GameplayWave {
       pressure,
       breaking,
       lineQuality,
+      seamDrive,
+      maxFlowEligible: seamDrive >= 0.85,
       potential,
       pumpEfficiency,
       acceleration,

@@ -1,3 +1,5 @@
+import { preloadVisualAssets } from "./asset-loader.js";
+
 /**
  * Narrow host boundary for a future Kitty Kaki Survivors integration.
  * The standalone launcher uses the same contract, so embedded behavior is not a fork.
@@ -16,7 +18,10 @@ export async function createKakiSurf({
   if (!(host instanceof HTMLElement)) {
     throw new TypeError("Kaki Surf requires a host HTMLElement.");
   }
-  const { KakiSurfGame } = await import("./game.js");
+  const [visualAssets, { KakiSurfGame }] = await Promise.all([
+    preloadVisualAssets(),
+    import("./game.js"),
+  ]);
   const game = new KakiSurfGame({
     host,
     externalInput: input,
@@ -27,6 +32,7 @@ export async function createKakiSurf({
     onExit,
     onRunComplete,
     qaScene,
+    visualAssets,
   });
 
   return Object.freeze({

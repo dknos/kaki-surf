@@ -55,6 +55,38 @@ test("zones separate safe shoulder, sustainable power seam, and critical curl", 
   assert.equal(wave.speedPotential(powerX, wave.powerFaceAt(powerX) + 0.3, { breaking: false }).zone, "safe");
 });
 
+test("full seam drive is exclusive to the sustainable power line", () => {
+  const wave = new GameplayWave(0x4b414b49);
+  wave.pressure = 1;
+  const shoulderX = wave.curlX + 190;
+  const powerX = wave.curlX + 72;
+  const criticalX = wave.curlX + 28;
+  const options = {
+    breaking: false,
+    pumpCharge: 1,
+    pumpReleased: true,
+    faceVelocity: 0.8,
+    board: BOARDS.mangoFish,
+  };
+  const sustainable = wave.speedPotential(powerX, wave.powerFaceAt(powerX), options);
+  const shoulder = wave.speedPotential(shoulderX, wave.powerFaceAt(shoulderX), options);
+  const critical = wave.speedPotential(criticalX, wave.powerFaceAt(criticalX), options);
+  const offLine = wave.speedPotential(powerX, wave.powerFaceAt(powerX) + 0.24, options);
+
+  assert.equal(sustainable.zone, "power");
+  assert.equal(sustainable.seamDrive, 1);
+  assert.equal(sustainable.maxFlowEligible, true);
+  assert.equal(sustainable.acceleration, 1.25);
+  for (const result of [shoulder, critical, offLine]) {
+    assert.equal(result.maxFlowEligible, false);
+    assert.ok(result.seamDrive < 0.01);
+    assert.ok(result.acceleration < sustainable.acceleration);
+  }
+  assert.equal(shoulder.zone, "safe");
+  assert.equal(critical.zone, "critical");
+  assert.equal(offLine.zone, "safe");
+});
+
 test("pressure, pocket position, breaking, and pump timing produce bounded variation", () => {
   const wave = new GameplayWave(0x0badf00d);
   const shoulderX = wave.curlX + 190;
@@ -87,6 +119,9 @@ test("pressure, pocket position, breaking, and pump timing produce bounded varia
   assert.ok(timedPump.pumpEfficiency > missedPump.pumpEfficiency);
   for (const result of [shoulder, pocketLowPressure, pocketHighPressure, breaking, timedPump, missedPump]) {
     assert.ok(result.potential >= 0 && result.potential <= 1);
+    assert.ok(result.lineQuality >= 0 && result.lineQuality <= 1);
+    assert.ok(result.seamDrive >= 0 && result.seamDrive <= 1);
+    assert.equal(typeof result.maxFlowEligible, "boolean");
     assert.ok(result.pumpEfficiency >= 0 && result.pumpEfficiency <= 1);
     assert.ok(result.acceleration >= 0.15 && result.acceleration <= 1.25);
   }

@@ -72,7 +72,7 @@ export class SurfSimulation {
     this.tutorialStage = 0;
     this.aerialSession = null;
     this.eventCount = 0;
-    resetPlayer(this.player);
+    resetPlayer(this.player, true, this.tuning.speed);
     this.emit("state", { state: "entry" });
   }
 
@@ -181,6 +181,18 @@ export class SurfSimulation {
         this.emit("powerLineLeave", { zone: speedPotential.zone });
       }
     }
+    const previousWaveMomentum = Number.isFinite(player.waveMomentum)
+      ? clamp(player.waveMomentum, 0, 1)
+      : 0;
+    const momentumResponse = speedPotential.seamDrive > previousWaveMomentum
+      ? finiteTuning(this.tuning.waveMomentumBuild, TUNING.waveMomentumBuild)
+      : finiteTuning(this.tuning.waveMomentumDecay, TUNING.waveMomentumDecay);
+    player.waveMomentum = damp(
+      previousWaveMomentum,
+      speedPotential.seamDrive,
+      momentumResponse,
+      dt,
+    );
 
     if (input.edge) {
       const previousCharge = player.charge;
@@ -192,13 +204,22 @@ export class SurfSimulation {
     }
 
     if (input.edgeReleased && player.charge > 0.12 && player.face > 0.12) {
+      const releasedCharge = player.charge;
       const rhythm = 0.58 + Math.min(0.42, Math.abs(player.faceVelocity) * 0.32);
-      const lineTiming = 0.55 + speedPotential.pumpEfficiency * 0.65;
-      const boost = this.tuning.pumpStrength * this.board.pump * player.charge * rhythm * lineTiming;
-      player.speed += boost;
-      this.score.bumpCombo(0.035 * player.charge);
+      const lineTiming = 0.22 + speedPotential.pumpEfficiency * 0.98;
+      const boost = this.tuning.pumpStrength * this.board.pump * releasedCharge * rhythm * lineTiming;
+      player.waveMomentum = clamp(
+        player.waveMomentum
+          + finiteTuning(this.tuning.waveMomentumPumpGain, TUNING.waveMomentumPumpGain)
+            * releasedCharge
+            * speedPotential.pumpEfficiency,
+        0,
+        1,
+      );
+      player.speed = Math.min(player.speed + boost, this.currentRideSpeedCap());
+      this.score.bumpCombo(0.035 * releasedCharge);
       this.emit("pump", {
-        strength: player.charge,
+        strength: releasedCharge,
         efficiency: speedPotential.pumpEfficiency,
         zone: speedPotential.zone,
       });
@@ -213,20 +234,40 @@ export class SurfSimulation {
       ? speedPotential.risk
       : this.wave.pocketRisk(player.x);
     const targetSpeed = this.tuning.speed * this.board.acceleration + downFaceDrive - climbCost;
-    const glideResponse = player.maneuver.id === "floater" ? 0.42 : 1.12;
+    const glideResponse = player.maneuver.id === "floater"
+      ? 0.42
+      : finiteTuning(this.tuning.rideSpeedResponse, TUNING.rideSpeedResponse);
     player.speed = damp(player.speed, targetSpeed, glideResponse, dt);
     player.speed += this.tuning.wavePush
       * speedPotential.acceleration
       * this.board.acceleration
       * dt;
-    player.speed = clamp(player.speed, 34, this.tuning.maxSpeed * this.board.maxSpeed);
+    player.speed = clamp(player.speed, 34, this.currentRideSpeedCap());
 
-    const lateralDrive = (player.speed - 69) * 0.052
-      + inputX * (18 + player.speed * 0.035)
+    const lateralTarget = (player.speed - (this.tuning.speed - 4)) * 0.06
+      + inputX * (20 + player.speed * 0.045)
       + player.redirectVelocity;
-    player.x += lateralDrive * dt;
-    player.x = clamp(player.x, 76, 338);
+    const lateralResponse = Math.abs(inputX) > 0.02 || Math.abs(player.redirectVelocity) > 0.5
+      ? finiteTuning(this.tuning.lateralResponse, TUNING.lateralResponse)
+      : finiteTuning(this.tuning.lateralCoast, TUNING.lateralCoast);
+    const currentLateralVelocity = Number.isFinite(player.lateralVelocity)
+      ? player.lateralVelocity
+      : 0;
+    player.lateralVelocity = clamp(
+      damp(currentLateralVelocity, lateralTarget, lateralResponse, dt),
+      -48,
+      48,
+    );
+    player.x += player.lateralVelocity * dt;
+    this.constrainRidingX();
     player.redirectVelocity = damp(player.redirectVelocity, 0, 4.2, dt);
+
+    if (previousWaveMomentum < 0.9 && player.waveMomentum >= 0.9) {
+      this.emit("fullPower", {
+        momentum: player.waveMomentum,
+        speed: player.speed,
+      });
+    }
 
     const carveLean = inputY * 0.24 + player.faceVelocity * 0.16;
     const horizontalLean = inputX * 0.08;
@@ -272,14 +313,31 @@ export class SurfSimulation {
   launch(input) {
     const player = this.player;
     const sourceManeuver = player.maneuver.id;
-    const launchEnergy = clamp(0.72 + Math.abs(player.faceVelocity) * 0.2 + player.charge * 0.3, 0.72, 1.28);
+    const baseSpeed = this.tuning.speed * this.board.acceleration;
+    const hardMaxSpeed = Math.max(baseSpeed, this.tuning.maxSpeed * this.board.maxSpeed);
+    const speedRange = Math.max(1, hardMaxSpeed - baseSpeed);
+    const speedRatio = clamp((player.speed - baseSpeed) / speedRange, 0, 1);
+    const launchMomentum = clamp(
+      Number.isFinite(player.waveMomentum) ? player.waveMomentum : 0,
+      0,
+      1,
+    );
+    const earnedDrive = Math.min(speedRatio, launchMomentum);
+    const launchEnergy = clamp(
+      0.72
+        + Math.abs(player.faceVelocity) * 0.16
+        + player.charge * 0.1
+        + earnedDrive * 0.44,
+      0.72,
+      1.32,
+    );
     const launchMultiplier = this.currentMultiplier() * (this.tuning.scoreAir / 1.25);
     const launchRisk = this.wave.pocketRisk(player.x);
     player.airX = player.x;
     player.airY = this.wave.crestY(player.x) - 1;
     player.previousAirX = player.airX;
     player.previousAirY = player.airY;
-    player.airVX = (player.speed - 62) * 0.115 + input.x * 7;
+    player.airVX = (player.speed - 58) * 0.14 + player.lateralVelocity * 0.22 + input.x * 5;
     player.airVY = -this.tuning.launchForce * this.board.launch * launchEnergy;
     player.launchY = player.airY;
     player.maxAirHeight = 0;
@@ -303,6 +361,9 @@ export class SurfSimulation {
         potential,
         launchStrength: launchEnergy,
         launchSpeed: player.speed,
+        speedRatio,
+        waveMomentum: launchMomentum,
+        seamDrive: player.speedPotential.seamDrive,
         launchVelocity: player.airVY,
         pocketRisk: launchRisk,
         multiplier: launchMultiplier,
@@ -319,6 +380,8 @@ export class SurfSimulation {
     this.applyAerialPreview(preview);
     this.emit("launch", {
       strength: launchEnergy,
+      momentum: launchMomentum,
+      speedRatio,
       pocketRisk: launchRisk,
       provisionalScore: player.provisionalScore,
     });
@@ -463,8 +526,13 @@ export class SurfSimulation {
     player.x = player.airX;
     player.face = player.landingFace;
     player.faceVelocity = quality === "wobble" ? 0.16 : 0.08;
+    player.lateralVelocity = clamp(
+      Number.isFinite(player.airVX) ? player.airVX * 0.55 : 0,
+      -48,
+      48,
+    );
     const preservation = quality === "perfect" ? 1.035 : quality === "clean" ? 0.94 : 0.74;
-    player.speed = clamp(player.speed * preservation, 38, this.tuning.maxSpeed * this.board.maxSpeed);
+    player.speed = clamp(player.speed * preservation, 38, this.currentRideSpeedCap());
     player.boardAngle = surfaceAngle;
     player.bodyAngle = surfaceAngle;
     player.compression = quality === "perfect" ? 1 : 0.78;
@@ -502,8 +570,26 @@ export class SurfSimulation {
     player.bodyAngle = surfaceAngle + Math.sin(player.stateTime * 28) * player.wobble * (1 - player.stateTime / duration) * 0.18;
     updateLandingPreview(player, surfaceAngle, this.landingBands(), false);
     player.compression = damp(player.compression, 0, 8, dt);
-    player.speed = Math.max(36, player.speed - (player.state === "wobble" ? 8 : -2) * dt);
-    player.x = clamp(player.x + (player.speed - 70) * 0.035 * dt + input.x * 11 * dt, 76, 338);
+    player.speed = clamp(
+      player.speed - (player.state === "wobble" ? 8 : -2) * dt,
+      36,
+      this.currentRideSpeedCap(),
+    );
+    const lateralTarget = (player.speed - (this.tuning.speed - 4)) * 0.05
+      + input.x * (13 + player.speed * 0.02);
+    const lateralResponse = Math.abs(input.x) > 0.02
+      ? finiteTuning(this.tuning.lateralResponse, TUNING.lateralResponse) * this.board.recovery
+      : finiteTuning(this.tuning.lateralCoast, TUNING.lateralCoast);
+    const currentLateralVelocity = Number.isFinite(player.lateralVelocity)
+      ? player.lateralVelocity
+      : 0;
+    player.lateralVelocity = clamp(
+      damp(currentLateralVelocity, lateralTarget, lateralResponse, dt),
+      -48,
+      48,
+    );
+    player.x += player.lateralVelocity * dt;
+    this.constrainRidingX();
     const pocketRisk = this.wave.pocketRisk(player.x);
     this.score.updateRide(dt, player.speed, pocketRisk, 0.12, this.currentMultiplier(), this.scoreScales());
     this.updateCurlDanger(dt, pocketRisk);
@@ -520,19 +606,57 @@ export class SurfSimulation {
     }
   }
 
+  currentRideSpeedCap(momentum = this.player.waveMomentum) {
+    const baseTarget = this.tuning.speed * this.board.acceleration;
+    const hardMax = Math.max(baseTarget, this.tuning.maxSpeed * this.board.maxSpeed);
+    const headroom = Math.max(
+      0,
+      finiteTuning(this.tuning.offLineSpeedHeadroom, TUNING.offLineSpeedHeadroom),
+    );
+    const offLineCap = Math.min(hardMax, baseTarget + headroom);
+    const earned = clamp(Number.isFinite(momentum) ? momentum : 0, 0, 1);
+    return offLineCap + (hardMax - offLineCap) * earned;
+  }
+
+  constrainRidingX() {
+    const player = this.player;
+    const nextX = clamp(player.x, 76, 338);
+    if (nextX !== player.x) {
+      const pushingOut = (nextX === 76 && player.lateralVelocity < 0)
+        || (nextX === 338 && player.lateralVelocity > 0);
+      if (pushingOut) player.lateralVelocity = 0;
+      player.x = nextX;
+    }
+  }
+
   querySpeedPotential(input = EMPTY_INPUT) {
     const player = this.player;
     const fallbackRisk = this.wave.pocketRisk(player.x);
     const fallbackTarget = clamp(0.42 - this.wave.pressure * 0.035, 0.3, 0.5);
     const fallbackError = player.face - fallbackTarget;
-    const fallbackPotential = clamp(1 - Math.abs(fallbackError) / 0.44, 0, 1);
-    const fallbackZone = fallbackRisk > 0.74
+    const absoluteFallbackError = Math.abs(fallbackError);
+    const fallbackLineQuality = 1 - smoothstep(0.035, 0.27, absoluteFallbackError);
+    const fallbackSeamCore = 1 - smoothstep(0.025, 0.115, absoluteFallbackError);
+    const fallbackSustainableBand = smoothstep(0.16, 0.34, fallbackRisk)
+      * (1 - smoothstep(0.68, 0.82, fallbackRisk))
+      * Number(player.state !== "lip");
+    const fallbackSeamDrive = clamp(fallbackSeamCore * fallbackSustainableBand, 0, 1);
+    const fallbackPotential = clamp(
+      fallbackLineQuality * 0.68 + fallbackRisk * 0.22 + fallbackSeamDrive * 0.1,
+      0,
+      1,
+    );
+    const fallbackZone = fallbackRisk >= 0.78 || player.state === "lip"
       ? "critical"
-      : Math.abs(fallbackError) < 0.11
+      : absoluteFallbackError <= 0.12 && fallbackRisk >= 0.16
         ? "power"
         : "safe";
     const fallback = {
-      acceleration: clamp(0.18 + fallbackPotential * 0.88 + fallbackRisk * 0.12, 0.15, 1.25),
+      acceleration: clamp(
+        0.18 + fallbackPotential * 0.7 + fallbackSeamDrive * 0.38,
+        0.15,
+        1.25,
+      ),
       targetFace: fallbackTarget,
       error: fallbackError,
       correction: Math.sign(fallbackTarget - player.face),
@@ -541,7 +665,15 @@ export class SurfSimulation {
       pocket: fallbackRisk,
       pressure: this.wave.pressure,
       breaking: player.state === "lip" ? 1 : 0,
-      pumpEfficiency: clamp(fallbackPotential * (0.78 + fallbackRisk * 0.22), 0, 1),
+      lineQuality: fallbackLineQuality,
+      seamDrive: fallbackSeamDrive,
+      maxFlowEligible: fallbackSeamDrive >= 0.85,
+      pumpEfficiency: clamp(
+        (fallbackLineQuality * 0.25 + fallbackSeamDrive * 0.75)
+          * (0.78 + fallbackRisk * 0.22),
+        0,
+        1,
+      ),
       potential: fallbackPotential,
     };
 
@@ -564,6 +696,9 @@ export class SurfSimulation {
       pocket: finiteOr(result.pocket, fallback.pocket, 0, 1),
       pressure: finiteOr(result.pressure, fallback.pressure, 0, 1),
       breaking: finiteOr(Number(result.breaking), fallback.breaking, 0, 1),
+      lineQuality: finiteOr(result.lineQuality, fallback.lineQuality, 0, 1),
+      seamDrive: finiteOr(result.seamDrive, fallback.seamDrive, 0, 1),
+      maxFlowEligible: Boolean(result.maxFlowEligible ?? fallback.maxFlowEligible),
       pumpEfficiency: finiteOr(result.pumpEfficiency, fallback.pumpEfficiency, 0, 1),
       potential: finiteOr(result.potential, fallback.potential, 0, 1),
     };
@@ -807,8 +942,10 @@ export class SurfSimulation {
     player.wipeoutSpin = player.angularVelocity || (cause === "curl" ? -5.4 : 4.7);
     player.airX = player.state === "airborne" ? player.airX : player.x;
     player.airY = player.state === "airborne" ? player.airY : this.wave.ridingY(player.x, player.face);
-    player.airVX = player.state === "airborne" ? player.airVX : 9;
+    player.airVX = player.state === "airborne" ? player.airVX : player.lateralVelocity || 9;
     player.airVY = player.state === "airborne" ? player.airVY : -28;
+    player.waveMomentum = 0;
+    player.lateralVelocity = 0;
     if (this.aerialSession) this.aerialSession.wipeout();
     player.provisionalScore = 0;
     player.provisionalTrickName = "";
@@ -840,7 +977,7 @@ export class SurfSimulation {
 
     const retreat = Math.max(38, this.wave.curlX - 42);
     this.wave.curlX = retreat;
-    resetPlayer(player, false);
+    resetPlayer(player, false, this.tuning.speed);
     this.aerialSession = null;
     player.x = clamp(this.wave.curlX + 122, 160, 282);
     player.face = 0.5;
@@ -910,7 +1047,7 @@ function createPlayer() {
     face: 0.48,
     previousFace: 0.48,
     faceVelocity: 0,
-    speed: 72,
+    speed: TUNING.speed,
     flowTier: "GLIDING",
     boardAngle: 0,
     bodyAngle: 0,
@@ -925,6 +1062,7 @@ function createPlayer() {
     maneuver: { id: "", progress: 0 },
     landingPreview: createLandingPreview(),
     speedPotential: createSpeedPotentialState(),
+    waveMomentum: 0,
     compression: 0,
     charge: 0,
     lipMemory: 0,
@@ -947,6 +1085,7 @@ function createPlayer() {
     wobble: 0,
     wipeoutCause: "",
     wipeoutSpin: 0,
+    lateralVelocity: 0,
     redirectVelocity: 0,
     maneuverCooldown: 0,
     maneuverTime: 0,
@@ -960,7 +1099,7 @@ function createPlayer() {
   };
 }
 
-function resetPlayer(player, resetPosition = true) {
+function resetPlayer(player, resetPosition = true, baseSpeed = TUNING.speed) {
   player.state = "entry";
   player.stateTime = 0;
   if (resetPosition) {
@@ -970,7 +1109,7 @@ function resetPlayer(player, resetPosition = true) {
   player.previousX = player.x;
   player.previousFace = player.face;
   player.faceVelocity = 0;
-  player.speed = 72;
+  player.speed = baseSpeed;
   player.flowTier = "GLIDING";
   player.boardAngle = 0;
   player.bodyAngle = 0;
@@ -986,6 +1125,7 @@ function resetPlayer(player, resetPosition = true) {
   player.maneuver.progress = 0;
   resetLandingPreview(player.landingPreview);
   copySpeedPotential(player.speedPotential, createSpeedPotentialState());
+  player.waveMomentum = 0;
   player.compression = 0;
   player.charge = 0;
   player.lipMemory = 0;
@@ -1008,6 +1148,7 @@ function resetPlayer(player, resetPosition = true) {
   player.wobble = 0;
   player.wipeoutCause = "";
   player.wipeoutSpin = 0;
+  player.lateralVelocity = 0;
   player.redirectVelocity = 0;
   player.maneuverCooldown = 0;
   player.maneuverTime = 0;
@@ -1029,6 +1170,9 @@ function createSpeedPotentialState() {
     pocket: 0,
     pressure: 0,
     breaking: 0,
+    lineQuality: 0,
+    seamDrive: 0,
+    maxFlowEligible: false,
     pumpEfficiency: 0,
     potential: 0,
   };
@@ -1044,6 +1188,9 @@ function copySpeedPotential(target, source) {
   target.pocket = Number(source.pocket) || 0;
   target.pressure = Number(source.pressure) || 0;
   target.breaking = Number(source.breaking) || 0;
+  target.lineQuality = Number(source.lineQuality) || 0;
+  target.seamDrive = Number(source.seamDrive) || 0;
+  target.maxFlowEligible = Boolean(source.maxFlowEligible);
   target.pumpEfficiency = Number(source.pumpEfficiency) || 0;
   target.potential = Number(source.potential) || 0;
   return target;
@@ -1090,6 +1237,10 @@ function flowTierForSpeed(speed) {
 
 function finiteOr(value, fallback, min, max) {
   return clamp(Number.isFinite(value) ? value : fallback, min, max);
+}
+
+function finiteTuning(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
 }
 
 export { EMPTY_INPUT };

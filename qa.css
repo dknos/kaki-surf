@@ -73,8 +73,10 @@ figcaption {
   display: block;
   width: 384px;
   height: 216px;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
   background: #0d1025;
 }
 

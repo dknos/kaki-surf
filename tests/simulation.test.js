@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { BOARDS, FIXED_STEP, TUNING } from "../js/config.js";
-import { seededRandom, TAU } from "../js/math.js";
+import { clamp, seededRandom, TAU } from "../js/math.js";
 import { SurfSimulation } from "../js/simulation.js";
 import { formatTrickName } from "../js/trick-scoring.js";
 
@@ -63,6 +63,8 @@ function simulationSnapshot(simulation) {
       angularVelocity: player.angularVelocity,
       rotationAccum: player.rotationAccum,
       charge: player.charge,
+      waveMomentum: player.waveMomentum,
+      lateralVelocity: player.lateralVelocity,
       maneuver: { ...player.maneuver },
       speedPotential: { ...player.speedPotential },
     },
@@ -128,6 +130,41 @@ function prepareLaunch(board = BOARDS.mangoFish) {
   return simulation;
 }
 
+function runPowerLineTrack(faceOffset, steps = 720) {
+  const simulation = beginRiding(BOARDS.mangoFish);
+  const player = simulation.player;
+  let topSpeed = player.speed;
+  let fullPowerEvents = 0;
+
+  for (let step = 0; step < steps; step += 1) {
+    player.x = simulation.wave.curlX + 72;
+    player.face = simulation.wave.powerFaceAt(player.x) + faceOffset;
+    player.faceVelocity = 0;
+    const phase = step % 120;
+    simulation.update(FIXED_STEP, {
+      edge: phase < 72,
+      edgePressed: phase === 0,
+      edgeReleased: phase === 72,
+    });
+    simulation.consumeEvents((event) => {
+      if (event.type === "fullPower") fullPowerEvents += 1;
+    });
+    topSpeed = Math.max(topSpeed, player.speed);
+  }
+
+  return {
+    simulation,
+    summary: {
+      speed: player.speed,
+      topSpeed,
+      waveMomentum: player.waveMomentum,
+      speedCap: simulation.currentRideSpeedCap(),
+      fullPowerEvents,
+      speedPotential: { ...player.speedPotential },
+    },
+  };
+}
+
 function boardProbe(board) {
   const steering = beginRiding(board);
   steering.update(FIXED_STEP, { y: 1 });
@@ -135,6 +172,7 @@ function boardProbe(board) {
 
   const speed = beginRiding(board);
   speed.player.speed = 240;
+  speed.player.waveMomentum = 1;
   speed.update(FIXED_STEP, {});
   const cappedSpeed = speed.player.speed;
 
@@ -187,6 +225,124 @@ test("fixed-step outcomes are identical behind 30, 60, and 144 Hz render schedul
   assert.deepEqual(oneFortyFour.snapshot, thirty.snapshot);
 });
 
+test("the sustainable power seam deterministically builds momentum and unlocks top speed", () => {
+  const firstSeamRun = runPowerLineTrack(0);
+  const secondSeamRun = runPowerLineTrack(0);
+  const offLineRun = runPowerLineTrack(0.24);
+  const hardMax = TUNING.maxSpeed * BOARDS.mangoFish.maxSpeed;
+
+  assert.deepEqual(firstSeamRun.summary, secondSeamRun.summary);
+  assert.ok(firstSeamRun.summary.waveMomentum >= 0.95);
+  assert.ok(offLineRun.summary.waveMomentum < 0.05);
+  assert.equal(firstSeamRun.summary.fullPowerEvents, 1);
+  assert.equal(offLineRun.summary.fullPowerEvents, 0);
+  assert.equal(firstSeamRun.summary.speedCap, hardMax);
+  assert.ok(offLineRun.summary.speedCap < hardMax - 30);
+  assert.ok(firstSeamRun.summary.topSpeed > offLineRun.summary.topSpeed + 20);
+  assert.ok(offLineRun.summary.topSpeed < hardMax - 40);
+});
+
+test("equal-speed launches gain vertical pop only from earned wave momentum", () => {
+  const launchAtMomentum = (waveMomentum) => {
+    const simulation = beginRiding(BOARDS.mangoFish);
+    Object.assign(simulation.player, {
+      state: "lip",
+      stateTime: 0.1,
+      face: 0.02,
+      faceVelocity: -0.85,
+      speed: 120,
+      charge: 0.7,
+      waveMomentum,
+      lateralVelocity: 12,
+    });
+    simulation.launch({ x: 0 });
+    return {
+      airVY: simulation.player.airVY,
+      airVX: simulation.player.airVX,
+      launchData: { ...simulation.aerialSession.manifest.launchData },
+    };
+  };
+
+  const offLine = launchAtMomentum(0);
+  const powered = launchAtMomentum(0.95);
+
+  assert.equal(powered.launchData.launchSpeed, offLine.launchData.launchSpeed);
+  assert.equal(powered.airVX, offLine.airVX);
+  assert.ok(powered.airVY < offLine.airVY - 20);
+  assert.ok(powered.launchData.launchStrength > offLine.launchData.launchStrength);
+  assert.equal(offLine.launchData.waveMomentum, 0);
+  assert.equal(powered.launchData.waveMomentum, 0.95);
+});
+
+test("on-wave lateral velocity coasts after release and decays toward drift", () => {
+  const simulation = beginRiding(BOARDS.mangoFish);
+  simulation.player.speed = 100;
+
+  for (let step = 0; step < 30; step += 1) simulation.update(FIXED_STEP, { x: 1 });
+  const pressedX = simulation.player.x;
+  const pressedVelocity = simulation.player.lateralVelocity;
+
+  simulation.update(FIXED_STEP, {});
+  const releasedX = simulation.player.x;
+  const releasedVelocity = simulation.player.lateralVelocity;
+
+  assert.ok(pressedVelocity > 20);
+  assert.ok(releasedX > pressedX, "release preserves forward lateral motion");
+  assert.ok(releasedVelocity > 0 && releasedVelocity < pressedVelocity);
+
+  for (let step = 0; step < 120; step += 1) simulation.update(FIXED_STEP, {});
+  assert.ok(simulation.player.x > releasedX);
+  assert.ok(Math.abs(simulation.player.lateralVelocity) < pressedVelocity * 0.2);
+  assert.ok(Number.isFinite(simulation.player.lateralVelocity));
+});
+
+test("natural steering loads the seam reserve and carries it to a stronger lip launch", () => {
+  const simulation = beginRiding(BOARDS.mangoFish);
+  const player = simulation.player;
+  let phase = "seam";
+  let loadedMomentum = 0;
+  let launchEvent = null;
+
+  for (let step = 0; step < 1_800 && player.state !== "airborne"; step += 1) {
+    const targetX = simulation.wave.curlX + 72;
+    const x = clamp((targetX - player.x) * 0.13 - player.lateralVelocity * 0.025, -1, 1);
+    let y = -1;
+    let edge = true;
+    let edgePressed = false;
+    let edgeReleased = false;
+
+    if (phase === "seam") {
+      const targetFace = simulation.wave.powerFaceAt(player.x);
+      y = clamp((targetFace - player.face) * 10 - player.faceVelocity * 1.6, -1, 1);
+      const pumpPhase = step % 84;
+      edge = pumpPhase < 58;
+      edgePressed = pumpPhase === 0;
+      edgeReleased = pumpPhase === 58;
+      if (player.waveMomentum >= 0.82 && player.speed >= 104) {
+        loadedMomentum = player.waveMomentum;
+        phase = "climb";
+        edge = true;
+        edgePressed = true;
+        edgeReleased = false;
+      }
+    }
+
+    simulation.update(FIXED_STEP, { x, y, edge, edgePressed, edgeReleased });
+    simulation.consumeEvents((event) => {
+      if (event.type === "launch") launchEvent = event;
+    });
+    assert.notEqual(player.state, "wipeout");
+  }
+
+  assert.equal(phase, "climb");
+  assert.ok(loadedMomentum >= 0.82);
+  assert.equal(player.state, "airborne");
+  assert.ok(launchEvent);
+  assert.ok(launchEvent.payload.momentum > 0.65, "seam history survives the climb to the lip");
+  assert.ok(launchEvent.payload.strength > 1.05, "earned reserve produces a strong launch");
+  assert.equal(simulation.aerialSession.manifest.launchData.seamDrive, 0, "launch uses history, not lip overlap");
+});
+
 test("all boards produce measurably different steering, speed, pop, and landing outcomes", () => {
   const foam = boardProbe(BOARDS.foamPuff);
   const fish = boardProbe(BOARDS.mangoFish);
@@ -227,6 +383,9 @@ test("a launched aerial banks only after a perfect landing and returns to riding
   assert.equal(simulation.score.breakdown.landings, 0);
   assert.ok(simulation.player.provisionalScore > 0);
 
+  simulation.player.waveMomentum = 0;
+  const landingSpeedCap = simulation.currentRideSpeedCap();
+  simulation.player.speed = landingSpeedCap;
   forceContact(simulation, 0);
   simulation.update(FIXED_STEP, {});
   const landingEvents = collectEvents(simulation);
@@ -234,6 +393,7 @@ test("a launched aerial banks only after a perfect landing and returns to riding
   assert.equal(landing?.payload.quality, "perfect");
   assert.equal(simulation.player.state, "landing");
   assert.equal(simulation.player.landingQuality, "perfect");
+  assert.equal(simulation.player.speed, landingSpeedCap);
   assert.ok(simulation.score.total > preLandingTotal);
   assert.equal(simulation.score.total, simulation.score.bucketTotal());
 
@@ -245,6 +405,8 @@ test("a launched aerial banks only after a perfect landing and returns to riding
 test("a misaligned landing wipes out, respawns, and reset provides a clean restart", () => {
   const simulation = prepareLaunch(BOARDS.moonLog);
   assert.ok(simulation.player.provisionalScore > 0);
+  simulation.player.waveMomentum = 1;
+  simulation.player.lateralVelocity = 36;
   collectEvents(simulation);
   forceContact(simulation, Math.PI);
 
@@ -255,6 +417,8 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
   assert.equal(simulation.player.state, "wipeout");
   assert.equal(simulation.wipeouts, 1);
   assert.equal(simulation.player.provisionalScore, 0);
+  assert.equal(simulation.player.waveMomentum, 0);
+  assert.equal(simulation.player.lateralVelocity, 0);
   assert.ok(wipeoutEvents.some((event) => event.type === "wipeout"));
 
   for (let step = 0; step < 140 && simulation.player.state === "wipeout"; step += 1) {
@@ -262,6 +426,8 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
   }
   const respawnEvents = collectEvents(simulation);
   assert.equal(simulation.player.state, "entry");
+  assert.equal(simulation.player.waveMomentum, 0);
+  assert.equal(simulation.player.lateralVelocity, 0);
   assert.ok(respawnEvents.some((event) => event.type === "respawn"));
 
   simulation.reset({ board: BOARDS.foamPuff, assists: { steering: true, landing: true } });
@@ -273,6 +439,8 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
   assert.equal(simulation.score.total, 0);
   assert.equal(simulation.player.state, "entry");
   assert.equal(simulation.aerialSession, null);
+  assert.equal(simulation.player.waveMomentum, 0);
+  assert.equal(simulation.player.lateralVelocity, 0);
   assert.equal(simulation.board.id, "foamPuff");
   simulation.begin();
   simulation.update(FIXED_STEP, { edgePressed: true });
@@ -339,6 +507,8 @@ test("long seeded randomized play remains finite, bounded, and restartable", () 
     assert.ok(simulation.player.x >= 58 && simulation.player.x <= 350);
     assert.ok(simulation.player.airX >= 50 && simulation.player.airX <= 360);
     assert.ok(simulation.player.charge >= 0 && simulation.player.charge <= 1);
+    assert.ok(simulation.player.waveMomentum >= 0 && simulation.player.waveMomentum <= 1);
+    assert.ok(Math.abs(simulation.player.lateralVelocity) <= 48);
     assert.ok(simulation.player.speed >= 0);
     assert.ok(simulation.player.speed <= TUNING.maxSpeed * simulation.board.maxSpeed + 2);
     assert.ok(simulation.timeRemaining >= 0 && simulation.timeRemaining <= TUNING.runDuration);

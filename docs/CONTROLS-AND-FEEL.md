@@ -78,9 +78,13 @@ The shared query classifies three zones:
 2. **Power seam:** within 0.12 normalized face units of the moving target and close enough to the pocket to sustain drive. Seafoam/gold beads, faster streaks, wake, an entry chirp, and the HUD communicate acquisition.
 3. **Critical curl:** the breaking area or pocket risk at least 0.78. Dark folding water, whitewater mass, foam fingers, sparse coral marks, stronger surf noise, and multiplier pressure distinguish danger from the sustainable seam.
 
-Hold Pump to charge, compress Kitty, and flex the board. Release with more than 0.12 charge while still on the face to convert charge, carve rhythm, board pump identity, and the shared `pumpEfficiency` into speed. The compact Pump meter turns gold when efficiency is strong; thresholded charge notes teach the build without sounding every simulation step. A timed release creates a larger spray and impact response, while poor line timing produces less boost.
+Hold Pump to charge, compress Kitty, and flex the board. Release with more than 0.12 charge while still on the face to convert charge, carve rhythm, board pump identity, and the shared `pumpEfficiency` into speed. The compact Pump meter turns gold when efficiency is strong; thresholded charge notes teach the build without sounding every simulation step. A timed seam release creates the full spray and impulse, while a completely missed line retains only 22% of the timing factor.
 
-The intended rhythm is playable rather than modal: climb, hold Pump, drop toward the seam, release, accelerate, return to the lip, and launch.
+Riding the narrow sustainable core builds `waveMomentum`. The reserve takes roughly one second to acquire, decays gradually off line, and unlocks the board's speed ceiling. The safe shoulder and critical curl remain playable, but cannot produce full reserve or maximum sustainable acceleration. The gradual decay lets the intended rhythm stay playable rather than modal: climb, hold Pump, drop toward the seam, release, carry the earned speed back to the lip, and launch.
+
+Launch pop reads both actual speed and stored wave momentum. An ordinary lip jump always keeps its base impulse, and charge or a strong climb can improve it, but maximum vertical pop requires line history backed by real speed. Horizontal approach also carries into the aerial instead of being replaced by the final input sample.
+
+On-wave horizontal movement stores lateral velocity. Steering responds quickly, releasing coasts briefly, reversing must work through the existing momentum, and playfield edges remove only the outward component. Face acceleration is slightly quicker while retaining carve velocity longer than the original target-snapping response.
 
 ## Wave Read Assist
 
@@ -109,6 +113,7 @@ The short first-run callouts come from simulation in every mode. In Full mode, t
 The fixed tiers are `STALLING` below 52, `GLIDING` below 78, `FLOWING` below 101, `FLYING` below 124, and `MAX FLOW` at 124 or above. Speed is redundantly communicated through:
 
 - the compact flow gauge and tier name;
+- the seam-earned momentum reserve that gates the board's upper speed envelope;
 - board-specific wake length and spray shape;
 - speed-driven spray density and water-streak motion;
 - pump compression/release poses, board flex, and aerial posture;

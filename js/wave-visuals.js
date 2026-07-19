@@ -1,6 +1,18 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from "./config.js";
-import { clamp, smoothstep } from "./math.js";
-import { drawPixelText } from "./pixel-font.js";
+import { clamp } from "./math.js";
+
+const EDGE_STEPS = Object.freeze([0, 1, 0, -1, 0, 2, 1, 0, -2, -1, 1, 0, 2, 0, -1, 0, 1, -2, 0, 1, 0, -1, 2, 1]);
+const RIBBON_LENGTHS = Object.freeze([8, 15, 5, 22, 11, 18, 7, 26, 13, 9, 20, 6, 17, 12, 24, 10]);
+const RIBBON_GAPS = Object.freeze([13, 7, 19, 11, 5, 17, 9, 21, 8, 15, 6, 18, 10, 23, 12, 7]);
+const CURL_WHITEWATER = Object.freeze([
+  [-72, 7, 28, 3], [-55, 13, 35, 4], [-82, 20, 24, 3], [-64, 27, 42, 4],
+  [-89, 36, 31, 4], [-69, 45, 48, 5], [-94, 57, 37, 4], [-76, 68, 55, 5],
+  [-101, 82, 42, 5], [-81, 94, 59, 5], [-105, 108, 51, 6], [-84, 123, 63, 6],
+]);
+const CURL_FINGERS = Object.freeze([
+  [-30, 8, 17, 3], [-25, 18, 11, 3], [-31, 30, 19, 4], [-22, 44, 12, 3],
+  [-29, 57, 16, 4], [-20, 72, 10, 3], [-27, 88, 15, 4], [-18, 105, 9, 3],
+]);
 
 /** Pure bridge used by renderer tests to prove the visual seam is canonical. */
 export function powerSeamFaceAt(wave, x) {
@@ -23,20 +35,21 @@ export function waveGuideAt(wave, player, board, options = {}) {
 export function drawLayeredWave(ctx, simulation, palette, settings, time, conditionId) {
   const wave = simulation.wave;
   const player = simulation.player;
+  const speedCap = publishedSpeedCap(simulation);
+  const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
+  const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
   traceWaveFace(ctx, wave, 0, 1.36);
-  ctx.fillStyle = palette.water;
+  ctx.fillStyle = palette.waterDeep;
   ctx.fill();
 
-  drawFaceBand(ctx, wave, 0.04, 0.2, mixTone(palette.waterLight, palette.crest, conditionId));
-  drawFaceBand(ctx, wave, 0.2, 0.43, palette.waterLight);
-  drawFaceBand(ctx, wave, 0.43, 0.72, palette.water);
-  drawFaceBand(ctx, wave, 0.72, 1.36, palette.waterDeep);
-  drawDepthDither(ctx, wave, palette, time, conditionId);
-  drawSafeShoulder(ctx, wave, palette, time);
-  drawDirectionalStreaks(ctx, wave, palette, time, settings.reducedMotion);
-  drawPowerSeam(ctx, wave, palette, time, settings);
-  drawCurlMass(ctx, wave, palette, time, conditionId, settings.reducedMotion);
-  drawCrestAndLip(ctx, wave, palette, time, conditionId, settings.reducedMotion);
+  drawRampBand(ctx, wave, 0.015, 0.78, palette.water, 5);
+  drawRampBand(ctx, wave, 0.015, 0.43, palette.waterLight, 13);
+  drawRampBand(ctx, wave, 0.01, 0.17, mixTone(palette.waterLight, palette.crest, conditionId), 19);
+  drawDeepSwellMasses(ctx, wave, palette, time, settings, speedRatio, momentum);
+  drawCurrentRibbons(ctx, wave, palette, time, settings, speedRatio, momentum);
+  drawPowerSeam(ctx, wave, player, palette, time, settings);
+  drawCurlMass(ctx, wave, palette, time, conditionId, settings);
+  drawCrestAndLip(ctx, wave, player, palette, time, conditionId, settings, speedRatio, momentum);
   drawWaveReadAssist(ctx, wave, player, simulation.board, palette, settings, time);
 }
 
@@ -48,150 +61,216 @@ function traceWaveFace(ctx, wave, topFace, bottomFace, start = 0, end = LOGICAL_
   ctx.closePath();
 }
 
-function drawFaceBand(ctx, wave, top, bottom, color) {
-  traceWaveFace(ctx, wave, top, bottom);
+function traceIrregularWaveFace(ctx, wave, topFace, bottomFace, seed) {
+  ctx.beginPath();
+  for (let x = 0; x <= LOGICAL_WIDTH; x += 2) {
+    const index = (Math.floor(x / 4) + seed) % EDGE_STEPS.length;
+    const face = clamp(topFace + EDGE_STEPS[index] * 0.0045, 0, 1.36);
+    const y = Math.round(wave.ridingY(x, face));
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  for (let x = LOGICAL_WIDTH; x >= 0; x -= 2) {
+    const index = (Math.floor(x / 5) + seed * 3 + 7) % EDGE_STEPS.length;
+    const face = clamp(bottomFace + EDGE_STEPS[index] * 0.007, 0, 1.36);
+    ctx.lineTo(x, Math.round(wave.ridingY(x, face)));
+  }
+  ctx.closePath();
+}
+
+function drawRampBand(ctx, wave, top, bottom, color, seed) {
+  traceIrregularWaveFace(ctx, wave, top, bottom, seed);
   ctx.fillStyle = color;
   ctx.fill();
 }
 
-function drawDepthDither(ctx, wave, p, time, conditionId) {
-  const phase = Math.floor(time * 6);
-  const colors = conditionId === "twilightGlass"
-    ? [p.violet, p.waterDeep]
-    : conditionId === "stormbreak"
-      ? [p.haze, p.deepInk]
-      : [p.crest, p.waterDeep];
-  for (let row = 0; row < 8; row += 1) {
-    const face = 0.19 + row * 0.105;
-    ctx.fillStyle = colors[row & 1];
-    for (let x = ((row * 13 + phase) % 17) - 17; x < LOGICAL_WIDTH; x += 17) {
-      if (x <= wave.curlX + 18) continue;
-      const y = Math.round(wave.ridingY(x, face));
-      const size = row > 4 ? 2 : 1;
-      ctx.fillRect(x, y + ((x + row) & 1), size, 1);
+function drawDeepSwellMasses(ctx, wave, p, time, settings, speedRatio, momentum) {
+  const clock = settings.reducedMotion ? 0 : wave.travel * (0.05 + speedRatio * 0.045) + time * momentum * 8;
+  ctx.save();
+  ctx.globalAlpha = settings.highContrast ? 0.42 : 0.3;
+  for (let lane = 0; lane < 5; lane += 1) {
+    const face = 0.55 + lane * 0.145;
+    for (let segment = 0; segment < 8; segment += 1) {
+      const pattern = (segment + lane * 5) % RIBBON_LENGTHS.length;
+      const travel = segment * 67 + lane * 29 + RIBBON_GAPS[pattern] - clock * (0.24 + lane * 0.035);
+      const x = Math.round(((travel % 520) + 520) % 520) - 72;
+      if (x <= wave.curlX + 12) continue;
+      const length = 28 + RIBBON_LENGTHS[pattern] + Math.round(momentum * 12);
+      const y = Math.round(wave.ridingY(x, face)) + EDGE_STEPS[(pattern + lane) % EDGE_STEPS.length];
+      ctx.fillStyle = lane % 2 === 0 ? p.deepInk : p.waterDeep;
+      ctx.fillRect(x, y, length, 3);
+      ctx.fillRect(x + 9, y + 3, Math.max(7, length - 19), 2);
     }
   }
+  ctx.restore();
 }
 
-function drawSafeShoulder(ctx, wave, p, time) {
-  const start = Math.max(190, Math.round(wave.curlX + 142));
-  const drift = Math.floor((wave.travel * 0.08 + time * 3) % 38);
-  ctx.fillStyle = p.waterLight;
-  for (let row = 0; row < 5; row += 1) {
-    const face = 0.24 + row * 0.13;
-    for (let x = start - drift + row * 9; x < LOGICAL_WIDTH; x += 44) {
-      ctx.fillRect(x, Math.round(wave.ridingY(x, face)), 13 + (row & 1) * 5, 1);
-    }
-  }
-}
-
-function drawDirectionalStreaks(ctx, wave, p, time, reducedMotion) {
-  const clock = reducedMotion ? 0 : time;
-  for (let row = 0; row < 7; row += 1) {
-    const baseFace = 0.16 + row * 0.105;
-    for (let column = 0; column < 11; column += 1) {
-      const sampleX = wave.curlX + 27 + column * 34;
-      if (sampleX >= LOGICAL_WIDTH + 22) continue;
-      const seam = powerSeamFaceAt(wave, sampleX);
-      const guide = wave.speedPotential(sampleX, baseFace, { breaking: false });
-      const drift = Math.floor((wave.travel * (0.06 + guide.potential * 0.18) + clock * guide.potential * 20 + row * 11) % 31);
-      const x = Math.round(sampleX + drift - 15);
-      const y = Math.round(wave.ridingY(x, baseFace));
-      const length = 2 + Math.round(guide.potential * 9);
-      ctx.fillStyle = Math.abs(baseFace - seam) < 0.12 ? p.crest : p.waterLight;
+function drawCurrentRibbons(ctx, wave, p, time, settings, speedRatio, momentum) {
+  const clock = settings.reducedMotion ? 0 : wave.travel * (0.11 + speedRatio * 0.14) + time * (5 + momentum * 16);
+  for (let lane = 0; lane < 9; lane += 1) {
+    const face = 0.14 + lane * 0.105;
+    for (let segment = 0; segment < 12; segment += 1) {
+      const pattern = (segment * 3 + lane * 7) % RIBBON_LENGTHS.length;
+      const travel = segment * 43 + lane * 17 + RIBBON_GAPS[pattern] - clock * (0.55 + lane * 0.035);
+      const x = Math.round(((travel % 470) + 470) % 470) - 43;
+      if (x <= wave.curlX + 24) continue;
+      const guide = wave.speedPotential(x, face, { breaking: false });
+      const nearSeam = Math.abs(face - powerSeamFaceAt(wave, x)) < 0.1;
+      const length = RIBBON_LENGTHS[pattern] + Math.round(speedRatio * 6 + guide.potential * 5);
+      const y = Math.round(wave.ridingY(x, face)) + EDGE_STEPS[(pattern + lane) % EDGE_STEPS.length];
+      ctx.fillStyle = nearSeam ? p.crest : lane > 5 ? p.waterLight : lane % 3 === 0 ? p.foamShade : p.crest;
       ctx.fillRect(x, y, length, 1);
-      if (guide.potential > 0.72 && (column + row) % 3 === 0) ctx.fillRect(x + length - 2, y + 2, 2, 1);
+      if (length > 13) ctx.fillRect(x + 4, y + 2, Math.max(3, length - 10), 1);
+      if (guide.potential > 0.78 && pattern % 4 === 0) ctx.fillRect(x + length - 2, y - 1, 2, 1);
     }
   }
 }
 
-function drawPowerSeam(ctx, wave, p, time, settings) {
+function drawPowerSeam(ctx, wave, player, p, time, settings) {
   const assist = String(settings.waveReadAssist ?? "full").toLowerCase();
   const strong = settings.highContrast || assist === "full";
-  const phase = Math.floor((wave.travel * 0.28 + (settings.reducedMotion ? 0 : time * 22)) % 23);
-  for (let x = Math.max(0, Math.floor(wave.curlX + 18)); x < LOGICAL_WIDTH; x += 3) {
+  const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
+  const start = Math.max(0, Math.floor(wave.curlX + 49));
+  const phase = settings.reducedMotion ? 0 : Math.floor((wave.travel * 0.4 + time * (13 + momentum * 20)) % 19);
+  for (let index = 0; index < 28; index += 1) {
+    const pattern = (index * 5 + 3) % RIBBON_LENGTHS.length;
+    const x = start + index * 18 + EDGE_STEPS[(pattern + index) % EDGE_STEPS.length] * 2 - phase;
+    if (x < start || x >= LOGICAL_WIDTH) continue;
     const face = powerSeamFaceAt(wave, x);
     const y = Math.round(wave.ridingY(x, face));
-    const bead = (x + phase) % 23;
-    ctx.fillStyle = bead < 8 ? p.gold : p.crest;
-    ctx.fillRect(x, y, strong && bead < 5 ? 4 : 3, strong && bead < 3 ? 2 : 1);
-    if (bead === 0 || bead === 1) {
+    const length = 4 + (RIBBON_LENGTHS[pattern] % 7) + Math.round(momentum * 4);
+    if (strong) {
+      ctx.fillStyle = p.waterDeep;
+      ctx.fillRect(x - 1, y + 1, length + 2, 1);
+    }
+    ctx.fillStyle = index % 4 === 0 ? p.gold : index % 3 === 0 ? p.foam : p.crest;
+    ctx.fillRect(x, y, length, 1);
+    ctx.fillRect(x + 2, y - 1, Math.max(2, length - 5), 1);
+    if (momentum > 0.72 && index % 5 === 0) ctx.fillRect(x + length - 2, y - 3, 2, 2);
+  }
+}
+
+function drawCurlMass(ctx, wave, p, time, conditionId, settings) {
+  const curl = Math.round(wave.curlX);
+  const crest = Math.round(wave.crestY(curl));
+  const pulse = settings.reducedMotion ? 0 : EDGE_STEPS[Math.floor(time * 7) % EDGE_STEPS.length];
+
+  // Connected foam islands create mass without the old horizontal barcode.
+  ctx.fillStyle = p.foamShade;
+  for (let index = 0; index < CURL_WHITEWATER.length; index += 1) {
+    const cluster = CURL_WHITEWATER[index];
+    const x = curl + cluster[0] + (index % 3 === 0 ? pulse : 0);
+    const y = crest + cluster[1];
+    ctx.fillRect(x, y, cluster[2], cluster[3]);
+    ctx.fillRect(x + 5, y - 2, Math.max(4, cluster[2] - 13), 2);
+    if (index % 3 === 1) {
       ctx.fillStyle = p.foam;
-      ctx.fillRect(x + 1, y - 2, 1, 1);
+      ctx.fillRect(x + 2, y, Math.max(5, cluster[2] - 9), 2);
+      ctx.fillStyle = p.foamShade;
     }
   }
-}
 
-function drawCurlMass(ctx, wave, p, time, conditionId, reducedMotion) {
-  const curl = Math.round(wave.curlX);
-  const pulse = reducedMotion ? 0 : Math.round(Math.sin(time * 5.7) * 2);
-
-  // Whitewater behind the breaking wall.
-  ctx.fillStyle = p.foamShade;
-  for (let y = 82; y < LOGICAL_HEIGHT; y += 5) {
-    const width = 34 + Math.floor((y - 82) * 0.22);
-    ctx.fillRect(curl - width - 24 + ((y + pulse) % 7), y, width, 3);
-  }
-  ctx.fillStyle = p.foam;
-  for (let y = 85; y < LOGICAL_HEIGHT; y += 9) {
-    ctx.fillRect(curl - 53 + ((y * 3 + pulse) % 14), y, 25 + (y % 13), 2);
-  }
-
-  // Tube shadow, folding face, and thick critical edge.
-  ctx.fillStyle = p.deepInk;
-  ctx.beginPath();
-  ctx.moveTo(curl - 28, Math.round(wave.crestY(curl - 28)));
-  ctx.lineTo(curl + 12, Math.round(wave.crestY(curl + 12)));
-  ctx.lineTo(curl + 24 + pulse, 94);
-  ctx.lineTo(curl + 16, 130);
-  ctx.lineTo(curl - 10, 158);
-  ctx.lineTo(curl - 33, 184);
-  ctx.closePath();
-  ctx.fill();
+  // A glassy folding face surrounds a smaller, readable tube shadow.
+  ctx.save();
+  ctx.globalAlpha = settings.highContrast ? 1 : 0.86;
   ctx.fillStyle = p.waterDeep;
   ctx.beginPath();
-  ctx.moveTo(curl - 20, 80);
-  ctx.lineTo(curl + 5, 79);
-  ctx.lineTo(curl + 14 + pulse, 93);
-  ctx.lineTo(curl + 5, 119);
-  ctx.lineTo(curl - 15, 138);
-  ctx.lineTo(curl - 28, 137);
+  ctx.moveTo(curl - 35, crest + 1);
+  ctx.lineTo(curl + 10, crest + 2);
+  ctx.lineTo(curl + 25 + pulse, crest + 19);
+  ctx.lineTo(curl + 20, crest + 44);
+  ctx.lineTo(curl + 7, crest + 70);
+  ctx.lineTo(curl - 13, crest + 92);
+  ctx.lineTo(curl - 37, LOGICAL_HEIGHT - 5);
+  ctx.lineTo(curl - 51, LOGICAL_HEIGHT - 5);
+  ctx.lineTo(curl - 36, crest + 75);
+  ctx.lineTo(curl - 28, crest + 36);
   ctx.closePath();
   ctx.fill();
+
+  ctx.globalAlpha = settings.highContrast ? 0.82 : 0.55;
+  ctx.fillStyle = p.waterLight;
+  ctx.beginPath();
+  ctx.moveTo(curl - 27, crest + 3);
+  ctx.lineTo(curl + 8, crest + 4);
+  ctx.lineTo(curl + 18 + pulse, crest + 20);
+  ctx.lineTo(curl + 9, crest + 43);
+  ctx.lineTo(curl - 10, crest + 62);
+  ctx.lineTo(curl - 26, crest + 61);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.globalAlpha = settings.highContrast ? 1 : 0.82;
+  ctx.fillStyle = p.deepInk;
+  ctx.beginPath();
+  ctx.moveTo(curl - 9, crest + 9);
+  ctx.lineTo(curl + 7, crest + 10);
+  ctx.lineTo(curl + 14 + pulse, crest + 23);
+  ctx.lineTo(curl + 7, crest + 45);
+  ctx.lineTo(curl - 7, crest + 63);
+  ctx.lineTo(curl - 19, crest + 72);
+  ctx.lineTo(curl - 24, crest + 61);
+  ctx.lineTo(curl - 14, crest + 35);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
   if (conditionId === "twilightGlass") {
     ctx.fillStyle = p.violet;
-    ctx.fillRect(curl - 16, 84, 20, 2);
+    ctx.fillRect(curl - 24, crest + 8, 25, 2);
+  } else if (conditionId === "stormbreak") {
+    ctx.fillStyle = p.haze;
+    ctx.fillRect(curl - 27, crest + 6, 19, 2);
   }
 
-  // Falling foam and inward-reaching fingers distinguish danger from speed.
-  for (let y = 79; y < 188; y += 6) {
-    const inward = Math.round(Math.sin(y * 0.21 + time * (reducedMotion ? 0 : 5)) * 3);
-    const length = 8 + ((y / 6) % 3) * 3;
-    ctx.fillStyle = y % 18 === 0 ? p.foam : p.foamShade;
-    ctx.fillRect(curl - 29 + inward, y, length, 3);
-    if (y > 97) ctx.fillRect(curl - 14 + inward, y + 3, 7 + (y % 11), 2);
+  // Inward hooks and light beads communicate the critical pocket by shape.
+  for (let index = 0; index < CURL_FINGERS.length; index += 1) {
+    const finger = CURL_FINGERS[index];
+    const x = curl + finger[0] + (index % 2 === 0 ? pulse : 0);
+    const y = crest + finger[1];
+    ctx.fillStyle = index % 3 === 0 ? p.foam : p.foamShade;
+    ctx.fillRect(x, y, finger[2], finger[3]);
+    ctx.fillRect(x + finger[2] - 4, y + finger[3], 4, 2);
   }
-  ctx.fillStyle = p.danger;
-  for (let y = 94; y < 178; y += 13) ctx.fillRect(curl + 17 + (y % 2), y, 2, 4);
+
+  ctx.fillStyle = p.crest;
+  ctx.fillRect(curl - 5, crest + 17, 8, 1);
+  ctx.fillRect(curl - 10, crest + 34, 6, 1);
+  ctx.fillRect(curl - 15, crest + 51, 5, 1);
 }
 
-function drawCrestAndLip(ctx, wave, p, time, conditionId, reducedMotion) {
-  const phase = reducedMotion ? 0 : Math.floor(time * 13);
+function drawCrestAndLip(ctx, wave, player, p, time, conditionId, settings, speedRatio, momentum) {
+  const phase = settings.reducedMotion ? 0 : Math.floor((time * 9 + wave.travel * 0.12) % 31);
   ctx.fillStyle = p.crest;
-  for (let x = 0; x < LOGICAL_WIDTH; x += 3) {
+  for (let x = 0; x < LOGICAL_WIDTH; x += 2) {
     const y = Math.round(wave.crestY(x));
-    const nearCurl = x < wave.curlX + 36;
-    const thickness = nearCurl ? 5 : 2 + ((x + phase) % 17 < 5 ? 2 : 0);
-    ctx.fillRect(x, y - 1, 4, thickness);
+    const nearCurl = x < wave.curlX + 42;
+    const pattern = EDGE_STEPS[(Math.floor(x / 4) + phase) % EDGE_STEPS.length];
+    const thickness = nearCurl ? 4 + Math.max(0, pattern) : 2 + Number(pattern > 0);
+    ctx.fillRect(x, y - 1, 3, thickness);
   }
+
   ctx.fillStyle = p.foam;
-  for (let x = 1; x < LOGICAL_WIDTH; x += 9) {
+  for (let index = 0; index < 30; index += 1) {
+    const pattern = (index * 7 + 2) % RIBBON_LENGTHS.length;
+    const travel = index * 23 + EDGE_STEPS[pattern] * 3 - phase;
+    const x = Math.round(((travel % 430) + 430) % 430) - 22;
+    if (x < 0 || x >= LOGICAL_WIDTH) continue;
     const y = Math.round(wave.crestY(x));
-    const feather = (x + phase) % 27;
-    ctx.fillRect(x, y - 3, 6 + (x % 4), 2);
-    if (feather < 9) {
-      ctx.fillRect(x + 1, y - 6 - (feather % 2), 2, 3);
-      if (conditionId === "stormbreak") ctx.fillRect(x + 4, y - 8, 1, 2);
+    const length = 5 + (RIBBON_LENGTHS[pattern] % 9) + Math.round(speedRatio * 3);
+    ctx.fillRect(x, y - 3, length, 2);
+    ctx.fillRect(x + 2, y - 5 - (pattern % 2), Math.max(2, Math.min(4, length - 3)), 2);
+    if (momentum > 0.72 && index % 4 === 0) ctx.fillRect(x + length - 2, y - 7, 2, 2);
+    if (conditionId === "stormbreak" && index % 3 === 0) ctx.fillRect(x + 1, y - 9, 1, 3);
+  }
+
+  if (Number(player?.waveMomentum ?? 0) >= 0.9) {
+    ctx.fillStyle = p.gold;
+    for (let index = 0; index < 6; index += 1) {
+      const x = 104 + index * 49 + ((phase + index * 7) % 13);
+      const y = Math.round(wave.crestY(x)) - 8 - (index % 2) * 2;
+      ctx.fillRect(x, y, 3, 1);
+      ctx.fillRect(x + 1, y - 1, 1, 3);
     }
   }
 }
@@ -201,10 +280,14 @@ function drawWaveReadAssist(ctx, wave, player, board, p, settings, time) {
   if (!player || player.state === "airborne" || player.state === "wipeout" || player.state === "complete") return;
   const guide = player.speedPotential ?? waveGuideAt(wave, player, board);
   const x = clamp(Math.round(player.x + (player.x > 310 ? -30 : 29)), 24, LOGICAL_WIDTH - 24);
-  const seamY = Math.round(wave.ridingY(player.x, guide.targetFace));
+  const seamFace = powerSeamFaceAt(wave, player.x);
+  const seamY = Math.round(wave.ridingY(player.x, seamFace));
   const y = clamp(seamY, 91, 172);
   const pulse = settings.reducedMotion ? 0 : Math.round(Math.sin(time * 8));
-  ctx.fillStyle = guide.zone === "power" ? p.gold : p.foam;
+  const color = guide.zone === "power" ? p.gold : p.foam;
+  ctx.fillStyle = p.ink;
+  ctx.fillRect(x - 2, y - 5, 5, 11);
+  ctx.fillStyle = color;
   ctx.fillRect(x - 1, y - 4, 3, 9);
   if (guide.correction > 0) {
     ctx.fillRect(x - 4, y + 2 + pulse, 9, 2);
@@ -214,21 +297,19 @@ function drawWaveReadAssist(ctx, wave, player, board, p, settings, time) {
     ctx.fillRect(x - 2, y - 6 + pulse, 5, 2);
   } else {
     ctx.fillRect(x - 4, y - 1, 9, 3);
+    ctx.fillStyle = p.foam;
+    ctx.fillRect(x, y - 4, 1, 9);
   }
-  const useful = guide.zone === "power"
-    ? "POWER LINE"
-    : Math.abs(guide.error) < 0.025
-      ? "HOLD LINE"
-      : guide.correction > 0
-        ? "TOO HIGH"
-        : "TOO LOW";
-  drawPixelText(ctx, useful, x, clamp(y + 10, 104, 181), {
-    align: "center",
-    color: guide.zone === "power" ? p.gold : p.foam,
-    shadow: p.ink,
-  });
 }
 
 function mixTone(light, accent, conditionId) {
   return conditionId === "twilightGlass" ? accent : light;
+}
+
+function publishedSpeedCap(simulation) {
+  const published = Number(simulation?.currentRideSpeedCap?.());
+  if (Number.isFinite(published) && published > 0) return published;
+  const tuningMax = Number(simulation?.tuning?.maxSpeed ?? 138);
+  const boardMax = Number(simulation?.board?.maxSpeed ?? 1);
+  return Math.max(1, tuningMax * boardMax);
 }
