@@ -1,6 +1,6 @@
 # Kaki Surf
 
-Kaki Surf is a standalone, no-bundler Canvas score-attack game starring Kitty Kaki. It runs at a fixed 384 x 216 logical resolution with a 1/120-second gameplay step and deploys directly to any static host.
+Kaki Surf is a standalone, no-bundler Canvas score-attack game starring Kitty Kaki. It runs at a fixed 384 x 216 logical resolution with a 1/120-second simulation step and deploys unchanged to a static host.
 
 **[Play Kaki Surf on GitHub Pages](https://dknos.github.io/kaki-surf/)**
 
@@ -8,64 +8,83 @@ Kaki Surf is a standalone, no-bundler Canvas score-attack game starring Kitty Ka
 
 ## Quick play
 
-Open the hosted game above, or serve this directory over HTTP and open `index.html`. For example:
+Open the hosted game, or serve this directory over HTTP:
 
 ```console
 python -m http.server 8000
 ```
 
-Then visit `http://localhost:8000`, choose one of three boards and one of three surf conditions, and select **Drop In**. No build or package installation is required.
+Then visit `http://localhost:8000`, choose a board and condition, and select **Drop In**. No build or package installation is required.
 
-| Intent | Keyboard | Gamepad |
-| --- | --- | --- |
-| Carve; spin or trim in air | Arrows or WASD | Left stick or D-pad |
-| Pump / compress / commit | Space or Z | A or right trigger |
-| Rail move / Front Rail Grab | Q; legacy X or C | X or left bumper |
-| Tail move / Tail Grab | E | Y or right bumper |
-| Lip move / Board Varial | F | B |
-| Pocket move / Kaki Twist | T | Left trigger or right-stick press |
-| Pause | Escape or P | Start |
-| Restart | R | B on results |
+Simple Controls are the default:
 
-Touch play uses a directional pad, a separate Pump button, and a four-button Q/E/F/T trick diamond. The controls accept simultaneous direction and trick pointers, so held grabs and aerial trim work on touch.
+| Intent | Keyboard | Standard gamepad | Touch |
+| --- | --- | --- | --- |
+| Travel, carve, and trim | Arrows or WASD | Left stick or D-pad | Direction pad |
+| Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
+| Context trick | F or X | X or B | **Trick** |
+| Optional spin impulses | Q / E | Left / right bumper | Left / right **Spin** |
+| Mounted-animal special | T or Shift | Y | **Special** when ready |
+| Pause | Escape or P | Start | Settings |
 
-## Read, pump, launch
+Advanced Controls preserve the original Q/E/F/T map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
 
-The face has three strategic zones: a calm safe shoulder, a shifting seafoam-and-gold power seam, and a dangerous critical curl. The sustainable power seam is the only line that builds persistent wave momentum and unlocks each board's full ride-speed cap; momentum decays after leaving it. Hold Pump while climbing to compress, drop toward the seam, and release in the line to build speed and momentum together. Launch height then depends on both actual speed and earned wave momentum, so off-line speed alone cannot produce maximum pop. Faster steering response and a decaying lateral velocity preserve a short, readable coast after input release. Wake length, spray, moving water streaks, Kitty's pose, the power meter, audio, and supported rumble reinforce the charge toward full power.
+## Surf both ways
 
-On the wave, Q/E/F/T become Snap, Cutback, Floater, and Tube Tuck (or Moon Log's Soul Arch). In the air they become Front Rail Grab, Tail Grab, Board Varial, and Kaki Twist. Left/right body spin and up/down board trim remain independent, so spins, holds, and sequenced tricks can be composed without entering a canned animation. Aerial points are provisional until the board meets the landing tangent; a wipeout loses the provisional bank.
+The rider can commit to left- or right-going travel. A reversal must scrub through the existing board velocity before the new direction commits, and the surfer, wake, airborne approach, world parallax, and switch-stance scoring all follow that signed direction. The board's maximum speed is a real cap, not a target that every line receives automatically.
 
-See [Controls and gameplay](docs/CONTROLS-AND-FEEL.md) for device mappings and contextual eligibility, and [Trick grammar](docs/TRICK-GRAMMAR.md) for the simulation and host-input contract.
+Wave geometry now supplies the main drive. Dropping down the face adds speed, climbing costs speed, and traversing retains a smaller glide. Action is an enhancer: compress and release to pump, or carry speed to the lip for bigger air. Launch height combines current speed, uphill approach, charge, board identity, pocket position, and any active bonus. Perfect and clean landings preserve useful carry into the next line.
+
+Speed and Flow are separate:
+
+- **Speed** is physical motion, reported as `STALLING`, `GLIDING`, `FAST`, `FLYING`, or `BLASTING` and reinforced by wake, spray, parallax, animation, and audio.
+- **Flow** is the run's combo/style state. Direction changes, varied tricks, clean landings, wildlife moments, and sustained committed surfing build it; repetition, stalling, wobble, and wipeouts reduce it.
+
+Simple Controls buffer one Trick request into the aerial context, choose an eligible move, fall back to a readable grab when a large move no longer fits, and begin helping the board toward the nearest valid landing tangent late in descent. Advanced Controls retain direct on-wave maneuvers and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
+
+## A living coast
+
+`WorldSimulation` owns a seeded, bounded world layer that is independent from the renderer. Far, mid, and near traffic includes sailboats, fishing boats, speedboats, birds, planes, helicopters, banner flights, and rare Fleet Airshow/carrier events. Signed `worldTravel` makes that traffic and its parallax agree with the rider's direction.
+
+Wildlife and bonuses are gameplay, not decoration:
+
+- dolphins offer a friendly ride and a special dismount launch;
+- sharks use readable telegraphs, a collision consequence, and a near-miss/thread bonus;
+- whales progress through distant, blow, breach, ramp, ride, splash, and departure phases;
+- bird flocks dodge harmlessly for Feather Thread, couriers drop fair pickups, and speedboats or jet skis offer no-penalty wake races;
+- Dolphin Ride and Fleet Airshow use simulation-owned foam-gate series;
+- Mango Rush reduces uphill loss, Moon Pop boosts the next launch, and Star Foam protects Flow from one dangerous contact or wobble.
+
+Spawn streams, quiet periods, capacities, culling, collision sweeps, interactions, and presentation events are all simulation-owned and deterministic for a seed.
 
 ## Boards and conditions
 
-- **Foam Puff** is the beginner recovery board: rounded and thick, with the widest landing modifier, strong trim, and low commitment.
-- **Mango Fish** is the technical combo board: a sharp fish silhouette with fast rails, strong grip, and quick spins.
-- **Moon Log** is the expert momentum board: a long silhouette with the highest speed and pop, slower correction, and high-value long holds and signatures.
+- **Foam Puff** is the beginner recovery board: rounded, stable, and easiest to auto-level in Simple mode.
+- **Mango Fish** is the technical combo board: fast rails, strong grip, and quick spins.
+- **Moon Log** is the expert glide board: the highest cap and pop, slower correction, and high-value long holds.
 
-Golden Coast, Twilight Glass, and Stormbreak share fair gameplay-wave physics while changing palette, horizon treatment, atmosphere, and reactive music. Each condition has a locally bundled 384 x 80 gameplay strip and 768 x 432 menu image; the live wave, seam, curl, surfer, and effects remain state-driven Canvas art.
+Golden Coast, Twilight Glass, and Stormbreak share fair gameplay geometry while changing palette, horizon treatment, traffic mix, atmosphere, and reactive music.
+
+## Local art pipeline
+
+The static game includes six condition backgrounds and 11 compact generated atlas families for wave-breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their 1280 x 720 Grok source sheets are preserved under `docs/art-source/grok`; `tools/art/build-grok-assets.py` deterministically removes chroma, extracts cells, downsamples, sharpens, quantizes, and rebuilds the transparent atlases under `assets/generated`.
+
+Every atlas is optional. `js/asset-loader.js` validates each family independently, and the Canvas renderer keeps a local code-authored fallback when one is absent or invalid. The browser never calls Grok, Blender, an image API, a CDN, or a remote asset host. Exact prompts, selections, source hashes, and output dimensions are recorded in [Grok asset provenance](docs/GROK-ASSET-PROVENANCE.md).
 
 ## Validation
-
-The repository has no third-party runtime or test dependencies. Run the native Node test suite and syntax validation from this directory:
 
 ```console
 npm test
 npm run check
+git diff --check
 ```
 
-The current automated run passes 49 tests, syntax-checks all 20 JavaScript modules, and passes Git whitespace checks. The refreshed 26-state browser QA sheet covers the menu, momentum charge, max speed, every trick/landing state, all three conditions, touch controls, and high contrast. See [validation results](docs/TEST-RESULTS.md).
+The final native suite passes **88/88 tests**, and the syntax gate checks **26 JavaScript modules**. The refreshed real-browser gallery contains **112 deterministic 1280 x 720 captures**; its reviewed [production contact sheet](docs/images/qa-contact-sheet.png) covers controls, bidirectional movement, curl states, air/tricks, wildlife, traffic, couriers, races, powerups, Fleet Airshow, all boards/conditions, and access modes. See [Validation results](docs/TEST-RESULTS.md) and [QA matrix](docs/QA.md).
 
-## Static deployment
+## Static deployment and integration
 
-Browsers require the native module files to be served over HTTP rather than opened through a `file://` URL. All runtime imports and assets use relative local URLs; there is no bundle, generated build directory, remote gameplay asset, or runtime image-generation API.
-
-The optional repository-level Sites wrapper is only a preview/deployment shell. The complete game lives in this directory and can be copied to a GitHub Pages branch or another static host unchanged.
-
-## Architecture and host integration
-
-Gameplay truth is renderer-independent. `js/wave.js` owns the canonical power seam and speed-potential queries; `js/simulation.js` stores wave momentum, applies the momentum-gated speed cap, and carries earned drive into launches; `js/tricks.js` owns the aerial manifest; and `js/trick-scoring.js` names and values it. `js/asset-loader.js` preloads the six local condition images with independent fallbacks, while `js/sprites.js`, `js/wave-visuals.js`, and `js/renderer.js` compose the state-driven foreground and effects.
+Browsers require the native modules to be served over HTTP rather than opened through `file://`. All runtime imports and assets use relative local URLs; there is no bundle, generated application directory, remote gameplay asset, or runtime generation API.
 
 `js/integration-adapter.js` exports `createKakiSurf({ host, input, audio, storage, settings, profile, onExit, onRunComplete, qaScene })`. It returns `start`, `pause`, `resume`, `restart`, `destroy`, and `getSnapshot` lifecycle methods.
 
-See [ADR-001](docs/ADR-001-standalone-canvas.md) for determinism and integration boundaries, [Asset manifest](docs/ASSET-MANIFEST.md) for production provenance, and [Hero source map](docs/HERO-SOURCE-MAP.md) for the reference-only Kitty Kaki Survivors identity mapping.
+Gameplay truth remains renderer-independent: `js/wave.js` owns ride geometry, `js/simulation.js` owns rider physics and interactions, `js/world.js` owns the ambient/gameplay world, `js/tricks.js` owns the aerial manifest, and `js/scoring.js` owns Speed/Flow valuation and score banking. See [ADR-001](docs/ADR-001-standalone-canvas.md), [Asset manifest](docs/ASSET-MANIFEST.md), and [Hero source map](docs/HERO-SOURCE-MAP.md).

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   BUFFER_WINDOW,
+  CONTROL_MODES,
   InputManager,
   KEY_BINDINGS,
   applyDeadZone,
@@ -30,6 +31,18 @@ const STEP_FIELDS = [
   "style",
   "stylePressed",
   "styleReleased",
+  "trick",
+  "trickPressed",
+  "trickReleased",
+  "special",
+  "specialPressed",
+  "specialReleased",
+  "spinLeft",
+  "spinLeftPressed",
+  "spinLeftReleased",
+  "spinRight",
+  "spinRightPressed",
+  "spinRightReleased",
 ];
 
 test("step contract is complete and navigator is optional", () => {
@@ -45,6 +58,106 @@ test("step contract is complete and navigator is optional", () => {
     debug: false,
   });
   input.destroy();
+});
+
+test("Simple mode is the default and exposes buffered action, context trick, special, and spin semantics", () => {
+  const target = new FakeTarget();
+  const input = new InputManager({ target, getGamepads: () => [] });
+  assert.equal(input.controlMode, CONTROL_MODES.SIMPLE);
+
+  for (const code of ["Space", "KeyF", "KeyT", "KeyQ", "KeyE"]) {
+    target.dispatch("keydown", { code });
+  }
+  input.update(0);
+  let step = snapshot(input.consumeStep());
+  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+    assert.equal(step[action], true, `${action} held`);
+    assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
+  }
+  for (const action of ["trick1", "trick2", "trick3", "trick4", "style"]) {
+    assert.equal(step[action], false, `${action} stays inactive in Simple mode`);
+  }
+
+  for (const code of ["Space", "KeyF", "KeyT", "KeyQ", "KeyE"]) {
+    target.dispatch("keyup", { code });
+  }
+  input.update(0);
+  step = snapshot(input.consumeStep());
+  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+    assert.equal(step[action], false, `${action} released hold`);
+    assert.equal(step[`${action}Released`], true, `${action} release buffered`);
+  }
+
+  input.destroy();
+});
+
+test("Simple keyboard aliases share logical edges and setControlMode clears before restoring Advanced Q/E/F/T", () => {
+  const target = new FakeTarget();
+  const input = new InputManager({ target, getGamepads: () => [] });
+
+  target.dispatch("keydown", { code: "KeyF" });
+  input.update(0);
+  assert.equal(input.consumeStep().trickPressed, true);
+  target.dispatch("keydown", { code: "KeyX" });
+  input.update(0);
+  assert.equal(input.consumeStep().trickPressed, false, "F and X are one Simple trick action");
+  target.dispatch("keyup", { code: "KeyF" });
+  input.update(0);
+  assert.equal(input.consumeStep().trickReleased, false, "X keeps the Simple trick held");
+
+  target.dispatch("keydown", { code: "ShiftLeft" });
+  input.update(0);
+  assert.equal(input.consumeStep().specialPressed, true, "Shift starts SPECIAL");
+  target.dispatch("keydown", { code: "KeyT" });
+  input.update(0);
+  assert.equal(input.consumeStep().specialPressed, false, "T and Shift are one SPECIAL action");
+  target.dispatch("keyup", { code: "ShiftLeft" });
+  input.update(0);
+  assert.equal(input.consumeStep().specialReleased, false, "T keeps SPECIAL held");
+  target.dispatch("keyup", { code: "KeyT" });
+  input.update(0);
+  assert.equal(input.consumeStep().specialReleased, true);
+
+  assert.equal(input.setControlMode("advanced"), CONTROL_MODES.ADVANCED);
+  assert.deepEqual(snapshot(input.consumeStep()), createInputStep(), "mode changes clear every held edge");
+  target.dispatch("keyup", { code: "KeyX" });
+  target.dispatch("keydown", { code: "KeyF" });
+  input.update(0);
+  let step = snapshot(input.consumeStep());
+  assert.equal(step.trick3Pressed, true);
+  assert.equal(step.trick, false);
+
+  assert.equal(input.setControlMode("unsupported"), CONTROL_MODES.SIMPLE);
+  assert.deepEqual(snapshot(input.consumeStep()), createInputStep());
+  input.destroy();
+});
+
+test("Simple keyboard, gamepad, and touch presses survive the shared 120ms edge buffer", () => {
+  const keyboardTarget = new FakeTarget();
+  const keyboard = new InputManager({ target: keyboardTarget, getGamepads: () => [] });
+  keyboardTarget.dispatch("keydown", { code: "KeyF" });
+  keyboard.update(BUFFER_WINDOW - 0.001);
+  assert.equal(keyboard.consumeStep().trickPressed, true);
+  keyboard.destroy();
+
+  const pad = createPad();
+  const gamepad = new InputManager({ target: new FakeTarget(), getGamepads: () => [pad] });
+  pressButtons(pad, 2);
+  gamepad.update(0);
+  gamepad.update(BUFFER_WINDOW - 0.001);
+  assert.equal(gamepad.consumeStep().trickPressed, true);
+  gamepad.destroy();
+
+  const trickButton = new FakeButton("trick");
+  const touch = new InputManager({
+    target: new FakeTarget(),
+    touchRoot: new FakeTouchRoot([trickButton]),
+    getGamepads: () => [],
+  });
+  trickButton.dispatch("pointerdown", { pointerId: 1 });
+  touch.update(BUFFER_WINDOW - 0.001);
+  assert.equal(touch.consumeStep().trickPressed, true);
+  touch.destroy();
 });
 
 test("Q, E, F, and T produce one buffered press, a held state, and a buffered release", () => {
@@ -207,7 +320,11 @@ test("directions, edge aliases, pause, restart, and bound-key default prevention
 test("gamepad mappings expose all actions and keep B retry separate from live restart", () => {
   const target = new FakeTarget();
   const pad = createPad();
-  const input = new InputManager({ target, getGamepads: () => [pad] });
+  const input = new InputManager({
+    target,
+    getGamepads: () => [pad],
+    controlMode: CONTROL_MODES.ADVANCED,
+  });
 
   pressButtons(pad, 15, 12, 0, 2, 3, 1, 6, 9);
   input.update(0);
@@ -262,6 +379,31 @@ test("gamepad mappings expose all actions and keep B retry separate from live re
   input.destroy();
 });
 
+test("Simple gamepad maps A/RT, X/B, Y, and bumpers without leaking Advanced trick edges", () => {
+  const pad = createPad();
+  const input = new InputManager({ target: new FakeTarget(), getGamepads: () => [pad] });
+
+  pressButtons(pad, 0, 7, 2, 1, 3, 4, 5);
+  input.update(0);
+  let step = snapshot(input.consumeStep());
+  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+    assert.equal(step[action], true, `${action} held`);
+    assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
+  }
+  for (const action of ["trick1", "trick2", "trick3", "trick4"]) {
+    assert.equal(step[action], false, `${action} inactive`);
+  }
+  assert.equal(input.consumeMeta().retry, true, "B remains the results retry edge");
+
+  releaseButtons(pad);
+  input.update(0);
+  step = snapshot(input.consumeStep());
+  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+    assert.equal(step[`${action}Released`], true, `${action} released`);
+  }
+  input.destroy();
+});
+
 test("touch tracks independent direction and action pointers with visible active states", () => {
   const controls = [
     "left",
@@ -276,7 +418,12 @@ test("touch tracks independent direction and action pointers with visible active
   ];
   const buttons = Object.fromEntries(controls.map((control) => [control, new FakeButton(control)]));
   const root = new FakeTouchRoot(Object.values(buttons));
-  const input = new InputManager({ target: new FakeTarget(), touchRoot: root, getGamepads: () => [] });
+  const input = new InputManager({
+    target: new FakeTarget(),
+    touchRoot: root,
+    getGamepads: () => [],
+    controlMode: CONTROL_MODES.ADVANCED,
+  });
 
   const active = ["left", "up", "edge", "trick1", "trick2", "trick3", "trick4"];
   active.forEach((control, index) => buttons[control].dispatch("pointerdown", { pointerId: index + 1 }));
@@ -326,6 +473,38 @@ test("touch tracks independent direction and action pointers with visible active
   input.destroy();
 });
 
+test("Simple multitouch keeps direction, ACTION, TRICK, SPECIAL, and optional spins independent", () => {
+  const controls = ["left", "up", "edge", "trick", "special", "spinLeft", "spinRight"];
+  const buttons = Object.fromEntries(controls.map((control) => [control, new FakeButton(control)]));
+  const input = new InputManager({
+    target: new FakeTarget(),
+    touchRoot: new FakeTouchRoot(Object.values(buttons)),
+    getGamepads: () => [],
+  });
+
+  controls.forEach((control, index) => buttons[control].dispatch("pointerdown", { pointerId: index + 1 }));
+  input.update(0);
+  let step = snapshot(input.consumeStep());
+  assert.equal(step.x, -1);
+  assert.equal(step.y, -1);
+  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+    assert.equal(step[action], true, `${action} held`);
+    assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
+  }
+
+  buttons.trick.dispatch("pointerdown", { pointerId: 20 });
+  buttons.trick.dispatch("pointerup", { pointerId: 4 });
+  input.update(0);
+  step = snapshot(input.consumeStep());
+  assert.equal(step.trick, true, "a second pointer keeps TRICK held");
+  assert.equal(step.trickReleased, false);
+  buttons.trick.dispatch("pointercancel", { pointerId: 20 });
+  input.update(0);
+  assert.equal(input.consumeStep().trickReleased, true);
+
+  input.destroy();
+});
+
 test("clear, blur, and destroy reset every held, buffered, and previous state", () => {
   const target = new FakeTarget();
   const edgeButton = new FakeButton("edge");
@@ -335,6 +514,7 @@ test("clear, blur, and destroy reset every held, buffered, and previous state", 
     target,
     touchRoot: new FakeTouchRoot([edgeButton]),
     getGamepads: () => [pad],
+    controlMode: CONTROL_MODES.ADVANCED,
   });
 
   target.dispatch("keydown", { code: "KeyQ" });
@@ -354,7 +534,7 @@ test("clear, blur, and destroy reset every held, buffered, and previous state", 
   assert.equal(input.keys.size, 0);
   assert.equal(input.touchPointers.size, 0);
   assert.equal(edgeButton.classList.contains("is-active"), false);
-  assert.deepEqual(Object.values(input.previousActions), [false, false, false, false, false]);
+  assert.equal(Object.values(input.previousActions).every((value) => value === false), true);
   assert.deepEqual(Object.values(input.previousMeta), [false, false, false, false]);
 
   input.update(0);
@@ -407,7 +587,11 @@ test("dead-zone helper is deterministic for external adapters", () => {
 });
 
 function createManager(target) {
-  return new InputManager({ target, getGamepads: () => [] });
+  return new InputManager({
+    target,
+    getGamepads: () => [],
+    controlMode: CONTROL_MODES.ADVANCED,
+  });
 }
 
 function snapshot(step) {

@@ -43,25 +43,42 @@ const step = {
   trick4: false,
   trick4Pressed: false,
   trick4Released: false,
+
+  trick: false,
+  trickPressed: false,
+  trickReleased: false,
+  special: false,
+  specialPressed: false,
+  specialReleased: false,
+  spinLeft: false,
+  spinLeftPressed: false,
+  spinLeftReleased: false,
+  spinRight: false,
+  spinRightPressed: false,
+  spinRightReleased: false,
 };
 ```
 
 The un-suffixed field is held state. `Pressed` and `Released` are one-shot edges; the built-in `InputManager` retains those edges for 120 ms or until consumed. An external adapter may produce the contract directly but must preserve the same semantics and clear all fields on pause, restart, blur, and unmount.
 
-`normalizeTrickInput(input, target)` also accepts the migration fields `style`, `stylePressed`, and `styleReleased` as aliases for `trick1`. It does not convert Q/E/F/T to a single style action.
+`normalizeTrickInput(input, target)` also accepts `action` as an alias for `edge` and the migration fields `style`, `stylePressed`, and `styleReleased` as aliases for `trick1`. It preserves both mode contracts; `SurfSimulation` decides which actions are active from `controlMode`.
+
+Simple Controls are the default. They activate `edge`, `trick`, `special`, `spinLeft`, and `spinRight`. A Simple Trick press is buffered by simulation, then mapped to an eligible manifest entry once airborne: hold for a grab, tap for the next discrete/variety option, and use an unused grab as a fallback when a large move misses its gate. Optional spin impulses coexist with ordinary horizontal body-spin input. Late descent receives board-specific auto-level toward the nearest regular or opposite-facing landing tangent.
+
+Advanced Controls activate `edge` and `trick1` through `trick4` and preserve the original direct catalog mapping:
 
 The built-in physical mapping is:
 
-| Action | Keyboard | Standard gamepad | Touch diamond |
+| Action | Keyboard | Standard gamepad | Touch cluster |
 | --- | --- | --- | --- |
 | `trick1` | Q, legacy X/C | X or left bumper | Left / Rail |
 | `trick2` | E | Y or right bumper | Top / Tail |
 | `trick3` | F | B | Bottom / Flip |
 | `trick4` | T | Left trigger or right-stick press | Right / Twist |
 
-## Context switch on the wave
+## Advanced context switch on the wave
 
-`SurfSimulation.updateRidingManeuvers` consumes the same logical presses before a launch:
+In Advanced mode, `SurfSimulation.updateRidingManeuvers` consumes the same logical presses before a launch. In Simple mode, Trick is reserved for the buffered aerial intent and Action owns pumping/pop:
 
 | Action | Maneuver | Eligibility | Rejection |
 | --- | --- | --- | --- |

@@ -9,7 +9,7 @@ import { resolveKakiPose } from "../js/sprites.js";
 function ridingSimulation() {
   const simulation = new SurfSimulation({ seed: 0xfeedbac });
   simulation.tutorialEnabled = false;
-  simulation.reset({ board: BOARDS.mangoFish });
+  simulation.reset({ board: BOARDS.mangoFish, controlMode: "advanced" });
   simulation.begin();
   simulation.player.state = "riding";
   simulation.player.stateTime = 1;
@@ -50,22 +50,28 @@ test("pump charge and combo-growth cues are thresholded instead of emitted every
   }
   assert.equal(pumpCues.at(-1).payload.tier, 1, "a new pump can teach the first charge tier again");
 
-  simulation.score.combo = 2.1;
+  simulation.score.flow = 0.35;
+  simulation.score.syncCombo();
   simulation.update(FIXED_STEP, {});
   assert.equal(drain(simulation).filter((event) => event.type === "comboIncrease").length, 1);
-  simulation.score.combo = 2.6;
+  simulation.score.flow = 0.52;
+  simulation.score.syncCombo();
   simulation.update(FIXED_STEP, {});
   assert.equal(drain(simulation).filter((event) => event.type === "comboIncrease").length, 1);
-  simulation.score.combo = 2.4;
+  simulation.score.flow = 0.45;
+  simulation.score.syncCombo();
   simulation.update(FIXED_STEP, {});
   drain(simulation);
-  simulation.score.combo = 2.6;
+  simulation.score.flow = 0.52;
+  simulation.score.syncCombo();
   simulation.update(FIXED_STEP, {});
   assert.equal(drain(simulation).filter((event) => event.type === "comboIncrease").length, 0, "minor decay cannot retrigger the same tier");
-  simulation.score.combo = 1;
+  simulation.score.flow = 0;
+  simulation.score.syncCombo();
   simulation.update(FIXED_STEP, {});
   drain(simulation);
-  simulation.score.combo = 1.6;
+  simulation.score.flow = 0.2;
+  simulation.score.syncCombo();
   simulation.update(FIXED_STEP, {});
   assert.equal(drain(simulation).filter((event) => event.type === "comboIncrease").length, 1, "a fully reset chain can grow again");
 });

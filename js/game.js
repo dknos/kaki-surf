@@ -62,10 +62,14 @@ export class KakiSurfGame {
     this.abort = new AbortController();
     this.host.innerHTML = gameMarkup();
     this.elements = collectElements(host);
-    this.simulation = new SurfSimulation({ tuning: TUNING });
+    this.simulation = new SurfSimulation({ tuning: TUNING, controlMode: this.settings.controlMode });
     this.renderer = new KakiRenderer(this.elements.canvas, this.settings, visualAssets);
     this.ownsInput = !externalInput;
-    this.input = externalInput ?? new InputManager({ touchRoot: this.elements.touchControls });
+    this.input = externalInput ?? new InputManager({
+      touchRoot: this.elements.touchControls,
+      controlMode: this.settings.controlMode,
+    });
+    this.input.setControlMode?.(this.settings.controlMode);
     this.audio = externalAudio ?? new SurfAudio(this.settings);
     this.selectedBoard = BOARDS[this.save.selectedBoard] ? this.save.selectedBoard : "foamPuff";
     this.selectedCondition = CONDITIONS[this.save.selectedCondition] ? this.save.selectedCondition : "goldenCoast";
@@ -110,6 +114,7 @@ export class KakiSurfGame {
         steering: this.settings.steeringAssist,
         landing: this.settings.landingAssist,
       },
+      controlMode: this.settings.controlMode,
     });
     this.simulation.tutorialEnabled = !this.save.tutorialSeen;
     this.simulation.begin();
@@ -155,7 +160,11 @@ export class KakiSurfGame {
   backToMenu() {
     this.input.clear?.();
     this.state = "menu";
-    this.simulation.reset({ board: this.selectedBoard });
+    this.simulation.reset({
+      board: this.selectedBoard,
+      condition: this.selectedCondition,
+      controlMode: this.settings.controlMode,
+    });
     this.accumulator = 0;
     this.updateMenuStats();
     this.showLayer("menu");
@@ -176,6 +185,9 @@ export class KakiSurfGame {
       condition: this.selectedCondition,
       bestScore: this.save.bestScore,
       assists: { ...this.simulation.assists },
+      controlMode: this.simulation.controlMode,
+      travelDirection: this.simulation.player.travelDirection,
+      world: this.simulation.world.snapshot(),
     };
   }
 
@@ -210,6 +222,7 @@ export class KakiSurfGame {
         this.accumulator = 0;
       }
       this.audio.update?.(this.simulation);
+      this.syncTouchActionState();
     } else if (this.state === "menu") {
       this.simulation.wave.update(frameDelta * 0.26, 24, 0);
       const controls = this.input.consumeStep?.() ?? EMPTY_CONTROLS;
@@ -236,6 +249,14 @@ export class KakiSurfGame {
       if (event.type === "powerLineEnter") this.rumble(42, 0.12, 0.22);
       if (event.type === "land") this.rumble(event.payload.quality === "perfect" ? 78 : 46, 0.25, event.payload.quality === "perfect" ? 0.55 : 0.3);
       if (event.type === "wipeout") this.rumble(110, 0.58, 0.72);
+      if (event.type === "directionChange") this.rumble(38, 0.14, 0.22);
+      if (event.type === "dolphinMounted" || event.type === "whaleMounted") this.rumble(72, 0.22, 0.48);
+      if (event.type === "powerupCollected") this.rumble(45, 0.18, 0.28);
+      if (event.type === "sharkCollision") this.rumble(92, 0.42, 0.58);
+      if (event.type === "wildlifePhase" && ["telegraph", "distant", "blow"].includes(event.payload.phase)) {
+        const cue = event.payload.kind === "shark" ? "Shark fin ahead." : event.payload.kind === "whale" ? "Whale event ahead." : "Dolphin opportunity ahead.";
+        this.announce(cue);
+      }
     });
   }
 
@@ -271,12 +292,13 @@ export class KakiSurfGame {
 
   renderResults(result, isBest) {
     const breakdown = result.breakdown;
+    const highlights = result.highlights ?? {};
     this.elements.resultRank.textContent = result.rank.grade;
     this.elements.resultTitle.textContent = result.rank.title;
     this.elements.resultScore.textContent = Math.round(result.score).toLocaleString();
     this.elements.resultBest.textContent = isBest ? "NEW PERSONAL BEST" : `BEST ${this.save.bestScore.toLocaleString()}`;
     this.elements.resultFlow.textContent = `${result.flow}%`;
-    this.elements.breakdown.innerHTML = [
+    const rows = [
       ["Ride", breakdown.ride],
       ["Speed", breakdown.speed],
       ["Pocket", breakdown.pocket],
@@ -285,7 +307,16 @@ export class KakiSurfGame {
       ["Air", breakdown.air],
       ["Style", breakdown.style],
       ["Landings", breakdown.landings],
-    ].map(([label, value]) => `<div><span>${label}</span><strong>${Math.round(value).toLocaleString()}</strong></div>`).join("");
+    ].map(([label, value]) => [label, Math.round(value).toLocaleString()]);
+    if (highlights.biggestAir > 0) rows.push(["Biggest Air", `${Math.round(highlights.biggestAir)} PX`]);
+    if (highlights.bestTrick) rows.push(["Best Trick", String(highlights.bestTrick).toUpperCase()]);
+    if (highlights.perfectLandings > 0) rows.push(["Perfect", String(highlights.perfectLandings)]);
+    if (highlights.switchBonuses > 0) rows.push(["Switch", String(highlights.switchBonuses)]);
+    if (highlights.animalBonuses > 0) rows.push(["Animal", String(highlights.animalBonuses)]);
+    if (highlights.nearMisses > 0) rows.push(["Near Miss", String(highlights.nearMisses)]);
+    this.elements.breakdown.innerHTML = rows
+      .map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`)
+      .join("");
     this.elements.resultCondition.textContent = CONDITIONS[this.selectedCondition].name;
   }
 
@@ -415,6 +446,11 @@ export class KakiSurfGame {
       : input.tagName === "SELECT"
         ? input.value
         : Number(input.value);
+    if (key === "controlMode") {
+      this.input.setControlMode?.(this.settings.controlMode);
+      this.simulation.controlMode = this.settings.controlMode;
+      this.host.dataset.controlMode = this.settings.controlMode;
+    }
     const output = this.host.querySelector(`[data-setting-output="${key}"]`);
     if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     this.renderer.applySettings(this.settings);
@@ -422,6 +458,14 @@ export class KakiSurfGame {
     this.elements.touchControls.hidden = !this.settings.touchControls || this.state !== "running";
     this.save.settings = this.settings;
     writeSave(this.save, this.storage);
+  }
+
+  syncTouchActionState() {
+    const simple = this.settings.controlMode !== "advanced";
+    this.host.dataset.controlMode = simple ? "simple" : "advanced";
+    if (this.elements.touchSpecial) {
+      this.elements.touchSpecial.hidden = simple && !this.simulation.player.animalSpecialReady;
+    }
   }
 
   syncSettingsUI() {
@@ -434,6 +478,7 @@ export class KakiSurfGame {
     }
     this.selectBoard(this.selectedBoard);
     this.selectCondition(this.selectedCondition);
+    this.syncTouchActionState();
   }
 
   openSettings() {
@@ -487,7 +532,7 @@ export class KakiSurfGame {
       waveReadAssist: "full",
     });
 
-    if (scene === "menu") {
+    if (["menu", "settingsSimple", "settingsAdvanced"].includes(scene)) {
       this.selectedBoard = "foamPuff";
       this.selectedCondition = "goldenCoast";
       this.host.dataset.condition = this.selectedCondition;
@@ -497,6 +542,14 @@ export class KakiSurfGame {
       this.simulation.condition = CONDITIONS.goldenCoast;
       this.state = "menu";
       this.showLayer("menu");
+      if (scene !== "menu") {
+        this.settings.controlMode = scene === "settingsAdvanced" ? "advanced" : "simple";
+        this.input.setControlMode?.(this.settings.controlMode);
+        this.simulation.controlMode = this.settings.controlMode;
+        this.host.dataset.controlMode = this.settings.controlMode;
+        this.syncSettingsUI();
+        this.openSettings();
+      }
       return;
     }
 
@@ -518,18 +571,34 @@ export class KakiSurfGame {
           style: 1720,
           landings: 1110,
         },
+        highlights: {
+          biggestAir: 94,
+          bestTrick: "720 KAKI TWIST",
+          perfectLandings: 3,
+          switchBonuses: 2,
+          animalBonuses: 1,
+          nearMisses: 2,
+        },
       }, true);
       this.showLayer("results");
       this.elements.topControls.hidden = true;
       return;
     }
 
-    const conditionId = CONDITIONS[scene] ? scene : "goldenCoast";
-    const boardId = scene === "maxSpeed" || scene === "tailGrab" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff";
+    const conditionId = Object.keys(CONDITIONS).find((id) => scene === id || scene.endsWith(`-${id}`))
+      ?? "goldenCoast";
+    const boardId = Object.keys(BOARDS).find((id) => scene === id || scene.startsWith(`${id}-`))
+      ?? (scene === "maxSpeed" || scene === "tailGrab" || scene === "hugeAir" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff");
     this.selectedCondition = conditionId;
     this.host.dataset.condition = conditionId;
     this.selectedBoard = boardId;
-    this.simulation.reset({ board: boardId, condition: conditionId, assists: { steering: false, landing: false } });
+    this.simulation.reset({
+      board: boardId,
+      condition: conditionId,
+      assists: { steering: false, landing: false },
+      controlMode: this.settings.controlMode,
+      worldQa: qaWorldOverride(scene),
+    });
     this.simulation.condition = CONDITIONS[conditionId];
     this.simulation.begin();
     this.simulation.elapsed = 24;
@@ -566,7 +635,13 @@ export class KakiSurfGame {
       provisionalTrickName: "",
       provisionalScore: 0,
       maneuver: null,
-      flowTier: "FLOWING",
+      speedTier: "FAST",
+      flowTier: "",
+      flow: 0.44,
+      travelDirection: 1,
+      travelVelocity: 18,
+      worldTravel: this.simulation.wave.worldTravel,
+      switchStance: false,
       airX: 232,
       previousAirX: 232,
       airY: 74,
@@ -609,14 +684,14 @@ export class KakiSurfGame {
       case "powerLine":
         player.waveMomentum = 0.82;
         player.speed = Math.max(106, Math.round(this.simulation.currentRideSpeedCap?.() * 0.84 || 106));
-        player.flowTier = "FLOWING";
+        player.speedTier = "FLYING";
         player.powerLine = true;
         this.renderer.onEvent({ type: "powerLineEnter", payload: { potential: 1 } }, this.simulation);
         break;
       case "maxSpeed":
         player.waveMomentum = 1;
         player.speed = Math.round((this.simulation.currentRideSpeedCap?.() ?? this.simulation.tuning.maxSpeed * this.simulation.board.maxSpeed) * 0.985);
-        player.flowTier = "MAX FLOW";
+        player.speedTier = "BLASTING";
         player.powerLine = true;
         this.renderer.onEvent({ type: "fullPower", payload: { momentum: 1 } }, this.simulation);
         break;
@@ -649,6 +724,30 @@ export class KakiSurfGame {
         player.airVY = -74;
         this.renderer.onEvent({ type: "launch", payload: { strength: 1.2 } }, this.simulation);
         break;
+      case "smallAir":
+        makeAirborne("rise", "SMALL POP", 0.18);
+        player.airY = 70;
+        player.previousAirY = 70;
+        player.airVY = -24;
+        player.maxAirHeight = 18;
+        break;
+      case "hugeAir":
+        makeAirborne("apex", "720 MOON LAUNCH", Math.PI * 4);
+        player.airY = 29;
+        player.previousAirY = 29;
+        player.airVY = 2;
+        player.maxAirHeight = 96;
+        player.provisionalScore = 2840;
+        break;
+      case "clockwiseSpin":
+        makeAirborne("apex", "360 AIR SPIN", Math.PI * 2);
+        player.angularVelocity = 6.4;
+        break;
+      case "counterSpin":
+        makeAirborne("apex", "CCW 360 AIR SPIN", -Math.PI * 2);
+        player.angularVelocity = -6.4;
+        player.travelDirection = -1;
+        break;
       case "frontRail":
         makeAirborne("frontRailGrab", "FRONT RAIL GRAB", Math.PI * 0.42);
         break;
@@ -676,6 +775,17 @@ export class KakiSurfGame {
         player.trickPose = "perfectLanding";
         this.renderer.onEvent({ type: "land", payload: { quality: "perfect", error: 0.04 } }, this.simulation);
         break;
+      case "switchLanding":
+        player.state = "landing";
+        player.stateTime = 0.06;
+        player.speed = 118;
+        player.compression = 0.92;
+        player.travelDirection = -1;
+        player.travelVelocity = -28;
+        player.switchStance = true;
+        player.trickPose = "perfectLanding";
+        this.renderer.onEvent({ type: "land", payload: { quality: "perfect", error: 0.05, switch: true, landingDirection: -1 } }, this.simulation);
+        break;
       case "wobble":
         player.state = "wobble";
         player.stateTime = 0.16;
@@ -698,9 +808,162 @@ export class KakiSurfGame {
         this.elements.touchControls.hidden = false;
         this.elements.touchControls.classList.add("qa-visible");
         break;
+      case "touchAdvanced":
+        this.settings.controlMode = "advanced";
+        this.input.setControlMode?.("advanced");
+        this.simulation.controlMode = "advanced";
+        this.host.dataset.controlMode = "advanced";
+        this.elements.touchControls.hidden = false;
+        this.elements.touchControls.classList.add("qa-visible");
+        this.syncTouchActionState();
+        break;
+      case "simpleKeyboard":
+        this.simulation.elapsed = 2;
+        this.simulation.tutorialEnabled = true;
+        this.simulation.qaControlHint = "ARROWS + SPACE + F";
+        break;
+      case "simpleGamepad":
+        this.simulation.elapsed = 2;
+        this.simulation.tutorialEnabled = true;
+        this.simulation.qaControlHint = "STICK + A + X";
+        break;
+      case "leftTravel":
+        player.travelDirection = -1;
+        player.travelVelocity = -24;
+        player.switchStance = true;
+        player.speed = 104;
+        break;
+      case "rightTravel":
+        player.travelDirection = 1;
+        player.travelVelocity = 24;
+        player.speed = 104;
+        break;
+      case "reversal":
+        player.travelDirection = -1;
+        player.travelVelocity = -31;
+        player.redirectVelocity = -18;
+        player.turnForce = 0.92;
+        player.switchStance = true;
+        player.trickPose = "cutback";
+        this.renderer.onEvent({ type: "directionChange", payload: { from: 1, to: -1, switch: true, turnForce: 0.92 } }, this.simulation);
+        break;
+      case "downhill":
+        player.face = 0.58;
+        player.faceVelocity = 0.72;
+        player.slopeDrive = 0.88;
+        player.speed = 126;
+        player.speedTier = "BLASTING";
+        player.trickPose = "downFaceCarve";
+        break;
+      case "curlEarly":
+        this.simulation.wave.curlX = 38;
+        this.simulation.wave.pressure = 0.3;
+        player.x = 242;
+        break;
+      case "curlFolding":
+        this.simulation.wave.curlX = 74;
+        this.simulation.wave.pressure = 0.68;
+        player.x = 236;
+        break;
+      case "curlImpact":
+        this.simulation.wave.curlX = 112;
+        this.simulation.wave.pressure = 0.94;
+        player.x = 252;
+        this.renderer.onEvent({ type: "lip", payload: { strength: 1.1 } }, this.simulation);
+        break;
+      case "curlDanger":
+        this.simulation.wave.curlX = 174;
+        this.simulation.wave.pressure = 1;
+        player.x = 210;
+        player.speed = 112;
+        this.renderer.onEvent({ type: "callout", payload: { text: "CURL CLOSE", subtext: "DROP OR REVERSE", tone: "risk" } }, this.simulation);
+        break;
+      case "dolphinRide":
+      case "dolphinGates":
+        player.animalMount = "dolphin";
+        player.animalSpecialReady = true;
+        player.speed = 116;
+        this.renderer.onEvent({ type: "dolphinMounted", payload: { kind: "dolphin" } }, this.simulation);
+        break;
+      case "whaleRide":
+        player.animalMount = "whale";
+        player.animalSpecialReady = true;
+        player.speed = 124;
+        this.renderer.onEvent({ type: "whaleMounted", payload: { kind: "whale" } }, this.simulation);
+        break;
+      case "sharkNearMiss":
+        makeAirborne("tailGrab", "SHARK THREAD", Math.PI);
+        player.airY = 78;
+        break;
+      case "sharkCollision":
+        player.state = "wipeout";
+        player.stateTime = 0.32;
+        player.airX = player.x;
+        player.airY = 112;
+        player.previousAirX = player.airX;
+        player.previousAirY = player.airY;
+        player.wipeoutCause = "shark";
+        this.renderer.onEvent({ type: "wipeout", payload: { cause: "shark" } }, this.simulation);
+        break;
+      case "dolphinDismount":
+        makeAirborne("takeoff", "DOLPHIN CORKSCREW", Math.PI * 2);
+        player.airY = 45;
+        player.previousAirY = 45;
+        player.airVY = -32;
+        player.maxAirHeight = 72;
+        break;
+      case "mangoRush":
+      case "moonPop":
+      case "starFoam":
+        this.simulation.world.activateBonus(scene);
+        break;
+      case "mangoExpired":
+        this.simulation.world.activateBonus("mangoRush");
+        this.simulation.world.bonuses.mangoRush.remaining = 0.08;
+        this.renderer.onEvent({ type: "callout", payload: { text: "MANGO RUSH ENDING", subtext: "KEEP THE LINE", tone: "hint" } }, this.simulation);
+        break;
+      case "moonConsumed":
+        this.simulation.world.activateBonus("moonPop");
+        this.simulation.world.bonuses.moonPop.charges = 0.12;
+        this.renderer.onEvent({ type: "callout", payload: { text: "MOON POP", subtext: "NEXT LIP CONSUMES", tone: "perfect" } }, this.simulation);
+        break;
+      case "starSave":
+        this.simulation.world.activateBonus("starFoam");
+        this.renderer.onEvent({ type: "callout", payload: { text: "STAR FOAM SAVE", subtext: "ONE HIT PROTECTED", tone: "perfect" } }, this.simulation);
+        break;
+      case "ambientReverse":
+        player.travelDirection = -1;
+        player.travelVelocity = -28;
+        player.switchStance = true;
+        break;
+      case "featherThread":
+        this.renderer.onEvent({ type: "featherThread", payload: { value: 1 } }, this.simulation);
+        break;
+      case "speedboatRace":
+      case "jetSkiRace":
+        this.renderer.onEvent({ type: "callout", payload: { text: "RACE THE WAKE", subtext: "LOSING COSTS NOTHING", tone: "risk" } }, this.simulation);
+        break;
+      case "dolphinReduced":
+        this.renderer.applySettings({ ...this.settings, reducedMotion: true, reducedFlash: true });
+        player.animalMount = "dolphin";
+        player.animalSpecialReady = true;
+        break;
+      case "sharkHighContrast":
+        this.renderer.applySettings({ ...this.settings, highContrast: true, waveReadAssist: "full" });
+        break;
+      case "whaleReduced":
+        this.renderer.applySettings({ ...this.settings, reducedMotion: true, reducedFlash: true });
+        break;
       case "highContrast":
         this.renderer.applySettings({ ...this.settings, highContrast: true, waveReadAssist: "full" });
         player.powerLine = true;
+        break;
+      case "reducedMotion":
+        this.renderer.applySettings({ ...this.settings, reducedMotion: true, reducedFlash: true });
+        break;
+      case "reducedFlash":
+        this.renderer.applySettings({ ...this.settings, reducedFlash: true });
+        this.renderer.onEvent({ type: "launch", payload: { strength: 1.2 } }, this.simulation);
         break;
       default:
         break;
@@ -750,6 +1013,7 @@ function collectElements(host) {
     closeSettings: host.querySelector("[data-action=close-settings]"),
     settingsInputs: host.querySelectorAll("[data-setting]"),
     touchControls: host.querySelector(".touch-controls"),
+    touchSpecial: host.querySelector('[data-control="special"]'),
     debugPanel: host.querySelector(".debug-panel"),
     debugFields: host.querySelector(".debug-fields"),
     debugReset: host.querySelector("[data-action=debug-reset]"),
@@ -761,7 +1025,7 @@ function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve with arrows or WASD, pump with Space or Z, and use Q, E, F, and T for four distinct maneuvers and aerial tricks."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve and rotate with arrows or WASD, use Space or Z for action, F or X for a context trick, and T or Shift for an available animal special."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="settings" aria-label="Open settings">SET</button>
@@ -776,7 +1040,7 @@ function gameMarkup() {
             <h1>KAKI <i>SURF</i></h1>
             <span class="title-wave" aria-hidden="true"></span>
           </div>
-          <p class="mission-copy">Read the glass. Load the rail. Build a trick string, then point the board home.</p>
+          <p class="mission-copy">Drop downhill for speed, carve back to the lip, and turn one huge air into the next.</p>
           <div class="board-grid" aria-label="Choose a board"></div>
           <div class="condition-select">
             <p><b>SESSION</b> Choose the light. The wave stays fair.</p>
@@ -792,7 +1056,7 @@ function gameMarkup() {
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
           </dl>
-          <p class="controls-line"><b>CARVE</b> ARROWS / STICK <b>PUMP</b> SPACE / A <b>TRICKS</b> Q RAIL &nbsp; E TAIL &nbsp; F VARIAL &nbsp; T KAKI TWIST</p>
+          <p class="controls-line"><b>CARVE + SPIN</b> ARROWS / STICK <b>ACTION</b> SPACE / A <b>TRICK</b> F / X <b>SPECIAL</b> T / Y WHEN READY</p>
         </div>
 
         <div class="game-layer compact-layer" data-layer="pause" hidden>
@@ -827,11 +1091,11 @@ function gameMarkup() {
             <button type="button" data-control="right" aria-label="Steer right">▶</button>
           </div>
           <div class="touch-actions">
-            <button class="touch-trick touch-trick--1" type="button" data-control="trick1" aria-label="Front rail grab or snap"><b>Q</b><span>RAIL</span></button>
-            <button class="touch-trick touch-trick--2" type="button" data-control="trick2" aria-label="Tail grab or cutback"><b>E</b><span>TAIL</span></button>
-            <button class="touch-trick touch-trick--3" type="button" data-control="trick3" aria-label="Board varial or floater"><b>F</b><span>FLIP</span></button>
-            <button class="touch-trick touch-trick--4" type="button" data-control="trick4" aria-label="Kaki Twist or tube tuck"><b>T</b><span>TWIST</span></button>
-            <button class="touch-pump" type="button" data-control="edge" aria-label="Pump and commit"><b>PUMP</b><span>HOLD</span></button>
+            <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" aria-label="Optional counterclockwise spin or advanced trick one"><b>Q</b><span>SPIN</span></button>
+            <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" aria-label="Optional clockwise spin or advanced trick two"><b>E</b><span>SPIN</span></button>
+            <button class="touch-trick" type="button" data-control="trick" aria-label="Context trick"><b>TRICK</b><span>TAP / HOLD</span></button>
+            <button class="touch-special" type="button" data-control="special" aria-label="Animal special ability" hidden><b>SPECIAL</b><span>READY</span></button>
+            <button class="touch-action" type="button" data-control="edge" aria-label="Action: compress, pump, and pop"><b>ACTION</b><span>HOLD / RELEASE</span></button>
           </div>
         </div>
 
@@ -853,6 +1117,7 @@ function gameMarkup() {
           </section>
           <section aria-labelledby="access-heading">
             <h3 id="access-heading">ACCESS</h3>
+            <label><span>CONTROLS</span><select data-setting="controlMode" aria-label="Control mode"><option value="simple">SIMPLE · ACTION + TRICK</option><option value="advanced">ADVANCED · Q E F T</option></select></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedMotion"><span>REDUCED MOTION</span></label>
             <label><span>SCREEN SHAKE <output data-setting-output="screenShake">70%</output></span><input type="range" min="0" max="1" step="0.05" data-setting="screenShake" aria-label="Screen shake intensity"></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedFlash"><span>FLASH REDUCTION</span></label>
@@ -871,6 +1136,198 @@ function gameMarkup() {
       <p class="sr-only" aria-live="polite"></p>
     </section>
   `;
+}
+
+function qaWorldOverride(scene) {
+  const wildlife = {
+    dolphinApproach: { kind: "dolphin", phase: "approach", screenX: 176, y: 128, direction: 1 },
+    dolphinRide: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
+    dolphinDismount: { kind: "dolphin", phase: "dismount", screenX: 232, y: 118, direction: 1 },
+    sharkApproach: { kind: "shark", phase: "telegraph", screenX: 190, y: 133, direction: 1 },
+    sharkNearMiss: { kind: "shark", phase: "crossing", screenX: 222, y: 134, direction: 1 },
+    sharkCollision: { kind: "shark", phase: "crossing", screenX: 232, y: 128, direction: 1 },
+    whaleDistant: { kind: "whale", phase: "distant", screenX: 270, y: 116, direction: -1 },
+    whaleBreach: { kind: "whale", phase: "breach", screenX: 270, y: 112, direction: -1 },
+    whaleRamp: { kind: "whale", phase: "ramp", screenX: 244, y: 126, direction: -1 },
+    whaleRide: { kind: "whale", phase: "mounted", screenX: 232, y: 137, direction: 1 },
+    whaleSplash: { kind: "whale", phase: "splash", screenX: 248, y: 126, direction: 1 },
+    dolphinReduced: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
+    sharkHighContrast: { kind: "shark", phase: "telegraph", screenX: 190, y: 133, direction: 1 },
+    whaleReduced: { kind: "whale", phase: "breach", screenX: 270, y: 112, direction: -1 },
+    dolphinGates: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
+    starSave: { kind: "shark", phase: "crossing", screenX: 222, y: 132, direction: 1 },
+  }[scene];
+  if (wildlife) return { wildlife };
+
+  if (scene === "flockScatter") {
+    return {
+      traffic: [{ kind: "gullFlock", layer: "near", screenX: 214, y: 84, direction: 1, duration: 30 }],
+      birdReaction: { reaction: "scatter", kind: "gullFlock", layer: "near", screenX: 214, y: 84 },
+    };
+  }
+  if (scene === "featherThread") {
+    return {
+      traffic: [{ kind: "gullFlock", layer: "near", screenX: 230, y: 112, direction: 1, duration: 30 }],
+      birdReaction: { reaction: "dodge", kind: "gullFlock", layer: "near", screenX: 230, y: 112 },
+    };
+  }
+  if (scene === "pelicanCourier" || scene === "gullCourier") {
+    return {
+      courier: {
+        birdKind: scene === "pelicanCourier" ? "pelican" : "gullFlock",
+        powerupKind: scene === "pelicanCourier" ? "mangoRush" : "starFoam",
+        layer: "near",
+        screenX: 306,
+        birdY: 58,
+        dropX: 274,
+        dropY: 106,
+        direction: 1,
+      },
+    };
+  }
+  if (scene === "speedboatRace" || scene === "jetSkiRace") {
+    return {
+      race: {
+        kind: scene === "speedboatRace" ? "speedboat" : "jetSki",
+        phase: "racing",
+        layer: "mid",
+        screenX: 204,
+        y: 92,
+        direction: 1,
+      },
+    };
+  }
+  if (scene === "aircraftDrop") {
+    return {
+      aircraftDrop: {
+        aircraftKind: "propPlane",
+        powerupKind: "moonPop",
+        phase: "approach",
+        screenX: 312,
+        aircraftY: 42,
+        dropX: 266,
+        dropY: 91,
+        direction: -1,
+      },
+    };
+  }
+
+  const powerup = {
+    mangoRush: { kind: "mangoRush", phase: "available", screenX: 258, y: 116, direction: -1 },
+    moonPop: { kind: "moonPop", phase: "available", screenX: 258, y: 92, direction: -1 },
+    starFoam: { kind: "starFoam", phase: "available", screenX: 258, y: 132, direction: -1 },
+    powerupMiss: { kind: "moonPop", phase: "available", screenX: 342, y: 56, direction: 1 },
+  }[scene];
+  if (powerup) return { powerup };
+
+  const carrierPhase = {
+    carrierHaze: "haze",
+    carrierArrival: "arrival",
+    carrierDeck: "deckActivity",
+    carrierLaunch: "launch",
+    fleetAirshow: "airshow",
+    airshowGates: "airshow",
+  }[scene];
+  if (carrierPhase) return { carrier: { phase: carrierPhase, direction: 1 } };
+
+  const trafficKind = {
+    gullFlock: "gullFlock",
+    pelican: "pelican",
+    ternFlock: "ternFlock",
+    cormorantFlock: "cormorantFlock",
+    bannerPlane: "bannerPlane",
+    propPlane: "propPlane",
+    helicopter: "helicopter",
+    seaplane: "seaplane",
+    sailboat: "sailboat",
+    speedboat: "speedboat",
+    fishingBoat: "fishingBoat",
+    tugboat: "tugboat",
+    cargoShip: "cargoShip",
+    jetSki: "jetSki",
+    rescueCraft: "rescueCraft",
+  }[scene];
+  if (trafficKind) {
+    const layer = ["cargoShip", "sailboat", "fishingBoat", "cormorantFlock", "propPlane"].includes(trafficKind)
+      ? "far"
+      : ["gullFlock", "pelican", "bannerPlane"].includes(trafficKind)
+        ? "near"
+        : "mid";
+    const trafficY = trafficKind === "bannerPlane"
+      ? 43
+      : ["propPlane", "seaplane", "helicopter"].includes(trafficKind)
+        ? 42
+        : ["gullFlock", "ternFlock", "cormorantFlock", "pelican"].includes(trafficKind)
+          ? 50
+          : layer === "far" ? 68 : 82;
+    return {
+      traffic: [{
+        kind: trafficKind,
+        layer,
+        screenX: 196,
+        y: trafficY,
+        direction: 1,
+        message: trafficKind === "bannerPlane" ? "GIANT AIR KAKI" : "",
+        duration: 30,
+      }],
+    };
+  }
+
+  if (scene === "ambientBusy") {
+    return {
+      traffic: [
+        { kind: "cargoShip", layer: "far", screenX: 310, y: 70, direction: -1, duration: 30 },
+        { kind: "sailboat", layer: "far", screenX: 82, y: 73, direction: 1, duration: 30 },
+        { kind: "gullFlock", layer: "mid", screenX: 122, y: 39, direction: 1, duration: 30 },
+        { kind: "helicopter", layer: "mid", screenX: 290, y: 49, direction: -1, duration: 30 },
+        { kind: "pelican", layer: "near", screenX: 328, y: 91, direction: -1, duration: 30 },
+      ],
+    };
+  }
+  if (scene === "ambientReverse") {
+    return {
+      traffic: [
+        { kind: "cargoShip", layer: "far", screenX: 306, y: 70, direction: 1, duration: 30 },
+        { kind: "gullFlock", layer: "mid", screenX: 126, y: 40, direction: -1, duration: 30 },
+        { kind: "pelican", layer: "near", screenX: 306, y: 88, direction: 1, duration: 30 },
+      ],
+    };
+  }
+  if (scene === "twilightTraffic-twilightGlass") {
+    return {
+      traffic: [
+        { kind: "fishingBoat", layer: "far", screenX: 300, y: 70, direction: -1, duration: 30 },
+        { kind: "cormorantFlock", layer: "mid", screenX: 104, y: 42, direction: 1, duration: 30 },
+        { kind: "seaplane", layer: "mid", screenX: 262, y: 46, direction: -1, duration: 30 },
+      ],
+    };
+  }
+  if (scene === "stormTraffic-stormbreak") {
+    return {
+      traffic: [
+        { kind: "rescueCraft", layer: "mid", screenX: 304, y: 89, direction: -1, duration: 30 },
+        { kind: "gullFlock", layer: "near", screenX: 118, y: 49, direction: 1, duration: 30 },
+        { kind: "helicopter", layer: "mid", screenX: 264, y: 42, direction: -1, duration: 30 },
+      ],
+    };
+  }
+  const bannerMessage = {
+    bannerDolphins: "DOLPHINS AHEAD",
+    bannerShark: "SHARK WATCH",
+    bannerBigAir: "BIG AIR WEATHER",
+  }[scene];
+  if (bannerMessage) {
+    return {
+      traffic: [{ kind: "bannerPlane", layer: "near", screenX: 196, y: 43, direction: 1, message: bannerMessage, duration: 30 }],
+    };
+  }
+  if (scene === "planeDrop") {
+    return {
+      traffic: [{ kind: "propPlane", layer: "mid", screenX: 268, y: 44, direction: -1, duration: 30 }],
+      powerup: { kind: "moonPop", phase: "available", screenX: 250, y: 88, direction: -1 },
+    };
+  }
+  return null;
 }
 
 const EMPTY_META = Object.freeze({ restart: false, retry: false, pause: false, debug: false });

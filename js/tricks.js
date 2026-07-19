@@ -16,9 +16,15 @@ const ACTION_FIELDS = Object.freeze(TRICK_ACTIONS.map((action) => Object.freeze(
 export function normalizeTrickInput(input = {}, target = {}) {
   target.x = Number.isFinite(input.x) ? input.x : 0;
   target.y = Number.isFinite(input.y) ? input.y : 0;
-  target.edge = Boolean(input.edge);
-  target.edgePressed = Boolean(input.edgePressed);
-  target.edgeReleased = Boolean(input.edgeReleased);
+  target.edge = Boolean(input.edge || input.action);
+  target.edgePressed = Boolean(input.edgePressed || input.actionPressed);
+  target.edgeReleased = Boolean(input.edgeReleased || input.actionReleased);
+
+  for (const action of ["trick", "special", "spinLeft", "spinRight"]) {
+    target[action] = Boolean(input[action]);
+    target[`${action}Pressed`] = Boolean(input[`${action}Pressed`]);
+    target[`${action}Released`] = Boolean(input[`${action}Released`]);
+  }
 
   for (const fields of ACTION_FIELDS) {
     const legacy = fields.action === "trick1";
@@ -78,6 +84,10 @@ export class AerialTrickSession {
       airtime: 0,
       landed: false,
       landingQuality: "",
+      takeoffDirection: Math.sign(launchData.takeoffDirection) || 1,
+      landingDirection: Math.sign(launchData.takeoffDirection) || 1,
+      switchTakeoff: Boolean(launchData.switchTakeoff),
+      switchLanding: false,
       invalidBoardOrientation: false,
       provisionalScore: 0,
       provisionalTrickName: "FLOATY POP",
@@ -295,7 +305,12 @@ export class AerialTrickSession {
     return clamp(sensitivity, 0.7, 1.75);
   }
 
-  finalizeLanding({ rotationAccumulated = 0, quality = "clean" } = {}) {
+  finalizeLanding({
+    rotationAccumulated = 0,
+    quality = "clean",
+    landingDirection = this.manifest.takeoffDirection,
+    switchLanding = false,
+  } = {}) {
     if (this.finalized) return this.manifest;
     this.manifest.rotationAccumulated = rotationAccumulated;
     for (let index = this.active.length - 1; index >= 0; index -= 1) {
@@ -317,6 +332,8 @@ export class AerialTrickSession {
     this.manifest.invalidBoardOrientation = orientationError > 0.34;
     this.manifest.landed = true;
     this.manifest.landingQuality = quality;
+    this.manifest.landingDirection = Math.sign(landingDirection) || this.manifest.takeoffDirection;
+    this.manifest.switchLanding = Boolean(switchLanding);
     for (const entry of this.manifest.sequence) {
       entry.landed = true;
       entry.invalidBoardOrientation = !entry.complete

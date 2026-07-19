@@ -43,7 +43,14 @@ export function buildTrickSignature(manifest, options = {}) {
     const apex = entry.heldThroughApex ? ":apex" : "";
     return `${entry.id}:${holdBand(entry)}${apex}${variant}`;
   }).join(">");
-  return `${direction}:${Math.abs(rotationDegrees)}:${sequence || "air"}`;
+  const stance = manifest?.switchTakeoff && manifest?.switchLanding
+    ? "switch-pop+switch-land"
+    : manifest?.switchLanding
+      ? "switch-land"
+      : manifest?.switchTakeoff
+        ? "switch-pop"
+        : "regular";
+  return `${direction}:${Math.abs(rotationDegrees)}:${sequence || "air"}:${stance}`;
 }
 
 function displayLabel(entry, hasRotation, entryCount, quality) {
@@ -133,6 +140,8 @@ export function scoreAerialManifest(manifest, {
   let airBase = SCORE.launchBase + launchPotential * 0.18;
   airBase += SCORE.airHeightScale * maxHeight;
   airBase += rotationPoints(rotationDegrees);
+  if (manifest.switchTakeoff) airBase += SCORE.switchTakeoff;
+  if (!preview && landed && manifest.switchLanding) airBase += SCORE.switchLanding;
   let styleBase = 0;
 
   for (const entry of entries) {
@@ -182,6 +191,8 @@ export function scoreAerialManifest(manifest, {
       : quality === "clean"
         ? "CLEAN!"
         : "WOBBLE SAVE",
+    switchTakeoff: Boolean(manifest.switchTakeoff),
+    switchLanding: Boolean(manifest.switchLanding),
   };
 }
 
@@ -223,6 +234,10 @@ export function createLegacyAerialManifest({
     airtime: 0,
     landed: true,
     landingQuality: "clean",
+    takeoffDirection: 1,
+    landingDirection: 1,
+    switchTakeoff: false,
+    switchLanding: false,
     invalidBoardOrientation: false,
     provisionalScore: 0,
     provisionalTrickName: "",
@@ -244,4 +259,3 @@ function emptyAerialResult() {
     callout: "",
   };
 }
-

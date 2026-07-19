@@ -23,33 +23,40 @@ The game loop accumulates at most 14 fixed steps per frame. Render interpolation
 | `carveAcceleration` | 3.65 | Face-direction response before board grip and assists |
 | `carveFriction` | 4 | Rate at which face velocity settles |
 | `faceEdgeBounce` | 0.28 | Trough-edge rebound retained from impact |
+| `downhillAcceleration` | 104 | Acceleration from positive surface-gradient drive |
+| `uphillSpeedCost` | 40 | Speed loss from climbing against the surface gradient |
+| `traverseDrive` | 3.2 | Small drive retained near a cross-slope traverse |
+| `reversalCommitTime` | 0.085 s | Time above the signed-velocity threshold before facing commits |
+| `reversalCommitSpeed` | 7 | Minimum signed travel speed for a direction change |
+| `reversalScrub` | 13.5 | Speed cost while opposite input fights existing travel |
 | `wavePush` | 15.5 | Acceleration scaled by shared speed potential |
 | `curlSpeed` | 2.35 | Base advance of the breaking curl |
 | `curlCatchDelay` | 0.58 s | Continuous curl contact before a wipeout |
 | `pumpStrength` | 18.5 | Maximum pump impulse before line, rhythm, and board factors |
 | `pumpChargeRate` | 1.55/s | Hold-to-compress charge rate |
 | `rideSpeedResponse` | 0.82/s | Pull toward base target; lower values retain earned speed longer |
-| `waveMomentumBuild` / `waveMomentumDecay` | 1.9/s / 0.55/s | Seam acquisition and off-line reserve loss |
-| `waveMomentumPumpGain` | 0.14 | Reserve added by a fully charged, fully efficient release |
-| `offLineSpeedHeadroom` | 26 | Speed above board base available without stored seam momentum |
-| `lateralResponse` / `lateralCoast` | 12/s / 3/s | On-wave x-velocity input response and release inertia |
+| `waveMomentumBuild` / `waveMomentumDecay` | 1.9/s / 0.55/s | Response rates for the smooth natural-momentum signal |
+| `waveMomentumPumpGain` | 0.14 | Momentum signal added by a fully charged, efficient release |
+| `offLineSpeedHeadroom` | 26 | Legacy tuning retained for compatibility; not used as a cap gate |
+| `lateralResponse` / `lateralCoast` | 12/s / 3/s | Signed travel response and release inertia |
 
-`GameplayWave.powerFaceAt(x)` produces a moving target near face coordinate 0.405 and clamps it to 0.31-0.49. `speedPotential(x, face, options)` is the one authoritative query for physics and presentation. It returns target/error/correction data plus `safe`, `power`, or `critical` zone, risk, pocket pressure, broad line quality, narrow `seamDrive`, pump efficiency, and a bounded 0.15-1.25 acceleration factor.
+`GameplayWave.powerFaceAt(x)` produces a moving fast-line guide near face coordinate 0.405 and clamps it to 0.31-0.49. `speedPotential(x, face, options)` is the authoritative local-wave query for physics and presentation. It returns target/error/correction data plus `safe`, `power`, or `critical` zone, risk, pocket pressure, broad line quality, narrow `seamDrive`, pump efficiency, and a bounded local acceleration contribution.
 
 The power zone requires an absolute face error no greater than 0.12 and pocket value at least 0.16. Breaking water or pocket value at least 0.78 is critical; remaining positions are safe. These are strategic labels, not three fixed color strips.
 
-Top-end drive is stricter than the readable power zone. `seamDrive` has a glassy core through 0.025 face error, fades out by 0.115, enters across pocket values 0.16-0.34, and fades before the critical band across 0.68-0.82. The safe shoulder and critical curl can provide useful motion, but neither can return `maxFlowEligible` or the 1.25 sustainable acceleration ceiling.
+`seamDrive` has a glassy core through 0.025 face error, fades out by 0.115, enters across pocket values 0.16-0.34, and fades before the critical band across 0.68-0.82. It remains useful for pump efficiency, presentation, and compatibility telemetry. It no longer grants permission to reach the board's hard speed cap.
 
-`player.waveMomentum` follows seam drive at 1.9/s, decays off line at 0.55/s, and receives up to 0.14 from a correctly timed full pump. The current ride cap is:
+Primary drive comes from `GameplayWave.surfaceGradientAt(x, face)`. Simulation projects signed x travel and face movement through that gradient to produce `slopeDrive` in `-1..1`. Positive values receive `downhillAcceleration`, negative values pay `uphillSpeedCost`, and a traverse receives `traverseDrive`. Mango Rush scales uphill loss while active. The fast-line query adds a smaller broad local contribution and a released pump adds a bounded burst.
+
+`player.waveMomentum` follows a mix of downhill drive, line quality, and pocket position. It is a smooth presentation/launch-history value rather than a speed-cap gate. A correctly timed pump can still add up to 0.14. The ride cap is:
 
 ```text
 baseTarget = speed * board.acceleration
-hardMax = maxSpeed * board.maxSpeed
-offLineCap = min(hardMax, baseTarget + offLineSpeedHeadroom)
-rideCap = offLineCap + (hardMax - offLineCap) * waveMomentum
+hardMax = max(baseTarget, maxSpeed * board.maxSpeed)
+rideCap = hardMax
 ```
 
-This reserve persists long enough to climb from the seam to the lip. A missed pump keeps only a 0.22 timing floor; full efficiency reaches a 1.20 timing factor. Lateral movement stores a bounded velocity in `-48..48`, responds quickly while steered, coasts on release, and removes outward velocity at the playfield edge.
+Travel velocity is bounded to `-48..48`. Same-direction input accelerates toward its signed target. Opposite input responds more slowly at high speed, scrubs velocity, and must satisfy both reversal thresholds before `travelDirection` changes. Releasing input coasts toward the current signed glide. Playfield edges remove only the outward component.
 
 ## Air and landing defaults
 
@@ -64,18 +71,26 @@ This reserve persists long enough to climb from the seam to the lip. A missed pu
 | `perfectTolerance` | 0.115 rad | Perfect tangent error; multiplied only by Landing Assist |
 | `landingCoyote` | 0.095 s | Time to recover an initially bad contact |
 | `launchCoyote` | 0.11 s | Lip-memory window for a committed release |
+| `simpleAutoLevelStart` | 18 | Downward velocity at which Simple auto-level starts |
+| `simpleTrickBuffer` | 0.34 s | Context Trick request lifetime |
+| `simpleGrabHold` | 0.115 s | Hold threshold that selects a grab |
+| `simpleSpinImpulse` | 1.8 | Q/E or bumper spin impulse in Simple mode |
+| `perfectLandingCarry` | 0.58 s | Speed-preservation window after a perfect landing |
+| `cleanLandingCarry` | 0.40 s | Speed-preservation window after a clean landing |
+| `wobbleLandingCarry` | 0.18 s | Reduced carry after a wobble |
 | `wipeoutThreshold` | 1.18 rad | Hard cap for the recovery band |
 
-Launch pop consumes actual speed and the previously earned reserve rather than pump charge alone:
+Launch pop reads physical speed and the climb into the lip:
 
 ```text
-speedRatio = clamp((speed - baseTarget) / (hardMax - baseTarget), 0, 1)
-earnedDrive = min(speedRatio, waveMomentum)
-launchEnergy = clamp(0.72 + abs(faceVelocity) * 0.16
-  + charge * 0.10 + earnedDrive * 0.44, 0.72, 1.32)
+speedRatio = clamp((speed - 34) / (hardMax - 34), 0, 1)
+uphillApproach = clamp(max(-slopeDrive, max(0, -faceVelocity) * 0.72), 0, 1)
+launchEnergy = clamp(0.68 + speedRatio * 0.42
+  + uphillApproach * 0.18 + charge * 0.10
+  + pocket * 0.04, 0.68, 1.36)
 ```
 
-The 0.72 floor keeps ordinary lip jumps available. Maximum vertical pop requires both high actual speed and line history. Launch horizontal velocity also inherits 22% of on-wave lateral velocity.
+The 0.68 floor keeps ordinary lip jumps available. Moon Pop multiplies the final vertical impulse and is consumed on launch. Signed travel contributes `(speed - 52) * 0.14`, while travel velocity contributes another 28%, so approach direction survives takeoff.
 
 At the apex, gravity is 42% while vertical speed is within 14 units/second. The resolved clean tolerance is:
 
@@ -84,6 +99,14 @@ landingTolerance * board.landing * assistScale * (1 - trickRisk * 0.18)
 ```
 
 `assistScale` is 1.4 with Landing Assist and 1 otherwise. The recovery limit is the smaller of `wipeoutThreshold` and 1.7 times the resolved clean tolerance. Perfect ignores board and trick-risk modifiers. A landing more than 2.25 radians out of line receives the `BOARD FIRST!` wipeout language after the contact window.
+
+Simple mode begins board-specific auto-level after downward velocity exceeds 18. It chooses the nearer of the surface tangent and that tangent plus π, allowing a real opposite-facing landing without guaranteeing it. Landing direction commits to signed travel on contact. Perfect, clean, and wobble speed preservation factors are 1.035, 0.94, and 0.74, followed by their short carry windows.
+
+## World envelope
+
+`js/world-catalog.js` keeps world tuning separate from rider tuning. Far, mid, and near traffic pools have capacities 8, 8, and 3 with parallax 0.08, 0.32, and 0.88. Wildlife and powerup pools each have capacity 3; at most two bonuses can be active. Interactions and presentation events use fixed 16- and 32-record arrays. A 7-second initial grace and 3.5-second minimum interactive quiet period prevent immediate or stacked hazards.
+
+Condition profiles change wind, density, traffic lists, and dolphin/shark/whale weights while rider collision geometry remains shared. Spawn streams are separately seeded so adding cosmetic traffic does not perturb interactive wildlife or powerup timing.
 
 ## Aerial trick gates
 
@@ -154,4 +177,4 @@ Exact signatures retain direction, rotation size, ordered trick IDs, grab hold b
 
 ## Presentation and access defaults
 
-`cameraResponse` is 5.8 and `juiceIntensity` is 1; both are presentation-only. New saves use Wave Read Assist `full`, Reduced Flash on, 70% screen shake, touch controls on, and steering/landing assists off. Either steering or landing assistance multiplies the score by 0.82. Reduced Motion, Reduced Flash, High Contrast, and Wave Read modes do not change physics or scoring.
+`cameraResponse` is 5.8 and `juiceIntensity` is 1; both are presentation-only. New saves use Simple Controls, Wave Read Assist `full`, Reduced Flash on, 70% screen shake, touch controls on, and steering/landing assists off. Saves created before `controlMode` existed migrate to Advanced so their learned mapping remains intact; fresh and malformed saves use Simple. Either steering or landing assistance multiplies the score by 0.82. Reduced Motion, Reduced Flash, High Contrast, and Wave Read modes do not change physics or scoring.

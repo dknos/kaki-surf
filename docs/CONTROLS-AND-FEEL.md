@@ -1,131 +1,126 @@
 # Controls and gameplay feel
 
-## Input map
+## Control modes
 
-The same five step actions are available on keyboard, standard-layout gamepads, touch, and an optional host input adapter. A trick button changes meaning with context; it never collapses back into a generic Style action.
+Simple Controls are the default for new saves. Advanced Controls preserve the direct Q/E/F/T scheme from earlier builds. The setting is persistent and switching modes clears held inputs and edge buffers so one mode cannot leak an action into the other.
 
-| Intent | Keyboard | Gamepad | Touch |
+### Simple Controls
+
+| Intent | Keyboard | Standard gamepad | Touch |
 | --- | --- | --- | --- |
-| Carve on the face | Arrows or WASD | Left stick or D-pad | Direction pad |
-| Body spin left/right in air | A/D or Left/Right | Left stick or D-pad | Left/Right |
-| Board trim in air | W/S or Up/Down | Left stick or D-pad | Up/Down |
-| Pump / compress / commit | Space or Z | A (button 0) or right trigger (7) | Separate Pump button |
-| Q: Rail | Q; legacy X or C | X (2) or left bumper (4) | Left point of trick diamond |
-| E: Tail | E | Y (3) or right bumper (5) | Top point of trick diamond |
-| F: Flip | F | B (1) | Bottom point of trick diamond |
-| T: Twist | T | Left trigger (6) or right-stick press (11) | Right point of trick diamond |
-| Pause | Escape or P | Start (9) | Open Settings to pause |
+| Travel left/right; carve up/down | Arrows or WASD | Left stick or D-pad | Direction pad |
+| Action: compress, pump, and commit a lip pop | Space or Z | A (0) or right trigger (7) | **Action** |
+| Context trick | F or X | X (2) or B (1) | **Trick** |
+| Optional counterclockwise / clockwise spin impulse | Q / E | Left / right bumper | Left / right **Spin** |
+| Mounted-animal special | T or either Shift | Y (3) | **Special** when ready |
+| Pause | Escape or P | Start (9) | Settings |
 | Restart / retry | R; Space on results | B on results; A on results | Results button |
-| Debug tuning | Backtick | Not mapped | Not mapped |
 
-The gamepad names above follow the browser Standard Gamepad layout. B is a live Board Varial input while surfing and a retry input only on the results screen; it does not restart an active ride.
+Action is always readable: hold on the face to compress and charge a pump, release to add an efficiency-scaled burst, and carry an uphill line through the lip to launch. It is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
 
-The touch layout keeps its direction pad on the left. On the right, Q/E/F/T form a compact diamond with Pump beside it. Pointer state is tracked independently, so a player can steer while holding a grab, use more than one action pointer, and release one direction without cancelling another. Buttons expose visible pressed state and the cluster scales down in short landscape layouts.
+Simple Trick is contextual and buffered. A held request chooses Front Rail Grab, or Tail Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time.
 
-## Pressed, held, and released contract
+Late in descent, Simple mode nudges the board toward whichever landing tangent is nearer: normal or opposite-facing. The board-specific correction is strongest on Foam Puff and lightest on Moon Log. This is not a guaranteed landing; speed, trick-relative board motion, contact error, and the normal landing bands still apply.
 
-`js/input.js` exports a 120 ms `BUFFER_WINDOW`. For Pump and all four trick actions:
+### Advanced Controls
 
-- `actionPressed` is retained for up to 120 ms or until the fixed-step simulation consumes it.
-- `action` is the live held state and remains true for the physical hold.
-- `actionReleased` is retained for up to 120 ms or until consumed.
+| Action | Keyboard | Standard gamepad | Touch control | On the wave | In the air |
+| --- | --- | --- | --- | --- | --- |
+| Rail / `trick1` | Q; legacy X or C | X (2) or left bumper (4) | Left Spin button | Snap / slash | Front Rail Grab |
+| Tail / `trick2` | E | Y (3) or right bumper (5) | Right Spin button | Cutback / layback | Tail Grab |
+| Flip / `trick3` | F | B (1) | Trick button | Floater / re-entry | Board Varial |
+| Twist / `trick4` | T | Left trigger (6) or right-stick press (11) | Special button | Tube Tuck; Moon Log Soul Arch | Kaki Twist |
 
-Keyboard repeat cannot create another press. Overlapping aliases are one logical action: holding X and then pressing C does not duplicate Q, and Q/X/C release only when the final alias is released. The legacy `style`, `stylePressed`, and `styleReleased` fields mirror `trick1` for old host adapters.
+Advanced gamepad B is Board Varial during a run and retry only on the results screen. Advanced touch remaps the same physical five-button cluster to Q/E/F/T plus Action; the labels remain compact enough for the Simple layout.
 
-Each analog-stick axis has an 18% dead zone and is rescaled outside it. Blur, pause, restart, and destroy clear held state, edge buffers, touch pointers, and meta actions. After a clear, a still-held gamepad must return to neutral before it can create a fresh action edge.
+## Input contract
 
-## Contextual trick map
+`js/input.js` retains pressed and released edges for 120 ms or until one fixed simulation step consumes them. Each logical action has:
 
-| Button | On the wave | Eligibility | Rejection hint | In the air |
-| --- | --- | --- | --- | --- |
-| Q | Snap / slash | A real carve and no maneuver cooldown | `CARVE FIRST` | Front Rail Grab |
-| E | Cutback / layback | A real carve, cooldown clear, and enough space from the curl | `CARVE FIRST` or `TOO DEEP` | Tail Grab |
-| F | Floater / re-entry | At the lip or within the crest band, with timing cooldown clear | `NEED LIP` or `TIME THE LIP` | Board Varial |
-| T | Tube Tuck; Soul Arch on Moon Log | Held in the critical/pocket area and a usable face band | `FIND POCKET` | Kaki Twist |
+- an unsuffixed live held field;
+- a `Pressed` one-shot edge;
+- a `Released` one-shot edge.
 
-An ineligible on-wave input emits a `trickRejected` event with `context: "wave"`, presents the short hint, and awards no maneuver points. Valid maneuvers are mechanical:
+Keyboard repeat cannot create duplicate edges. In Advanced mode Q/X/C are aliases for one action, so releasing one alias while another remains held does not generate a release. The legacy `style`, `stylePressed`, and `styleReleased` fields mirror `trick1` for old host adapters.
 
-- Snap redirects the carve toward the useful line and costs extra speed when performed on a poor line.
-- Cutback reverses face velocity, redirects toward the curl, and gives up some speed for pocket position.
-- Floater holds speed across the lip and preserves the launch-coyote opportunity.
-- Tube Tuck or Soul Arch narrows steering to 46% while held and earns style only in the eligible pocket.
+Simple mode additionally exposes `trick`, `special`, `spinLeft`, and `spinRight`; Advanced mode exposes `trick1` through `trick4`. Inactive-mode actions remain false. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers; a held gamepad must return to neutral before it can create a new edge.
 
-## Aerial composition
+Touch pointers are independent, allowing direction plus Action or a held Trick at the same time. Releasing one pointer does not cancel another.
 
-Horizontal input always controls Kitty's accumulated body spin. Vertical input trims the board relative to the body. The aerial trick manifest then adds pose motion or board-relative motion on top of those controls:
+## Bidirectional travel and switch stance
 
-- Q and E are hold tricks. Front Rail enters fastest; Tail Grab pays more, makes trim more sensitive, rewards an apex hold, and adds late-release risk while descending.
-- F is a discrete full board-relative turn. It needs at least 0.08 seconds before starting, 0.44 seconds of total air, and 4 logical pixels of height. An incomplete varial can leave a bad board orientation.
-- T is the signature counter-rotation. It needs at least 0.28 seconds before starting, 0.78 seconds of total air, and 18 logical pixels of height. Board-specific timing, motion, score, and risk modifiers make each version distinct.
+Horizontal riding input targets signed travel velocity rather than teleporting the rider's facing. Opposite input first fights the current glide and applies a speed scrub. A direction change commits only after velocity crosses the configured threshold for the configured commit time; this prevents a single noisy sample from flipping the sprite or world.
 
-Different tricks can be sequenced during one launch. Starting one grab ends the other active grab, but a completed grab can chain into a varial or signature. The same trick cannot be started twice in one aerial; the restrained rejection is `CHAIN ANOTHER`. Starting too early reports `WAIT FOR AIR`, and a height gate reports `NEED MORE POP`.
+When a change commits:
 
-Examples of valid composition include:
+- `travelDirection`, `worldTravel`, parallax, wake, airborne carry, and sprite facing agree;
+- the run records regular or switch stance relative to its starting direction;
+- a meaningful reversal adds Flow and emits one `directionChange` event;
+- takeoff and landing may independently record switch bonuses.
 
-- Hold Right and Q for `180 FRONT RAIL`, then use Up/Down to trim.
-- Hold Right, hold and release E through the apex, tap F, then land for `360 TAIL GRAB + VARIAL`.
-- Build a larger Moon Log launch, start T after the gate, continue spinning, and align the independently counter-rotating board for `KAKI TWIST` plus rotation.
+In the air, the nearest of the regular and opposite-facing landing tangents is valid. A clean opposite-facing landing commits the new direction and keeps quality-dependent momentum carry.
 
-See [Trick grammar](./TRICK-GRAMMAR.md) for manifest fields, exact naming, gates, and scoring behavior.
+## Slope drive, Action, and big air
 
-## Wave reading and pumping
+The rider samples the same animated ride surface used for drawing and landing. The simulation projects signed x travel and face movement through that surface gradient:
 
-Physics and presentation both call `GameplayWave.powerFaceAt(x)` and `GameplayWave.speedPotential(x, face, options)`. The renderer must not invent a second fast-line formula.
+- positive downhill drive adds the strongest acceleration;
+- uphill travel has a real speed cost;
+- traverse supplies a smaller glide contribution;
+- broad line quality, pocket position, board acceleration, and an Action release enhance the result.
 
-The shared query classifies three zones:
+The old narrow seam is no longer required to unlock the board's maximum speed. The readable fast line remains useful guidance and improves pump efficiency, but `currentRideSpeedCap()` is the board's actual hard cap. A poor line can still move; it simply gives back speed through slope and reduced local drive.
 
-1. **Safe shoulder:** lower pocket risk, calmer streaks, stable recovery space, and modest acceleration. An off-line position is also classified safe even if it is nearer the pocket.
-2. **Power seam:** within 0.12 normalized face units of the moving target and close enough to the pocket to sustain drive. Seafoam/gold beads, faster streaks, wake, an entry chirp, and the HUD communicate acquisition.
-3. **Critical curl:** the breaking area or pocket risk at least 0.78. Dark folding water, whitewater mass, foam fingers, sparse coral marks, stronger surf noise, and multiplier pressure distinguish danger from the sustainable seam.
+Launch height comes from current speed, uphill approach, Action charge, pocket position, board launch identity, and bonuses such as Moon Pop. A basic lip pop retains a useful floor. A fast bottom turn and climb makes the larger arc. Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample.
 
-Hold Pump to charge, compress Kitty, and flex the board. Release with more than 0.12 charge while still on the face to convert charge, carve rhythm, board pump identity, and the shared `pumpEfficiency` into speed. The compact Pump meter turns gold when efficiency is strong; thresholded charge notes teach the build without sounding every simulation step. A timed seam release creates the full spray and impulse, while a completely missed line retains only 22% of the timing factor.
+Perfect, clean, and wobble landings preserve progressively less speed. A short carry timer prevents a successful landing from collapsing immediately back to baseline glide.
 
-Riding the narrow sustainable core builds `waveMomentum`. The reserve takes roughly one second to acquire, decays gradually off line, and unlocks the board's speed ceiling. The safe shoulder and critical curl remain playable, but cannot produce full reserve or maximum sustainable acceleration. The gradual decay lets the intended rhythm stay playable rather than modal: climb, hold Pump, drop toward the seam, release, carry the earned speed back to the lip, and launch.
+## Aerial tricks
 
-Launch pop reads both actual speed and stored wave momentum. An ordinary lip jump always keeps its base impulse, and charge or a strong climb can improve it, but maximum vertical pop requires line history backed by real speed. Horizontal approach also carries into the aerial instead of being replaced by the final input sample.
+Advanced mode composes body spin, manual trim, and the Q/E/F/T manifest directly:
 
-On-wave horizontal movement stores lateral velocity. Steering responds quickly, releasing coasts briefly, reversing must work through the existing momentum, and playfield edges remove only the outward component. Face acceleration is slightly quicker while retaining carve velocity longer than the original target-snapping response.
+- Front Rail and Tail Grab are held tricks. Tail pays more, changes trim, rewards an apex hold, and adds descending risk.
+- Board Varial is a discrete board-relative turn with start, height, and airtime gates.
+- Kaki Twist is a larger signature counter-rotation with stricter gates and board-specific variants.
 
-## Wave Read Assist
+Different tricks can be sequenced in one launch. Starting one grab ends the other active grab, while a completed grab can chain into a varial or signature. Body rotation remains independent from board-relative trick motion in both control modes. See [Trick grammar](./TRICK-GRAMMAR.md) for exact manifest and scoring fields.
 
-Wave Read Assist changes presentation only. It never changes physics, score, or eligibility.
+## Speed and Flow
+
+Speed is physical velocity. Its fixed presentation tiers are:
+
+| Range | Tier |
+| --- | --- |
+| Below 52 | `STALLING` |
+| 52 through below 78 | `GLIDING` |
+| 78 through below 101 | `FAST` |
+| 101 through below 124 | `FLYING` |
+| 124 and above | `BLASTING` |
+
+Wake length, directional spray, water streaks, parallax, pose, wave-filter pitch, and speed accents reinforce those tiers. The HUD does not expose a persistent POWER meter.
+
+Flow is a separate 0–100 style/combo state. Alternating carves, committed direction changes, pumping, varied landed tricks, landing quality, wildlife rides, near misses, and set-piece bonuses add Flow. Stalling, repetition, wobble, and wipeouts reduce it. Flow drives the live score multiplier but never replaces physical speed.
+
+## Wave Read Assist and teaching
+
+Wave Read changes presentation only. It does not change slope physics, collision, score, trick eligibility, or spawn logic.
 
 | Mode | Presentation |
 | --- | --- |
-| Full | Stronger seam beads, a nearby correction arrow, `TOO HIGH` / `TOO LOW` / `POWER LINE` labels, acquisition callout, landing label, and the first-run teaching overlay |
-| Subtle | Natural seam, directional streaks, spray, board wake, and audio; no persistent correction arrow or teaching panel |
-| Off | Keeps world animation and the base physical seam readable but removes assist-only arrows, labels, and the lower teaching panel |
+| Full | Stronger fast-line cue, correction help, landing label, and a short first-run teaching prompt |
+| Subtle | Natural streaks, spray, wake, and audio without persistent labels |
+| Off | World and physical wave remain visible; assist-only text and arrows are removed |
 
-High Contrast also strengthens the seam and landing label. Steering Assist and Landing Assist are separate options; either applies the displayed 18% scoring reduction, while Wave Read Assist does not.
+The first-run lesson is intentionally one idea: **drop for speed, hit the lip for air**. It avoids teaching the old seam as a requirement. Steering Assist and Landing Assist are separate scoring assists; either applies the displayed 18% score reduction. Simple auto-level is part of the selected control mode, not the Landing Assist setting.
 
-## First-run teaching
+## Wildlife and bonuses
 
-Until a completed run records `tutorialSeen`, the ride stages three short prompts rather than showing a wall of instructions:
+Dolphin and whale offers can temporarily mount Kitty. While mounted, the ride preserves a minimum speed and grows Flow; Special or a lip launch triggers a large animal-assisted dismount. A shark uses a minimum telegraph before crossing. Contact wipes out unless Star Foam is ready, while threading the crossing grants score and Flow.
 
-1. After entry: `CLIMB + HOLD PUMP`.
-2. Around four seconds or once Kitty reaches the upper face: `DROP TO POWER SEAM + RELEASE`.
-3. Around seven seconds or on reaching the lip: `FIND LIP / Q E F T IN AIR`.
-
-The short first-run callouts come from simulation in every mode. In Full mode, the lower teaching card additionally mirrors this flow with `LOAD THE BOARD`, seam correction language, and the four trick labels, then fades by roughly 13 seconds.
-
-## Speed feedback
-
-The fixed tiers are `STALLING` below 52, `GLIDING` below 78, `FLOWING` below 101, `FLYING` below 124, and `MAX FLOW` at 124 or above. Speed is redundantly communicated through:
-
-- the compact flow gauge and tier name;
-- the seam-earned momentum reserve that gates the board's upper speed envelope;
-- board-specific wake length and spray shape;
-- speed-driven spray density and water-streak motion;
-- pump compression/release poses, board flex, and aerial posture;
-- travel-driven background parallax;
-- wave-filter pitch, music density, and high-tier audio accents;
-- restrained semantic cues for combo-tier growth, trick start/completion, and rejected inputs;
-- vibration or dual-rumble events where the device and browser support them.
+Mango Rush reduces uphill loss for its active duration, Moon Pop multiplies the next launch and is consumed on use, and Star Foam protects one shark contact or wobble landing before being consumed. Powerups, mounts, and active timers come from `WorldSimulation.getModifiers()`; their sprites and HUD are presentation only.
 
 ## Landing and banking
 
-The dotted landing tangent is simulation-derived. The aerial landing panel shows current alignment against perfect, clean, and recovery bands and indicates whether error is improving. Full Wave Read or High Contrast also labels the world-space tangent.
+The dotted landing tangent is simulation-derived. The landing preview reports perfect, clean, and recovery bands and whether alignment is improving. Perfect and clean landings bank the completed aerial. A wobble banks less and cuts Flow; a wipeout clears the provisional score and banks none of it. Exact repeats decay by the complete landed signature, not a generic spin label.
 
-Perfect and clean landings bank the completed aerial at their quality values. A wobble landing banks a reduced aerial, weakens combo heat, and loses more speed. A wipeout clears the provisional name and score, resets the combo, and banks none of the aerial value. Exact repeats decay by the complete landed signature, not by a generic spin label.
-
-Runs last 78 seconds or three wipeouts. A short recovery returns the player to the wave when time and paws remain.
+Runs last 78 seconds or three wipeouts. A short recovery returns Kitty to the wave when time and paws remain.

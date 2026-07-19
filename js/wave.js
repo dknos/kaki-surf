@@ -7,6 +7,7 @@ export class GameplayWave {
     this.phaseB = ((seed >>> 12) & 255) / 255 * Math.PI * 2;
     this.time = 0;
     this.travel = 0;
+    this.worldTravel = 0;
     this.curlX = 48;
     this.pressure = 0;
   }
@@ -14,13 +15,15 @@ export class GameplayWave {
   reset() {
     this.time = 0;
     this.travel = 0;
+    this.worldTravel = 0;
     this.curlX = 48;
     this.pressure = 0;
   }
 
-  update(dt, speed, curlSpeed) {
+  update(dt, speed, curlSpeed, signedSpeed = speed) {
     this.time += dt;
     this.travel += speed * dt;
+    this.worldTravel += (Number.isFinite(signedSpeed) ? signedSpeed : speed) * dt;
     const pulse = Math.sin(this.time * 0.44 + this.phaseB) * 0.22;
     this.curlX += (curlSpeed + pulse) * dt;
     this.pressure = smoothstep(0, 72, this.time);
@@ -69,8 +72,8 @@ export class GameplayWave {
     const pressure = clamp(this.pressure, 0, 1);
     const breaking = Boolean(options.breaking ?? this.curlContact(x));
 
-    // Keep broad guidance readable, but reserve top-end drive for the narrow,
-    // sustainable seam between the weak shoulder and the collapsing curl.
+    // Keep broad guidance readable while letting the simulation's surface
+    // gradient, rather than a narrow seam, own ordinary top-end drive.
     const lineQuality = 1 - smoothstep(0.035, 0.27, absoluteError);
     const pocketDrive = 0.34 + smoothstep(0.06, 0.68, pocket) * 0.66;
     const criticalLoss = smoothstep(0.76, 1, pocket) * 0.38;
@@ -90,7 +93,7 @@ export class GameplayWave {
     const faceVelocity = clamp(Math.abs(Number(options.faceVelocity ?? 0)), 0, 1.5);
     const movementTiming = 0.78 + Math.min(0.22, faceVelocity * 0.2);
     const pumpAccess = clamp(
-      lineQuality * sustainablePocket * 0.25 + seamDrive * 0.75,
+      lineQuality * sustainablePocket * 0.58 + seamDrive * 0.24 + pocketDrive * 0.18,
       0,
       1,
     );
@@ -111,14 +114,17 @@ export class GameplayWave {
       0,
       1,
     );
+    // The readable line is useful, but it is no longer a permission gate for
+    // ordinary speed. Geometry-derived downhill drive is applied by the
+    // simulation; this query supplies only a broad local-wave contribution.
     const acceleration = clamp(
-      (0.18 + potential * 0.7 + seamDrive * 0.38)
+      (0.46 + lineQuality * 0.24 + sustainablePocket * 0.16 + seamDrive * 0.08 + pressure * 0.08)
         * pressureContribution
         * breakingContribution
         * pumpContribution
         * (0.84 + boardAcceleration * 0.16),
-      0.15,
-      1.25,
+      0.32,
+      1.12,
     );
     const risk = clamp(
       pocket * 0.78
@@ -159,6 +165,31 @@ export class GameplayWave {
       this.ridingY(x + epsilon, face) - this.ridingY(x - epsilon, face),
       epsilon * 2,
     );
+  }
+
+  /**
+   * Side-effect-free gradient of the ride surface at one point. Both
+   * derivatives use the same current wave state, so animated wave motion does
+   * not inject energy into the rider. Simulation projects signed rider motion
+   * through this gradient to distinguish downhill, traverse, and uphill travel.
+   */
+  surfaceGradientAt(x, face = 0.25) {
+    const sampleX = Number.isFinite(x) ? x : 0;
+    const sampleFace = Number.isFinite(face) ? face : 0.25;
+    const epsilonX = 2;
+    const epsilonFace = 1 / 512;
+    const lowFace = clamp(sampleFace - epsilonFace, -0.06, 1.36);
+    const highFace = clamp(sampleFace + epsilonFace, -0.06, 1.36);
+    return {
+      x: (
+        this.ridingY(sampleX + epsilonX, sampleFace)
+        - this.ridingY(sampleX - epsilonX, sampleFace)
+      ) / (epsilonX * 2),
+      face: (
+        this.ridingY(sampleX, highFace)
+        - this.ridingY(sampleX, lowFace)
+      ) / Math.max(Number.EPSILON, highFace - lowFace),
+    };
   }
 
   pocketRisk(playerX) {

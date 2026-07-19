@@ -55,7 +55,7 @@ test("zones separate safe shoulder, sustainable power seam, and critical curl", 
   assert.equal(wave.speedPotential(powerX, wave.powerFaceAt(powerX) + 0.3, { breaking: false }).zone, "safe");
 });
 
-test("full seam drive is exclusive to the sustainable power line", () => {
+test("the readable seam improves response without gating broad useful acceleration", () => {
   const wave = new GameplayWave(0x4b414b49);
   wave.pressure = 1;
   const shoulderX = wave.curlX + 190;
@@ -76,11 +76,11 @@ test("full seam drive is exclusive to the sustainable power line", () => {
   assert.equal(sustainable.zone, "power");
   assert.equal(sustainable.seamDrive, 1);
   assert.equal(sustainable.maxFlowEligible, true);
-  assert.equal(sustainable.acceleration, 1.25);
+  assert.ok(sustainable.acceleration > offLine.acceleration);
   for (const result of [shoulder, critical, offLine]) {
     assert.equal(result.maxFlowEligible, false);
     assert.ok(result.seamDrive < 0.01);
-    assert.ok(result.acceleration < sustainable.acceleration);
+    assert.ok(result.acceleration >= 0.32, "ordinary lines retain useful drive");
   }
   assert.equal(shoulder.zone, "safe");
   assert.equal(critical.zone, "critical");
@@ -123,8 +123,26 @@ test("pressure, pocket position, breaking, and pump timing produce bounded varia
     assert.ok(result.seamDrive >= 0 && result.seamDrive <= 1);
     assert.equal(typeof result.maxFlowEligible, "boolean");
     assert.ok(result.pumpEfficiency >= 0 && result.pumpEfficiency <= 1);
-    assert.ok(result.acceleration >= 0.15 && result.acceleration <= 1.25);
+    assert.ok(result.acceleration >= 0.32 && result.acceleration <= 1.12);
   }
+});
+
+test("surface gradients are deterministic, side-effect free, and world travel is signed", () => {
+  const wave = new GameplayWave(0x5150cafe);
+  wave.update(2.5, 96, 2.4, 96);
+  const before = snapshotWave(wave);
+  const first = wave.surfaceGradientAt(174, 0.46);
+  const second = wave.surfaceGradientAt(174, 0.46);
+  assert.deepEqual(second, first);
+  assert.deepEqual(snapshotWave(wave), before);
+  assert.ok(Number.isFinite(first.x));
+  assert.ok(first.face > 90, "face coordinate follows the physical face depth");
+
+  const unsignedBefore = wave.travel;
+  const signedBefore = wave.worldTravel;
+  wave.update(0.5, 80, 0, -80);
+  assert.equal(wave.travel, unsignedBefore + 40);
+  assert.equal(wave.worldTravel, signedBefore - 40);
 });
 
 test("renderer guide reads the exact canonical power face", () => {
@@ -137,4 +155,3 @@ test("renderer guide reads the exact canonical power face", () => {
   const guide = waveGuideAt(wave, player, BOARDS.moonLog);
   assert.equal(guide.targetFace, powerSeamFaceAt(wave, player.x));
 });
-

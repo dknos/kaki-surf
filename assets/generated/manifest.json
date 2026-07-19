@@ -1,0 +1,1014 @@
+{
+  "version": 1,
+  "generator": "tools/art/build-grok-assets.py",
+  "families": {
+    "wave-breaker-atlas": {
+      "image": "wave-breaker-atlas.png",
+      "width": 288,
+      "height": 128,
+      "frames": {
+        "crestFeatherA": {
+          "x": 0,
+          "y": 0,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "crestFeatherB": {
+          "x": 72,
+          "y": 0,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "risingCurl": {
+          "x": 144,
+          "y": 0,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "impact": {
+          "x": 216,
+          "y": 0,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "whitewaterChurn": {
+          "x": 0,
+          "y": 64,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "foamTendrils": {
+          "x": 72,
+          "y": 64,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "sprayBurst": {
+          "x": 144,
+          "y": 64,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "seaMist": {
+          "x": 216,
+          "y": 64,
+          "width": 72,
+          "height": 64,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/wave-breaker-source.jpg"
+    },
+    "dolphin-atlas": {
+      "image": "dolphin-atlas.png",
+      "width": 224,
+      "height": 80,
+      "frames": {
+        "approach": {
+          "x": 0,
+          "y": 0,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "offer": {
+          "x": 56,
+          "y": 0,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "mountedGlide": {
+          "x": 112,
+          "y": 0,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "compress": {
+          "x": 168,
+          "y": 0,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "breach": {
+          "x": 0,
+          "y": 40,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "corkscrew": {
+          "x": 56,
+          "y": 40,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "tailSlap": {
+          "x": 112,
+          "y": 40,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        },
+        "dismount": {
+          "x": 168,
+          "y": 40,
+          "width": 56,
+          "height": 40,
+          "anchor": [
+            0.5,
+            0.78
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/dolphin-source.png"
+    },
+    "shark-atlas": {
+      "image": "shark-atlas.png",
+      "width": 224,
+      "height": 72,
+      "frames": {
+        "deepShadow": {
+          "x": 0,
+          "y": 0,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "finTelegraph": {
+          "x": 56,
+          "y": 0,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "closeFin": {
+          "x": 112,
+          "y": 0,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "crossing": {
+          "x": 168,
+          "y": 0,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "jumpUnder": {
+          "x": 0,
+          "y": 36,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "nearMiss": {
+          "x": 56,
+          "y": 36,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "comicSplash": {
+          "x": 112,
+          "y": 36,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        },
+        "retreat": {
+          "x": 168,
+          "y": 36,
+          "width": 56,
+          "height": 36,
+          "anchor": [
+            0.5,
+            0.76
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/shark-source.png"
+    },
+    "whale-atlas": {
+      "image": "whale-atlas.png",
+      "width": 352,
+      "height": 108,
+      "frames": {
+        "distantShadow": {
+          "x": 0,
+          "y": 0,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "blowTelegraph": {
+          "x": 88,
+          "y": 0,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "swellLift": {
+          "x": 176,
+          "y": 0,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "breachAnticipation": {
+          "x": 264,
+          "y": 0,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "breach": {
+          "x": 0,
+          "y": 54,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "rideableBack": {
+          "x": 88,
+          "y": 54,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "giantSplash": {
+          "x": 176,
+          "y": 54,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        },
+        "departure": {
+          "x": 264,
+          "y": 54,
+          "width": 88,
+          "height": 54,
+          "anchor": [
+            0.5,
+            0.84
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/whale-source.png"
+    },
+    "birds-atlas": {
+      "image": "birds-atlas.png",
+      "width": 136,
+      "height": 48,
+      "frames": {
+        "gullGlide": {
+          "x": 0,
+          "y": 0,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "gullFlap": {
+          "x": 34,
+          "y": 0,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "pelicanSkim": {
+          "x": 68,
+          "y": 0,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "pelicanCourier": {
+          "x": 102,
+          "y": 0,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "ternBank": {
+          "x": 0,
+          "y": 24,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "cormorantDive": {
+          "x": 34,
+          "y": 24,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "flock": {
+          "x": 68,
+          "y": 24,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        },
+        "scatter": {
+          "x": 102,
+          "y": 24,
+          "width": 34,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.55
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/birds-source.png"
+    },
+    "boats-atlas": {
+      "image": "boats-atlas.png",
+      "width": 256,
+      "height": 68,
+      "frames": {
+        "sailboat": {
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "speedboat": {
+          "x": 64,
+          "y": 0,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "fishingBoat": {
+          "x": 128,
+          "y": 0,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "tugboat": {
+          "x": 192,
+          "y": 0,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "cargoShip": {
+          "x": 0,
+          "y": 34,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "jetSki": {
+          "x": 64,
+          "y": 34,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "rescueCraft": {
+          "x": 128,
+          "y": 34,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "escortBoat": {
+          "x": 192,
+          "y": 34,
+          "width": 64,
+          "height": 34,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/boats-source.png"
+    },
+    "air-traffic-atlas": {
+      "image": "air-traffic-atlas.png",
+      "width": 288,
+      "height": 64,
+      "frames": {
+        "propPlane": {
+          "x": 0,
+          "y": 0,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "seaplane": {
+          "x": 72,
+          "y": 0,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "helicopter": {
+          "x": 144,
+          "y": 0,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "fastPlane": {
+          "x": 216,
+          "y": 0,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "bannerPlane": {
+          "x": 0,
+          "y": 32,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "parachuteDrop": {
+          "x": 72,
+          "y": 32,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "airshowFormation": {
+          "x": 144,
+          "y": 32,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        },
+        "launchClimb": {
+          "x": 216,
+          "y": 32,
+          "width": 72,
+          "height": 32,
+          "anchor": [
+            0.5,
+            0.52
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/air-traffic-source.jpg"
+    },
+    "powerups-atlas": {
+      "image": "powerups-atlas.png",
+      "width": 96,
+      "height": 48,
+      "frames": {
+        "mangoRush": {
+          "x": 0,
+          "y": 0,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "moonPop": {
+          "x": 24,
+          "y": 0,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "starFoam": {
+          "x": 48,
+          "y": 0,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "dolphinCall": {
+          "x": 72,
+          "y": 0,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "mangoHalo": {
+          "x": 0,
+          "y": 24,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "moonHalo": {
+          "x": 24,
+          "y": 24,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "starHalo": {
+          "x": 48,
+          "y": 24,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "pickupBurst": {
+          "x": 72,
+          "y": 24,
+          "width": 24,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/powerups-source.png"
+    },
+    "boards-atlas": {
+      "image": "boards-atlas.png",
+      "width": 256,
+      "height": 72,
+      "frames": {
+        "foamPuffTop": {
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "foamPuffRail": {
+          "x": 64,
+          "y": 0,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "foamPuffFlexConcept": {
+          "x": 128,
+          "y": 0,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "foamPuffUnderside": {
+          "x": 192,
+          "y": 0,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "mangoFishTop": {
+          "x": 0,
+          "y": 24,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "mangoFishRail": {
+          "x": 64,
+          "y": 24,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "mangoFishFlexConcept": {
+          "x": 128,
+          "y": 24,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "mangoFishUnderside": {
+          "x": 192,
+          "y": 24,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "moonLogTop": {
+          "x": 0,
+          "y": 48,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "moonLogRail": {
+          "x": 64,
+          "y": 48,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "moonLogFlexConcept": {
+          "x": 128,
+          "y": 48,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        },
+        "moonLogUnderside": {
+          "x": 192,
+          "y": 48,
+          "width": 64,
+          "height": 24,
+          "anchor": [
+            0.5,
+            0.62
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/boards-source.png"
+    },
+    "carrier-atlas": {
+      "image": "carrier-atlas.png",
+      "width": 384,
+      "height": 100,
+      "frames": {
+        "hazeSilhouette": {
+          "x": 0,
+          "y": 0,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "festivalCarrier": {
+          "x": 96,
+          "y": 0,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "islandLights": {
+          "x": 192,
+          "y": 0,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "radarDish": {
+          "x": 288,
+          "y": 0,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "deckCrew": {
+          "x": 0,
+          "y": 50,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "deckAircraft": {
+          "x": 96,
+          "y": 50,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "escortVessel": {
+          "x": 192,
+          "y": 50,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        },
+        "layeredWake": {
+          "x": 288,
+          "y": 50,
+          "width": 96,
+          "height": 50,
+          "anchor": [
+            0.5,
+            0.82
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/carrier-source.png"
+    },
+    "ui-ornaments-atlas": {
+      "image": "ui-ornaments-atlas.png",
+      "width": 320,
+      "height": 104,
+      "frames": {
+        "titleCrest": {
+          "x": 0,
+          "y": 0,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "foamPuffEmblem": {
+          "x": 80,
+          "y": 0,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "mangoFishEmblem": {
+          "x": 160,
+          "y": 0,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "moonLogEmblem": {
+          "x": 240,
+          "y": 0,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "simpleControlsGlyph": {
+          "x": 0,
+          "y": 52,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "blankRibbon": {
+          "x": 80,
+          "y": 52,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "wildlifeSpecialBadge": {
+          "x": 160,
+          "y": 52,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "resultsMedallion": {
+          "x": 240,
+          "y": 52,
+          "width": 80,
+          "height": 52,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/ui-ornaments-source-v2.png"
+    }
+  }
+}
