@@ -1,4 +1,4 @@
-import { BOARDS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_FRAME_DELTA, TUNING } from "./config.js";
+import { BOARDS, CONDITIONS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_FRAME_DELTA, TUNING } from "./config.js";
 import { SurfAudio } from "./audio.js";
 import { InputManager } from "./input.js";
 import { clamp } from "./math.js";
@@ -39,12 +39,15 @@ export class KakiSurfGame {
     profile = null,
     onExit = null,
     onRunComplete = null,
+    qaScene = null,
   }) {
     this.host = host;
     this.storage = storage;
     this.profile = profile;
     this.onExit = onExit;
     this.onRunComplete = onRunComplete;
+    this.initialQaScene = qaScene;
+    this.qaFreeze = false;
     this.save = loadSave(storage);
     if (hostSettings) this.save.settings = { ...this.save.settings, ...hostSettings };
     this.settings = this.save.settings;
@@ -64,21 +67,29 @@ export class KakiSurfGame {
     this.input = externalInput ?? new InputManager({ touchRoot: this.elements.touchControls });
     this.audio = externalAudio ?? new SurfAudio(this.settings);
     this.selectedBoard = BOARDS[this.save.selectedBoard] ? this.save.selectedBoard : "foamPuff";
+    this.selectedCondition = CONDITIONS[this.save.selectedCondition] ? this.save.selectedCondition : "goldenCoast";
     this.bindUI();
     this.buildBoardCards();
+    this.buildConditionCards();
     this.buildDebugPanel();
     this.syncSettingsUI();
     this.updateMenuStats();
     this.showLayer("menu");
   }
 
-  start({ immediate = false, board = null } = {}) {
+  start({ immediate = false, board = null, condition = null } = {}) {
     if (this.destroyed) throw new Error("Cannot start a destroyed Kaki Surf instance.");
     if (board && BOARDS[board]) this.selectBoard(board);
+    if (condition && CONDITIONS[condition]) this.selectCondition(condition);
     if (!this.started) {
       this.started = true;
       this.lastFrame = performance.now();
       this.frameHandle = requestAnimationFrame((now) => this.frame(now));
+    }
+    if (this.initialQaScene) {
+      const scene = this.initialQaScene;
+      this.initialQaScene = null;
+      this.setQaScene(scene);
     }
     if (immediate) this.startRun();
     return this;
@@ -87,14 +98,18 @@ export class KakiSurfGame {
   async startRun() {
     if (this.destroyed) return;
     this.save.selectedBoard = this.selectedBoard;
+    this.save.selectedCondition = this.selectedCondition;
     writeSave(this.save, this.storage);
+    this.input.clear?.();
     this.simulation.reset({
       board: this.selectedBoard,
+      condition: this.selectedCondition,
       assists: {
         steering: this.settings.steeringAssist,
         landing: this.settings.landingAssist,
       },
     });
+    this.simulation.tutorialEnabled = !this.save.tutorialSeen;
     this.simulation.begin();
     this.accumulator = 0;
     this.state = "running";
@@ -107,7 +122,7 @@ export class KakiSurfGame {
     } catch (error) {
       console.warn("Kaki Surf audio could not be unlocked; play continues silently.", error);
     }
-    this.announce(`Ride started on ${BOARDS[this.selectedBoard].name}.`);
+    this.announce(`Ride started on ${BOARDS[this.selectedBoard].name} at ${CONDITIONS[this.selectedCondition].name}.`);
   }
 
   pause(reason = "manual") {
@@ -131,10 +146,12 @@ export class KakiSurfGame {
   }
 
   restart() {
+    this.input.clear?.();
     this.startRun();
   }
 
   backToMenu() {
+    this.input.clear?.();
     this.state = "menu";
     this.simulation.reset({ board: this.selectedBoard });
     this.accumulator = 0;
@@ -154,6 +171,7 @@ export class KakiSurfGame {
       multiplier: this.simulation.currentMultiplier(),
       wipeouts: this.simulation.wipeouts,
       board: this.selectedBoard,
+      condition: this.selectedCondition,
       bestScore: this.save.bestScore,
       assists: { ...this.simulation.assists },
     };
@@ -172,6 +190,7 @@ export class KakiSurfGame {
       else if (this.state === "paused") this.resume();
     }
     if (meta.restart && (this.state === "running" || this.state === "results")) this.restart();
+    if (meta.retry && this.state === "results") this.restart();
 
     if (this.state === "running") {
       if (!this.renderer.shouldFreeze()) {
@@ -201,6 +220,7 @@ export class KakiSurfGame {
     this.renderer.update(frameDelta, this.simulation);
     const alpha = this.accumulator / FIXED_STEP;
     this.renderer.render(this.simulation, alpha);
+    if (this.qaFreeze) return;
     this.frameHandle = requestAnimationFrame((next) => this.frame(next));
   }
 
@@ -210,14 +230,34 @@ export class KakiSurfGame {
       this.audio.onEvent?.(event, this.simulation);
       if (event.type === "callout") this.announce(event.payload.subtext ? `${event.payload.text}. ${event.payload.subtext}` : event.payload.text);
       if (event.type === "complete") this.handleComplete(event.payload);
-      if (event.type === "wipeout" && navigator.vibrate) navigator.vibrate(this.settings.reducedMotion ? 0 : 35);
+      if (event.type === "pump") this.rumble(28, 0.16, 0.08);
+      if (event.type === "powerLineEnter") this.rumble(42, 0.12, 0.22);
+      if (event.type === "land") this.rumble(event.payload.quality === "perfect" ? 78 : 46, 0.25, event.payload.quality === "perfect" ? 0.55 : 0.3);
+      if (event.type === "wipeout") this.rumble(110, 0.58, 0.72);
     });
   }
 
+  rumble(duration, weakMagnitude, strongMagnitude) {
+    if (this.settings.reducedMotion) return;
+    navigator.vibrate?.(Math.min(45, duration));
+    const pad = Array.from(navigator.getGamepads?.() ?? []).find(Boolean);
+    pad?.vibrationActuator?.playEffect?.("dual-rumble", {
+      duration,
+      weakMagnitude,
+      strongMagnitude,
+    }).catch?.(() => {});
+  }
+
   handleComplete(result) {
-    const enriched = { ...result, board: this.selectedBoard };
+    const enriched = { ...result, board: this.selectedBoard, condition: this.selectedCondition };
     const isBest = recordRun(this.save, enriched);
+    this.save.tutorialSeen = true;
     writeSave(this.save, this.storage);
+    if (isBest) {
+      const event = { type: "personalBest", payload: { score: result.score }, time: this.simulation.elapsed };
+      this.renderer.onEvent(event, this.simulation);
+      this.audio.onEvent?.(event, this.simulation);
+    }
     this.state = "results";
     this.renderResults(enriched, isBest);
     this.showLayer("results");
@@ -239,10 +279,12 @@ export class KakiSurfGame {
       ["Speed", breakdown.speed],
       ["Pocket", breakdown.pocket],
       ["Carves", breakdown.carves],
+      ["Moves", breakdown.maneuvers ?? 0],
       ["Air", breakdown.air],
       ["Style", breakdown.style],
       ["Landings", breakdown.landings],
     ].map(([label, value]) => `<div><span>${label}</span><strong>${Math.round(value).toLocaleString()}</strong></div>`).join("");
+    this.elements.resultCondition.textContent = CONDITIONS[this.selectedCondition].name;
   }
 
   bindUI() {
@@ -282,16 +324,32 @@ export class KakiSurfGame {
   }
 
   buildBoardCards() {
+    const stats = ["speed", "carve", "pump", "pop", "spin", "landing"];
     this.elements.boardGrid.innerHTML = Object.values(BOARDS).map((board) => `
       <button class="board-card${board.id === this.selectedBoard ? " is-selected" : ""}" type="button" data-board="${board.id}" aria-pressed="${board.id === this.selectedBoard}">
-        <span class="board-art" style="--board:${board.color};--board-accent:${board.accent}" aria-hidden="true"><i></i></span>
-        <strong>${board.name}</strong>
-        <small>${board.tagline}</small>
-        <span>${board.description}</span>
+        <span class="board-art board-art--${board.shape}" style="--board:${board.color};--board-accent:${board.accent}" aria-hidden="true"><i></i><em></em></span>
+        <span class="board-copy"><strong>${board.name}</strong><small>${board.tagline}</small></span>
+        <span class="board-specialty"><b>${board.recommendation}</b>${board.specialty}</span>
+        <span class="board-stats" aria-label="Board ratings">
+          ${stats.map((stat) => `<span title="${stat}"><i>${stat.slice(0, 3).toUpperCase()}</i><b>${Array.from({ length: 5 }, (_, index) => `<em class="${index < board.stats[stat] ? "on" : ""}"></em>`).join("")}</b></span>`).join("")}
+        </span>
       </button>
     `).join("");
     this.elements.boardGrid.querySelectorAll("[data-board]").forEach((button) => {
       button.addEventListener("click", () => this.selectBoard(button.dataset.board), { signal: this.abort.signal });
+    });
+  }
+
+  buildConditionCards() {
+    this.elements.conditionGrid.innerHTML = Object.values(CONDITIONS).map((condition) => `
+      <button class="condition-card condition-card--${condition.id}${condition.id === this.selectedCondition ? " is-selected" : ""}" type="button" data-condition="${condition.id}" aria-pressed="${condition.id === this.selectedCondition}">
+        <span aria-hidden="true"><i></i><b></b></span>
+        <strong>${condition.shortName}</strong>
+        <small>${condition.tagline}</small>
+      </button>
+    `).join("");
+    this.elements.conditionGrid.querySelectorAll("[data-condition]").forEach((button) => {
+      button.addEventListener("click", () => this.selectCondition(button.dataset.condition), { signal: this.abort.signal });
     });
   }
 
@@ -305,6 +363,20 @@ export class KakiSurfGame {
       button.setAttribute("aria-pressed", String(selected));
     });
     this.elements.selectedBoardName.textContent = BOARDS[boardId].name;
+    writeSave(this.save, this.storage);
+  }
+
+  selectCondition(conditionId) {
+    if (!CONDITIONS[conditionId]) return;
+    this.selectedCondition = conditionId;
+    this.simulation.condition = CONDITIONS[conditionId];
+    this.save.selectedCondition = conditionId;
+    this.elements.conditionGrid.querySelectorAll("[data-condition]").forEach((button) => {
+      const selected = button.dataset.condition === conditionId;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    this.elements.selectedConditionName.textContent = CONDITIONS[conditionId].shortName;
     writeSave(this.save, this.storage);
   }
 
@@ -335,7 +407,11 @@ export class KakiSurfGame {
   updateSetting(input) {
     const key = input.dataset.setting;
     if (!key) return;
-    this.settings[key] = input.type === "checkbox" ? input.checked : Number(input.value);
+    this.settings[key] = input.type === "checkbox"
+      ? input.checked
+      : input.tagName === "SELECT"
+        ? input.value
+        : Number(input.value);
     const output = this.host.querySelector(`[data-setting-output="${key}"]`);
     if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     this.renderer.applySettings(this.settings);
@@ -354,6 +430,7 @@ export class KakiSurfGame {
       if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     }
     this.selectBoard(this.selectedBoard);
+    this.selectCondition(this.selectedCondition);
   }
 
   openSettings() {
@@ -371,6 +448,7 @@ export class KakiSurfGame {
     this.elements.bestScore.textContent = this.save.bestScore.toLocaleString();
     this.elements.runCount.textContent = String(this.save.totalRuns);
     this.elements.selectedBoardName.textContent = BOARDS[this.selectedBoard].name;
+    this.elements.selectedConditionName.textContent = CONDITIONS[this.selectedCondition].shortName;
   }
 
   showLayer(name) {
@@ -394,12 +472,240 @@ export class KakiSurfGame {
     }
   }
 
+  setQaScene(scene) {
+    this.qaFreeze = true;
+    this.input.clear?.();
+    if ("enabled" in this.input) this.input.enabled = false;
+    this.renderer.applySettings({
+      ...this.settings,
+      highContrast: false,
+      reducedMotion: false,
+      reducedFlash: true,
+      waveReadAssist: "full",
+    });
+
+    if (scene === "menu") {
+      this.selectedBoard = "foamPuff";
+      this.selectedCondition = "goldenCoast";
+      this.buildBoardCards();
+      this.buildConditionCards();
+      this.updateMenuStats();
+      this.simulation.condition = CONDITIONS.goldenCoast;
+      this.state = "menu";
+      this.showLayer("menu");
+      return;
+    }
+
+    if (scene === "results") {
+      this.selectedCondition = "goldenCoast";
+      this.state = "results";
+      this.renderResults({
+        score: 18420,
+        flow: 94,
+        rank: { grade: "S", title: "LEGENDARY PLUSH" },
+        breakdown: {
+          ride: 1280,
+          speed: 2460,
+          pocket: 3180,
+          carves: 1640,
+          maneuvers: 2140,
+          air: 4890,
+          style: 1720,
+          landings: 1110,
+        },
+      }, true);
+      this.showLayer("results");
+      this.elements.topControls.hidden = true;
+      return;
+    }
+
+    const conditionId = CONDITIONS[scene] ? scene : "goldenCoast";
+    const boardId = scene === "maxSpeed" || scene === "tailGrab" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff";
+    this.selectedCondition = conditionId;
+    this.selectedBoard = boardId;
+    this.simulation.reset({ board: boardId, condition: conditionId, assists: { steering: false, landing: false } });
+    this.simulation.condition = CONDITIONS[conditionId];
+    this.simulation.begin();
+    this.simulation.elapsed = 24;
+    this.simulation.timeRemaining = 54;
+    this.simulation.wave.time = 18;
+    this.simulation.wave.travel = 1320;
+    this.simulation.wave.pressure = 0.72;
+    this.simulation.wave.curlX = 72;
+    this.simulation.score.total = scene === "neutral" ? 1240 : 6840;
+    this.simulation.score.combo = scene.includes("combo") ? 3.8 : 2.4;
+    this.simulation.score.comboHeat = scene.includes("combo") ? 0.88 : 0.44;
+    this.state = "qa";
+    this.showLayer(null);
+    this.elements.topControls.hidden = true;
+    this.elements.touchControls.hidden = true;
+
+    const player = this.simulation.player;
+    const targetFace = this.simulation.wave.powerFaceAt?.(232) ?? 0.4;
+    Object.assign(player, {
+      state: "riding",
+      stateTime: 0.42,
+      x: 232,
+      previousX: 232,
+      face: targetFace,
+      previousFace: targetFace,
+      faceVelocity: -0.12,
+      speed: 92,
+      compression: 0,
+      charge: 0,
+      boardAngle: this.simulation.wave.slopeAt(232, targetFace),
+      bodyAngle: this.simulation.wave.slopeAt(232, targetFace),
+      trickPose: "neutral",
+      boardRelativeAngle: 0,
+      provisionalTrickName: "",
+      provisionalScore: 0,
+      maneuver: null,
+      flowTier: "FLOWING",
+      airX: 232,
+      previousAirX: 232,
+      airY: 74,
+      previousAirY: 74,
+      airVX: 8,
+      airVY: -12,
+      rotationAccum: 0,
+      maxAirHeight: 28,
+      landingFace: 0.2,
+      landingPreview: null,
+    });
+
+    const makeAirborne = (pose, name, rotation, boardRelative = 0) => {
+      Object.assign(player, {
+        state: "airborne",
+        stateTime: 0.68,
+        airX: 230,
+        previousAirX: 230,
+        airY: 49,
+        previousAirY: 49,
+        airVY: 6,
+        bodyAngle: rotation,
+        boardAngle: rotation + boardRelative,
+        rotationAccum: rotation,
+        boardRelativeAngle: boardRelative,
+        trickPose: pose,
+        provisionalTrickName: name,
+        provisionalScore: 940 + Math.round(Math.abs(rotation) * 180),
+        landingPreview: {
+          boardAngle: rotation + boardRelative,
+          targetAngle: this.simulation.wave.slopeAt(230, 0.2),
+          error: 0.28,
+          improving: true,
+          bands: { perfect: 0.12, clean: 0.46, recovery: 0.78 },
+        },
+      });
+    };
+
+    switch (scene) {
+      case "powerLine":
+        player.speed = 106;
+        player.flowTier = "FLOWING";
+        player.powerLine = true;
+        this.renderer.onEvent({ type: "powerLineEnter", payload: { potential: 1 } }, this.simulation);
+        break;
+      case "maxSpeed":
+        player.speed = 151;
+        player.flowTier = "MAX FLOW";
+        player.powerLine = true;
+        break;
+      case "pumpCompression":
+        player.compression = 1;
+        player.charge = 0.86;
+        player.trickPose = "pumpCompress";
+        break;
+      case "pumpRelease":
+        player.speed = 116;
+        player.trickPose = "pumpRelease";
+        this.renderer.onEvent({ type: "pump", payload: { strength: 1, efficiency: 1 } }, this.simulation);
+        break;
+      case "snap":
+      case "cutback":
+      case "floater":
+      case "tubeTuck": {
+        const maneuverId = scene === "tubeTuck" ? "tubeTuck" : scene;
+        player.maneuver = { id: maneuverId, progress: 0.58 };
+        player.trickPose = maneuverId;
+        player.faceVelocity = scene === "snap" ? -0.72 : 0.54;
+        if (scene === "tubeTuck") player.x = 116;
+        this.renderer.onEvent({ type: "maneuver", payload: { id: maneuverId, strength: 1 } }, this.simulation);
+        break;
+      }
+      case "launch":
+        makeAirborne("takeoff", "FLOATY POP", 0.12);
+        player.airY = 68;
+        player.previousAirY = 68;
+        player.airVY = -74;
+        this.renderer.onEvent({ type: "launch", payload: { strength: 1.2 } }, this.simulation);
+        break;
+      case "frontRail":
+        makeAirborne("frontRailGrab", "FRONT RAIL GRAB", Math.PI * 0.42);
+        break;
+      case "tailGrab":
+        makeAirborne("tailGrab", "360 TAIL GRAB", Math.PI * 2);
+        break;
+      case "varial":
+        makeAirborne("boardVarial", "BOARD VARIAL", Math.PI * 0.2, Math.PI * 0.72);
+        break;
+      case "kakiTwist":
+        makeAirborne("kakiTwist", "360 KAKI TWIST", Math.PI * 2, -Math.PI * 0.42);
+        this.renderer.onEvent({ type: "trickStart", payload: { id: "kakiTwist" } }, this.simulation);
+        break;
+      case "combo360":
+        makeAirborne("tailGrab", "360 TAIL GRAB + VARIAL", Math.PI * 2, Math.PI * 0.28);
+        break;
+      case "combo540":
+        makeAirborne("boardVarial", "PERFECT 540 VARIAL", Math.PI * 3, Math.PI * 0.58);
+        break;
+      case "perfectLanding":
+        player.state = "landing";
+        player.stateTime = 0.06;
+        player.speed = 122;
+        player.compression = 1;
+        player.trickPose = "perfectLanding";
+        this.renderer.onEvent({ type: "land", payload: { quality: "perfect", error: 0.04 } }, this.simulation);
+        break;
+      case "wobble":
+        player.state = "wobble";
+        player.stateTime = 0.16;
+        player.wobble = 0.9;
+        player.trickPose = "wobble";
+        this.renderer.onEvent({ type: "land", payload: { quality: "wobble", error: 0.72 } }, this.simulation);
+        break;
+      case "wipeout":
+        player.state = "wipeout";
+        player.stateTime = 0.48;
+        player.airX = 216;
+        player.previousAirX = 216;
+        player.airY = 106;
+        player.previousAirY = 106;
+        player.boardAngle = -0.9;
+        player.bodyAngle = 1.2;
+        this.renderer.onEvent({ type: "wipeout", payload: { cause: "landing" } }, this.simulation);
+        break;
+      case "touch":
+        this.elements.touchControls.hidden = false;
+        this.elements.touchControls.classList.add("qa-visible");
+        break;
+      case "highContrast":
+        this.renderer.applySettings({ ...this.settings, highContrast: true, waveReadAssist: "full" });
+        player.powerLine = true;
+        break;
+      default:
+        break;
+    }
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
     cancelAnimationFrame(this.frameHandle);
     this.abort.abort();
+    this.input.clear?.();
     if (this.ownsInput) this.input.destroy?.();
+    this.audio.destroy?.();
     this.host.innerHTML = "";
   }
 }
@@ -419,14 +725,17 @@ function collectElements(host) {
     fullscreenButton: host.querySelector("[data-action=fullscreen]"),
     exitButton: host.querySelector("[data-action=exit]"),
     boardGrid: host.querySelector(".board-grid"),
+    conditionGrid: host.querySelector(".condition-grid"),
     bestScore: host.querySelector("[data-stat=best]"),
     runCount: host.querySelector("[data-stat=runs]"),
     selectedBoardName: host.querySelector("[data-stat=board]"),
+    selectedConditionName: host.querySelector("[data-stat=condition]"),
     resultRank: host.querySelector("[data-result=rank]"),
     resultTitle: host.querySelector("[data-result=title]"),
     resultScore: host.querySelector("[data-result=score]"),
     resultBest: host.querySelector("[data-result=best]"),
     resultFlow: host.querySelector("[data-result=flow]"),
+    resultCondition: host.querySelector("[data-result=condition]"),
     breakdown: host.querySelector("[data-result=breakdown]"),
     settingsDialog: host.querySelector(".settings-dialog"),
     closeSettings: host.querySelector("[data-action=close-settings]"),
@@ -443,7 +752,7 @@ function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Use arrow keys or a controller stick to carve, Space or Z to pump, and X to style in the air."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve with arrows or WASD, pump with Space or Z, and use Q, E, F, and T for four distinct maneuvers and aerial tricks."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="settings" aria-label="Open settings">SET</button>
@@ -458,8 +767,12 @@ function gameMarkup() {
             <h1>KAKI <i>SURF</i></h1>
             <span class="title-wave" aria-hidden="true"></span>
           </div>
-          <p class="mission-copy">Carve the living face. Tempt the curl. Point the board home before gravity notices.</p>
+          <p class="mission-copy">Read the glass. Load the rail. Build a trick string, then point the board home.</p>
           <div class="board-grid" aria-label="Choose a board"></div>
+          <div class="condition-select">
+            <p><b>SESSION</b> Choose the light. The wave stays fair.</p>
+            <div class="condition-grid" aria-label="Choose a surf condition"></div>
+          </div>
           <div class="start-row">
             <button class="primary-button" type="button" data-action="start"><span>DROP IN</span><small>SPACE / GAMEPAD A</small></button>
             <button class="secondary-button" type="button" data-action="settings">ACCESS + AUDIO</button>
@@ -467,9 +780,10 @@ function gameMarkup() {
           <dl class="menu-stats">
             <div><dt>BEST</dt><dd data-stat="best">0</dd></div>
             <div><dt>BOARD</dt><dd data-stat="board">FOAM PUFF</dd></div>
+            <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
           </dl>
-          <p class="controls-line"><b>CARVE</b> ARROWS / STICK <b>PUMP</b> SPACE / A <b>STYLE</b> X / GAMEPAD X <b>RESTART</b> R / B</p>
+          <p class="controls-line"><b>CARVE</b> ARROWS / STICK <b>PUMP</b> SPACE / A <b>TRICKS</b> Q RAIL &nbsp; E TAIL &nbsp; F VARIAL &nbsp; T KAKI TWIST</p>
         </div>
 
         <div class="game-layer compact-layer" data-layer="pause" hidden>
@@ -488,6 +802,7 @@ function gameMarkup() {
             <p class="eyebrow" data-result="title">KAKI FLOW</p>
             <div class="final-score" data-result="score">0</div>
             <p class="best-label" data-result="best">PERSONAL BEST</p>
+            <p class="condition-label" data-result="condition">Golden Coast</p>
             <div class="flow-row"><span>FLOW</span><strong data-result="flow">0%</strong></div>
             <div class="score-breakdown" data-result="breakdown"></div>
             <button class="primary-button" type="button" data-action="retry"><span>PRESS YOUR LUCK</span><small>R / GAMEPAD B / SPACE</small></button>
@@ -503,8 +818,11 @@ function gameMarkup() {
             <button type="button" data-control="right" aria-label="Steer right">▶</button>
           </div>
           <div class="touch-actions">
-            <button type="button" data-control="style" aria-label="Style grab">STYLE</button>
-            <button type="button" data-control="edge" aria-label="Pump and commit">PUMP</button>
+            <button class="touch-trick touch-trick--1" type="button" data-control="trick1" aria-label="Front rail grab or snap"><b>Q</b><span>RAIL</span></button>
+            <button class="touch-trick touch-trick--2" type="button" data-control="trick2" aria-label="Tail grab or cutback"><b>E</b><span>TAIL</span></button>
+            <button class="touch-trick touch-trick--3" type="button" data-control="trick3" aria-label="Board varial or floater"><b>F</b><span>FLIP</span></button>
+            <button class="touch-trick touch-trick--4" type="button" data-control="trick4" aria-label="Kaki Twist or tube tuck"><b>T</b><span>TWIST</span></button>
+            <button class="touch-pump" type="button" data-control="edge" aria-label="Pump and commit"><b>PUMP</b><span>HOLD</span></button>
           </div>
         </div>
 
@@ -531,6 +849,7 @@ function gameMarkup() {
             <label class="toggle"><input type="checkbox" data-setting="reducedFlash"><span>FLASH REDUCTION</span></label>
             <label class="toggle"><input type="checkbox" data-setting="highContrast"><span>HIGH-CONTRAST SURF MARKERS</span></label>
             <label class="toggle"><input type="checkbox" data-setting="touchControls"><span>TOUCH CONTROLS</span></label>
+            <label><span>WAVE READ</span><select data-setting="waveReadAssist" aria-label="Wave Read Assist"><option value="full">FULL</option><option value="subtle">SUBTLE</option><option value="off">OFF</option></select></label>
           </section>
           <section aria-labelledby="assist-heading">
             <h3 id="assist-heading">ASSISTS <small>−18% SCORE, NO SHAME</small></h3>
@@ -545,5 +864,26 @@ function gameMarkup() {
   `;
 }
 
-const EMPTY_META = Object.freeze({ restart: false, pause: false, debug: false });
-const EMPTY_CONTROLS = Object.freeze({ x: 0, y: 0, edge: false, edgePressed: false, edgeReleased: false, style: false, stylePressed: false });
+const EMPTY_META = Object.freeze({ restart: false, retry: false, pause: false, debug: false });
+const EMPTY_CONTROLS = Object.freeze({
+  x: 0,
+  y: 0,
+  edge: false,
+  edgePressed: false,
+  edgeReleased: false,
+  trick1: false,
+  trick1Pressed: false,
+  trick1Released: false,
+  trick2: false,
+  trick2Pressed: false,
+  trick2Released: false,
+  trick3: false,
+  trick3Pressed: false,
+  trick3Released: false,
+  trick4: false,
+  trick4Pressed: false,
+  trick4Released: false,
+  style: false,
+  stylePressed: false,
+  styleReleased: false,
+});

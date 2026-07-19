@@ -46,7 +46,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -56,6 +57,7 @@ button {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 canvas:focus-visible {
   outline: 3px solid var(--gold);
   outline-offset: 3px;
@@ -788,6 +790,326 @@ input[type="range"]::-moz-range-thumb {
   border: 0;
 }
 
+/* Deluxe surf-shack selection and four-action control pass. */
+.title-layer {
+  padding-top: clamp(12px, 2vh, 24px);
+  gap: clamp(7px, 1vh, 12px);
+  background:
+    linear-gradient(90deg, rgb(9 13 33 / 94%) 0 7%, transparent 24% 76%, rgb(9 13 33 / 94%) 93%),
+    linear-gradient(0deg, rgb(13 16 37 / 97%) 0 10%, transparent 42% 67%, rgb(13 16 37 / 68%) 100%),
+    repeating-linear-gradient(135deg, transparent 0 22px, rgb(255 209 102 / 3%) 22px 24px);
+}
+
+.title-lockup h1 {
+  font-size: clamp(42px, 6vw, 76px);
+}
+
+.board-grid {
+  width: min(1120px, 94vw);
+}
+
+.board-card {
+  min-height: 166px;
+  padding: 13px 12px 10px 86px;
+  overflow: hidden;
+}
+
+.board-copy {
+  display: block;
+  min-height: 44px;
+  padding-right: 54px;
+}
+
+.board-copy strong,
+.board-copy small,
+.board-specialty,
+.board-stats {
+  display: block;
+}
+
+.board-copy small {
+  margin-bottom: 4px;
+}
+
+.board-specialty {
+  margin: 3px 0 6px;
+  color: #c5e7df;
+  font-size: 8px;
+  line-height: 1.25;
+}
+
+.board-specialty b {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 4px;
+  color: var(--ink);
+  background: var(--foam-shadow);
+}
+
+.board-stats {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 8px;
+  color: var(--foam-shadow) !important;
+  font-size: 7px !important;
+}
+
+.board-stats > span {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 3px;
+}
+
+.board-stats i {
+  color: var(--foam-shadow);
+  font-style: normal;
+}
+
+.board-stats b {
+  display: flex;
+  gap: 2px;
+}
+
+.board-stats em {
+  width: 7px;
+  height: 4px;
+  background: #101a31;
+  box-shadow: inset 0 0 0 1px #315574;
+}
+
+.board-stats em.on {
+  background: var(--gold);
+  box-shadow: none;
+}
+
+.board-art {
+  transform: rotate(16deg);
+  transform-origin: center;
+}
+
+.board-art--puff {
+  left: 14px;
+  top: 31px;
+  width: 56px;
+  height: 86px;
+  clip-path: polygon(28% 0, 72% 0, 90% 9%, 100% 28%, 100% 72%, 88% 91%, 70% 100%, 30% 100%, 12% 91%, 0 72%, 0 28%, 10% 9%);
+  box-shadow: inset -13px 0 var(--board-accent);
+}
+
+.board-art--fish {
+  left: 18px;
+  top: 38px;
+  width: 48px;
+  height: 78px;
+  clip-path: polygon(35% 0, 65% 0, 88% 10%, 100% 32%, 100% 76%, 78% 100%, 52% 87%, 48% 87%, 22% 100%, 0 76%, 0 32%, 12% 10%);
+  box-shadow: inset -9px 0 var(--board-accent);
+}
+
+.board-art--log {
+  left: 22px;
+  top: 17px;
+  width: 38px;
+  height: 118px;
+  clip-path: polygon(34% 0, 66% 0, 88% 8%, 100% 22%, 100% 78%, 88% 92%, 66% 100%, 34% 100%, 12% 92%, 0 78%, 0 22%, 12% 8%);
+  box-shadow: inset -8px 0 var(--board-accent);
+}
+
+.board-art i {
+  width: calc(100% - 16px);
+  left: 8px;
+  top: 43%;
+}
+
+.board-art em {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  width: 14px;
+  height: 16px;
+  translate: -50% 0;
+  border: 3px solid var(--ink);
+  background: #70c1d4;
+  box-shadow: 0 11px 0 1px #1c1833;
+  animation: board-preview-bob 760ms steps(2) infinite alternate;
+}
+
+.board-art::after {
+  content: "";
+  position: absolute;
+  left: -10px;
+  bottom: 13%;
+  width: 12px;
+  height: 3px;
+  background: var(--foam);
+  box-shadow: -7px 4px 0 -1px var(--foam-shadow), -13px 8px 0 -1px var(--foam);
+  animation: board-preview-wake 620ms steps(3) infinite;
+}
+
+.board-art--fish em { animation-duration: 430ms; }
+.board-art--log em { animation-duration: 980ms; }
+
+@keyframes board-preview-bob {
+  to { translate: -50% 3px; rotate: -5deg; }
+}
+
+@keyframes board-preview-wake {
+  50% { translate: -4px 1px; opacity: 0.62; }
+}
+
+.condition-select {
+  width: min(760px, 90vw);
+}
+
+.condition-select > p {
+  margin: 0 0 5px;
+  color: var(--foam-shadow);
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.condition-select > p b {
+  color: var(--gold);
+}
+
+.condition-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.condition-card {
+  position: relative;
+  min-height: 55px;
+  padding: 8px 8px 7px 58px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  background: rgb(16 28 52 / 90%);
+  box-shadow: inset 0 0 0 1px #315574, 3px 3px 0 var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.condition-card.is-selected {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px var(--foam), 3px 3px 0 var(--ink);
+}
+
+.condition-card > span {
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  width: 43px;
+  height: 38px;
+  background: linear-gradient(#5aa7cb 0 44%, #ffd166 44% 49%, #247fa2 49% 100%);
+}
+
+.condition-card > span::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 2px;
+  bottom: 5px;
+  height: 5px;
+  border-top: 2px solid var(--foam);
+  transform: skewX(-28deg);
+}
+
+.condition-card--twilightGlass > span {
+  background: linear-gradient(#554c91 0 44%, #ffd19a 44% 49%, #235b83 49% 100%);
+}
+
+.condition-card--stormbreak > span {
+  background: linear-gradient(#34475b 0 42%, #dff3d0 42% 47%, #16677a 47% 100%);
+}
+
+.condition-card strong,
+.condition-card small {
+  display: block;
+}
+
+.condition-card strong {
+  color: var(--foam);
+  font-size: 10px;
+}
+
+.condition-card small {
+  margin-top: 3px;
+  color: var(--foam-shadow);
+  font-size: 7px;
+  line-height: 1.2;
+}
+
+.menu-stats {
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+}
+
+.condition-label {
+  margin: -4px 0 6px;
+  color: var(--foam-shadow);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.settings-card select {
+  min-height: 30px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  color: var(--foam);
+  background: #244f6d;
+  font: 900 10px var(--pixel-font);
+}
+
+.touch-actions {
+  width: 218px;
+  height: 144px;
+  display: block;
+}
+
+.touch-actions button {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 0;
+  font-size: 8px;
+}
+
+.touch-actions button b,
+.touch-actions button span {
+  display: block;
+}
+
+.touch-actions button b {
+  color: var(--gold);
+  font-size: 12px;
+}
+
+.touch-actions button span {
+  margin-top: 2px;
+  font-size: 6px;
+}
+
+.touch-actions .touch-trick--1 { left: 0; top: 46px; }
+.touch-actions .touch-trick--2 { left: 52px; top: 0; }
+.touch-actions .touch-trick--3 { left: 52px; top: 92px; }
+.touch-actions .touch-trick--4 { left: 104px; top: 46px; }
+
+.touch-actions .touch-pump,
+.touch-actions [data-control="edge"] {
+  right: 0;
+  bottom: 0;
+  width: 62px;
+  height: 62px;
+  color: var(--gold);
+  border-radius: 50%;
+}
+
+.touch-controls.qa-visible {
+  display: block !important;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .touch-controls {
     display: none !important;
@@ -814,8 +1136,8 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .board-card {
-    min-height: 94px;
-    padding-left: 72px;
+    min-height: 142px;
+    padding-left: 76px;
   }
 
   .board-art {
@@ -829,6 +1151,23 @@ input[type="range"]::-moz-range-thumb {
     align-self: center;
     width: min(430px, 92vw);
     flex-direction: column;
+  }
+
+  .condition-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .menu-stats div:nth-child(3) {
+    border-left: 0;
+    border-top: 2px solid #538aa0;
+  }
+
+  .menu-stats div:nth-child(4) {
+    border-top: 2px solid #538aa0;
   }
 
   .controls-line {
@@ -854,9 +1193,14 @@ input[type="range"]::-moz-range-thumb {
 
   .title-lockup h1 { font-size: 48px; }
   .mission-copy { display: none; }
-  .board-card { min-height: 96px; padding: 10px 9px 9px 67px; }
+  .board-card { min-height: 112px; padding: 8px 8px 8px 68px; }
   .board-art { left: 10px; top: 10px; width: 39px; height: 66px; }
   .board-card > span:last-child { display: none; }
+  .board-specialty { display: none; }
+  .condition-select > p,
+  .condition-card small { display: none; }
+  .condition-card { min-height: 38px; padding-top: 11px; }
+  .condition-card > span { height: 24px; }
   .menu-stats { display: none; }
   .controls-line { font-size: 8px; }
   .pixel-card { transform: scale(0.84); }

@@ -1,5 +1,10 @@
 import { SCORE } from "./config.js";
 import { clamp } from "./math.js";
+import {
+  createLegacyAerialManifest,
+  repeatDecayForEntries,
+  scoreAerialManifest,
+} from "./trick-scoring.js";
 
 const REPEAT_WINDOW = 4;
 
@@ -20,6 +25,7 @@ export class ScoreSystem {
       speed: 0,
       pocket: 0,
       carves: 0,
+      maneuvers: 0,
       air: 0,
       style: 0,
       landings: 0,
@@ -28,6 +34,8 @@ export class ScoreSystem {
     this.flow = 0;
     this.lastCarveSign = 0;
     this.carveCooldown = 0;
+    this.provisionalAerial = null;
+    this.pendingLaunchPotential = 0;
   }
 
   multiplier(risk, boardStyle = 1, assists = false) {
@@ -37,9 +45,14 @@ export class ScoreSystem {
 
   add(bucket, points, multiplier = 1) {
     const awarded = Math.max(0, points * multiplier);
-    this.total += awarded;
+    if (!Object.hasOwn(this.breakdown, bucket)) this.breakdown[bucket] = 0;
     this.breakdown[bucket] += awarded;
+    this.total = this.bucketTotal();
     return awarded;
+  }
+
+  bucketTotal() {
+    return Object.values(this.breakdown).reduce((total, value) => total + value, 0);
   }
 
   updateRide(dt, speed, risk, flowScale, multiplier, scales = DEFAULT_SCORE_SCALES) {
@@ -67,45 +80,109 @@ export class ScoreSystem {
   }
 
   registerLaunch(heightPotential, multiplier) {
-    this.add("air", SCORE.launchBase + heightPotential * 0.18, multiplier);
-    this.bumpCombo(0.08);
+    this.pendingLaunchPotential = Math.max(0, Number(heightPotential) || 0);
+    this.provisionalAerial = {
+      provisional: (SCORE.launchBase + this.pendingLaunchPotential * 0.18)
+        * Math.max(0, Number(multiplier) || 0),
+      name: "FLOATY POP",
+      signature: "cw:0:air",
+    };
+    return this.provisionalAerial.provisional;
   }
 
-  registerLanding({ turns, maxHeight, grabbed, quality, boardStyle, multiplier }) {
-    const absTurns = Math.abs(turns);
-    const halfTurns = Math.floor(absTurns * 2 + 0.16);
-    const trick = halfTurns >= 2 ? `${Math.floor(halfTurns / 2)}x PLUSH ROTATION` : halfTurns === 1 ? "PLUSH HALF" : "FLOATY POP";
-    const decay = this.repeatFactor(trick);
-    let trickPoints = SCORE.airHeightScale * maxHeight;
-    if (halfTurns === 1) trickPoints += SCORE.halfRotation;
-    if (halfTurns >= 2) trickPoints += SCORE.fullRotation + Math.max(0, halfTurns - 2) * SCORE.extraRotation;
-    trickPoints *= decay;
-    this.add("air", trickPoints, multiplier * boardStyle);
+  beginAerial(manifest, options = {}) {
+    return this.previewAerial(manifest, options);
+  }
 
-    if (grabbed) this.add("style", SCORE.grab, multiplier * decay);
+  previewAerial(manifest, { boardStyle = 1, multiplier = 1 } = {}) {
+    const firstPass = scoreAerialManifest(manifest, {
+      boardStyle,
+      multiplier,
+      preview: true,
+    });
+    const decayBase = repeatDecayForEntries(firstPass.entries);
+    const repeatFactor = this.repeatFactor(firstPass.signature, decayBase);
+    const result = scoreAerialManifest(manifest, {
+      boardStyle,
+      multiplier,
+      repeatFactor,
+      preview: true,
+    });
+    this.provisionalAerial = result;
+    return result;
+  }
 
-    let callout = "CLEAN!";
+  registerLanding({
+    manifest = null,
+    turns = 0,
+    maxHeight = 0,
+    grabbed = false,
+    quality = "clean",
+    boardStyle = 1,
+    multiplier = 1,
+  } = {}) {
+    const landedManifest = manifest ?? createLegacyAerialManifest({
+      turns,
+      maxHeight,
+      grabbed,
+      launchPotential: this.pendingLaunchPotential,
+    });
+    const firstPass = scoreAerialManifest(landedManifest, {
+      quality,
+      boardStyle,
+      multiplier,
+    });
+    const decayBase = repeatDecayForEntries(firstPass.entries);
+    const decay = this.repeatFactor(firstPass.signature, decayBase);
+    const result = scoreAerialManifest(landedManifest, {
+      quality,
+      boardStyle,
+      multiplier,
+      repeatFactor: decay,
+    });
+
+    this.add("air", result.buckets.air);
+    this.add("style", result.buckets.style);
+    this.add("landings", result.buckets.landings);
+
     if (quality === "perfect") {
-      this.add("landings", SCORE.perfectLanding, multiplier);
       this.bumpCombo(0.34);
-      callout = halfTurns >= 2 ? "RADICAL!" : "PERFECT!";
     } else if (quality === "clean") {
-      this.add("landings", SCORE.cleanLanding, multiplier);
       this.bumpCombo(0.2);
     } else {
-      this.add("landings", SCORE.wobbleSave, multiplier * 0.5);
+      this.comboHeat *= 0.55;
       this.bumpCombo(0.05);
-      callout = "WOBBLE SAVE";
     }
 
-    this.pushHistory(trick);
-    return { trick, callout, decay };
+    this.pushHistory(result.signature);
+    this.provisionalAerial = null;
+    this.pendingLaunchPotential = 0;
+    return { ...result, decay, trick: result.name };
+  }
+
+  registerManeuver({ points, multiplier = 1, bucket = "maneuvers", combo = 0.07 } = {}) {
+    const awarded = this.add(bucket, Math.max(0, Number(points) || 0), multiplier);
+    if (awarded > 0) this.bumpCombo(combo);
+    return awarded;
+  }
+
+  updateTube(dt, risk, multiplier) {
+    const seconds = Math.max(0, Number(dt) || 0);
+    const awarded = this.add(
+      "style",
+      seconds * 58 * (1 + clamp(Number(risk) || 0, 0, 1) * 0.55),
+      multiplier,
+    );
+    if (awarded > 0) this.bumpCombo(seconds * 0.025);
+    return awarded;
   }
 
   wipeout() {
     this.combo = 1;
     this.comboHeat = 0;
     this.flow *= 0.25;
+    this.provisionalAerial = null;
+    this.pendingLaunchPotential = 0;
   }
 
   bumpCombo(amount) {
@@ -114,13 +191,13 @@ export class ScoreSystem {
     this.bestChain = Math.max(this.bestChain, this.combo);
   }
 
-  repeatFactor(trick) {
+  repeatFactor(trick, decay = SCORE.repeatDecay) {
     let repeats = 0;
     for (let offset = 0; offset < REPEAT_WINDOW; offset += 1) {
       const index = (this.historyIndex - 1 - offset + this.history.length) % this.history.length;
       if (this.history[index] === trick) repeats += 1;
     }
-    return Math.pow(SCORE.repeatDecay, repeats);
+    return Math.pow(clamp(decay, 0.05, 1), repeats);
   }
 
   pushHistory(trick) {

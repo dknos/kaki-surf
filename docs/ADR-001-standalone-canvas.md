@@ -1,33 +1,63 @@
 # ADR-001: Standalone fixed-step Canvas core
 
-Status: accepted for the vertical slice, 2026-07-19.
+Status: accepted 2026-07-19; amended for the premium wave, trick, and presentation overhaul.
 
 ## Decision
 
-Build Kaki Surf as a self-contained native JavaScript module set with a 384×216 Canvas renderer, a fixed 1/120-second gameplay simulation, and an independent adapter for host input, audio, settings, storage, exit, and run-complete events.
+Kaki Surf remains a self-contained native JavaScript module set with a 384 x 216 Canvas renderer, a fixed 1/120-second gameplay simulation, relative local URLs, no bundler, and a narrow adapter for host input, audio, settings, storage, exit, and run-complete events.
 
-Simulation, scoring, wave collision, input, rendering, audio, persistence, and host integration are separate modules. The gameplay wave exposes a stable crest/face function. The renderer animates foam, highlights, parallax, curl mass, particles, and camera response around that function without changing collision.
+The stable gameplay core is separated from presentation and browser lifecycle:
 
-The standalone directory uses only relative URLs and needs no build step. A thin optional site page embeds the exact standalone launcher for preview and private hosting.
+| Module | Owned truth |
+| --- | --- |
+| `js/config.js` | Shipping tuning, boards, conditions, palettes, settings, and metadata |
+| `js/input.js` | Keyboard/gamepad/touch normalization and 120 ms action-edge buffers |
+| `js/wave.js` | Seeded wave geometry, curl, canonical power face, and speed potential |
+| `js/trick-catalog.js` | Renderer-free trick definitions and board specialties |
+| `js/tricks.js` | One-launch `AerialTrickSession` and plain-data manifest |
+| `js/trick-scoring.js` | Pure completion filtering, rotation naming, signatures, and aerial valuation |
+| `js/scoring.js` | Score buckets, combo, full-signature history, preview, and landing bank |
+| `js/simulation.js` | Fixed-step player state, contextual maneuvers, launches, landings, and events |
+| `js/sprites.js` | Production Kitty poses, board silhouettes, flex, and wake drawing |
+| `js/wave-visuals.js` | Production face/curl/VFX drawing derived from canonical wave queries |
+| `js/renderer.js` | Canvas composition, HUD, callouts, particles, and accessibility presentation |
+| `js/audio.js` | Procedural music/wave sound and semantic-event cues |
+| `js/persistence.js` | Defensive local save read/write and run records under `kaki-surf-meta-v1` |
+| `js/integration-adapter.js` | Lazy game construction and frozen public lifecycle surface |
 
-## Why
+## Shared-query rule
 
-- Fixed-step simulation protects handling from 30/60/144 Hz render pacing.
-- Canvas at a fixed logical resolution keeps the board, lip, curl, and landing tangent legible.
-- No runtime dependency, GLB, or framework is required by the game.
-- A separate save key (`kaki-surf-meta-v1`) cannot collide with Kitty Kaki Survivors' existing meta save.
-- Independent lifecycle and listeners let both projects evolve in parallel.
+The displayed wave may never approximate gameplay with a visual-only formula.
 
-## Alternatives considered
+- `GameplayWave.ridingY(x, face)` and `slopeAt(x, face)` define the ride and landing surface.
+- `GameplayWave.powerFaceAt(x)` defines the sustainable seam.
+- `GameplayWave.speedPotential(x, face, options)` returns the acceleration, target/error/correction, zone, risk, pocket, pressure, breaking state, line quality, pump efficiency, and potential used by simulation.
+- `waveGuideAt` and `powerSeamFaceAt` in `js/wave-visuals.js` are pure presentation bridges to those exact methods.
 
-1. Embed directly into the mature Three.js town. Rejected for the first slice because existing global input/audio lifecycles and the broad integration surface create unrelated-mode regression risk.
-2. Reuse the supplied plush GLB. Rejected for runtime use: 1.5 million triangles, three 4096² textures, roughly 300 MB estimated GPU footprint with mipmaps, and no rig, morphs, or animations.
-3. Build a fluid or rigid-body simulation. Rejected because stable landing readability and fast tuning matter more than water realism.
-4. Use a component framework for the gameplay core. Rejected because the game is a fixed-resolution render/simulation loop and must remain GitHub Pages compatible without compilation.
+Any future renderer, accessibility overlay, ghost, replay, or host view must consume these queries. It must not hard-code another seam or zone boundary. Golden Coast, Twilight Glass, and Stormbreak may change palette, atmosphere, and audio, but currently share collision and speed-potential truth.
 
-## Integration boundary
+## Determinism boundary
 
-Later, mount the game within the existing `#kk-stage` and provide adapters rather than importing the existing global systems directly:
+The simulation advances only in fixed `FIXED_STEP` increments and uses the seeded `GameplayWave`. Trick state and score valuation are plain data with no Canvas, DOM, audio, wall-clock, or network dependency. Given the same seed, tuning, board, and consumed step-input sequence, gameplay state is intended to reproduce independently of 30/60/144 Hz render pacing.
+
+The deterministic boundary ends at presentation and metadata:
+
+- Render interpolation, camera response, shake, and condition art do not write simulation values. Event-driven impact freeze can briefly suspend step consumption, but it does not calculate a different per-step outcome.
+- Cosmetic spray/sparkle positions and procedural audio noise may use `Math.random()`; they are not replay or scoring truth.
+- Web Audio scheduling, vibration/rumble availability, DOM focus, and persistence timestamps depend on the host environment.
+- Local saves record rounded results and selected presentation state; they are not deterministic replay files.
+
+This distinction permits rich feedback without making particles, audio timing, or frame rate authoritative.
+
+## Static-host boundary
+
+`index.html` loads `./styles.css` and `./js/main.js` as native local assets. The module graph contains only relative imports and does not depend on `dist`, `build`, bundles, `node_modules`, remote URLs, GLBs, or generated gameplay images. Browsers must serve the directory over HTTP, but the host needs no compilation step or server-side application.
+
+`npm test` uses Node's native test runner; it validates source behavior and static-host assumptions without becoming a runtime dependency.
+
+## Host integration boundary
+
+A future Kitty Kaki Survivors host mounts the exact standalone implementation through the adapter rather than importing town globals into the surf modules:
 
 ```js
 const surf = await createKakiSurf({
@@ -40,10 +70,47 @@ const surf = await createKakiSurf({
   onExit,
   onRunComplete,
 });
+
+surf.start({
+  immediate: true,
+  board: "mangoFish",
+  condition: "twilightGlass",
+});
 ```
 
-The host must suspend its own gameplay listeners while Surf owns focus, forward audio only after the browser's user-gesture unlock, and call `destroy()` on exit. No Survivor save schema changes are required.
+The frozen adapter surface is `start`, `pause`, `resume`, `restart`, `destroy`, and `getSnapshot`.
+
+Host responsibilities are:
+
+- provide a real `HTMLElement` and suspend competing gameplay listeners while Surf owns focus;
+- if injecting input, provide the same held/pressed/released step contract and `update`, `consumeStep`, `consumeMeta`, and `clear` behavior; the game clears but does not destroy external input;
+- unlock audio only after a user gesture and treat an injected audio facade as session-owned, because game teardown calls its optional `destroy` method;
+- provide a Storage-compatible object if local browser storage is not desired;
+- receive a snapshot on `onExit` and a board/condition-enriched result on `onRunComplete`;
+- call `destroy()` when unmounting so animation frames, listeners, input state, audio, and DOM are released.
+
+No Kitty Kaki Survivors save-schema change is required. The standalone save key remains separate, and a later host can translate rewards in `onRunComplete` without placing town progression inside the surfing simulation.
+
+## Why
+
+- Fixed-step simulation protects handling from render pacing.
+- A fixed logical Canvas keeps Kitty, board trim, lip, seam, curl, and landing tangent legible at handheld scale.
+- Focused trick and scoring modules permit pure tests and prevent renderer-owned game rules.
+- One wave-query source prevents misleading speed guidance.
+- Code-authored sprites and wave VFX preserve pixel control without runtime image or 3D dependencies.
+- A narrow lifecycle boundary allows the standalone game and Kitty Kaki Survivors to evolve independently.
+
+## Alternatives considered
+
+1. **Embed directly into the mature Three.js town.** Rejected because global input/audio lifecycles and the wider integration surface create unrelated-mode regression risk.
+2. **Use the supplied plush GLB at runtime.** Rejected because its geometry, large embedded textures, lack of a rig, and different rendering language do not fit a 384 x 216 pixel-action game.
+3. **Let the renderer draw an approximate fast line.** Rejected because even a small mismatch teaches the wrong surfing behavior.
+4. **Store tricks as unrelated booleans in `simulation.js`.** Rejected because sequencing, board-relative motion, preview scoring, landing finalization, and exact-repeat signatures need a coherent manifest.
+5. **Use fluid or rigid-body water simulation.** Rejected because stable landing readability, seeded behavior, and fast tuning matter more than water realism.
+6. **Add a component framework or build pipeline.** Rejected because the game must remain source-native and directly deployable to GitHub Pages.
 
 ## Consequences
 
-The vertical slice uses deterministic code-authored pixel art and procedural audio instead of shared Three.js assets. Town rewards and cross-mode progression wait until the ride is validated by broader playtesting.
+The game ships deterministic simulation and code-authored production pixel work instead of shared Three.js assets. Conditions remain competitively fair because they share gameplay geometry. Aerial value can be previewed without mutating score, then banked only through landing. Presentation may evolve freely as long as it consumes semantic state/events and obeys the shared-query rule.
+
+Cross-mode rewards, town entry, and broader profile use remain host-adapter concerns. Physical-device, assistive-technology, low-powered-hardware, and rights validation remain release follow-up items rather than reasons to merge the two projects.

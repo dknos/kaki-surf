@@ -11,6 +11,7 @@ export async function createKakiSurf({
   profile = null,
   onExit = null,
   onRunComplete = null,
+  qaScene = null,
 } = {}) {
   if (!(host instanceof HTMLElement)) {
     throw new TypeError("Kaki Surf requires a host HTMLElement.");
@@ -25,6 +26,7 @@ export async function createKakiSurf({
     profile,
     onExit,
     onRunComplete,
+    qaScene,
   });
 
   return Object.freeze({
