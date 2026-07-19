@@ -3,7 +3,17 @@ import assert from "node:assert/strict";
 
 import { BOARDS } from "../js/config.js";
 import { GameplayWave } from "../js/wave.js";
-import { powerSeamFaceAt, waveGuideAt, waveSurfaceTravel, waveVisualTravel } from "../js/wave-visuals.js";
+import {
+  advanceWavePresentationClocks,
+  breakerSkyWindow,
+  createWavePresentationClocks,
+  powerSeamFaceAt,
+  waveGoldGlintOffset,
+  waveGuideAt,
+  waveProgressionBlend,
+  waveSurfaceTravel,
+  waveVisualTravel,
+} from "../js/wave-visuals.js";
 
 function snapshotWave(wave) {
   return JSON.parse(JSON.stringify(wave));
@@ -155,6 +165,64 @@ test("decorative surface flow stays monotonic when the rider reverses", () => {
   assert.equal(waveSurfaceTravel({ travel: 180, worldTravel: 34 }), 180);
   assert.equal(waveSurfaceTravel({ travel: 210, worldTravel: -12 }), 210);
   assert.equal(waveSurfaceTravel({ worldTravel: -22 }), 22);
+});
+
+test("presentation clocks never reverse across sharp speed, momentum, or direction changes", () => {
+  const clocks = createWavePresentationClocks();
+  const wave = { travel: 0, worldTravel: 0 };
+  const player = { speed: 132, waveMomentum: 1, travelDirection: 1 };
+  const phaseKeys = ["backWater", "speedFeedback", "swellContours", "faceGlints", "powerSeam"];
+  advanceWavePresentationClocks(clocks, wave, player, 138);
+
+  const samples = [
+    { travel: 96, worldTravel: 96, speed: 132, momentum: 1, direction: 1 },
+    { travel: 97, worldTravel: 95, speed: 8, momentum: 0.02, direction: -1 },
+    { travel: 101, worldTravel: 91, speed: 42, momentum: 0.18, direction: -1 },
+    { travel: 109, worldTravel: 99, speed: 96, momentum: 0.76, direction: 1 },
+  ];
+  let previous = Object.fromEntries(phaseKeys.map((key) => [key, clocks[key]]));
+  for (const sample of samples) {
+    Object.assign(wave, { travel: sample.travel, worldTravel: sample.worldTravel });
+    Object.assign(player, {
+      speed: sample.speed,
+      waveMomentum: sample.momentum,
+      travelDirection: sample.direction,
+    });
+    advanceWavePresentationClocks(clocks, wave, player, 138);
+    for (const key of phaseKeys) {
+      assert.ok(clocks[key] >= previous[key], `${key} cannot run backward`);
+      previous[key] = clocks[key];
+    }
+  }
+});
+
+test("wave progression stages and gold glints follow readable forward motion", () => {
+  assert.deepEqual(waveProgressionBlend({ pressure: 0.1 }, {}), { from: "swell", to: "pitch", mix: 0 });
+  const folding = waveProgressionBlend({ pressure: 0.68 }, {});
+  assert.equal(folding.from, "pitch");
+  assert.equal(folding.to, "curl");
+  assert.ok(folding.mix > 0 && folding.mix < 1);
+  assert.equal(waveProgressionBlend({ pressure: 0.94 }, {}).to, "impact");
+  assert.equal(waveProgressionBlend({ pressure: 0.4 }, { curlTimer: 0.5 }).to, "impact");
+
+  assert.equal(waveGoldGlintOffset(5, 0), -5);
+  assert.equal(waveGoldGlintOffset(6, 0), -6, "glints advance left with the ambient flow");
+  assert.ok(waveGoldGlintOffset(12, 3) <= 0);
+});
+
+test("the passing breaker reveals a growing sky window behind its contact edge", () => {
+  const wave = {
+    curlX: 42,
+    crestY: () => 78,
+  };
+  const early = breakerSkyWindow(wave);
+  wave.curlX = 176;
+  const late = breakerSkyWindow(wave);
+  assert.ok(late.right > early.right + 100, "the cleared sky grows as the breaker passes");
+  assert.ok(late.right < wave.curlX + 13, "the reveal stays behind the collision/contact edge");
+  assert.ok(late.bottom > late.fold && late.fold > late.top, "the opening has a readable trailing slope");
+  assert.equal(late.horizon, 80, "the authored horizon anchors the sky extension");
+  assert.ok(late.bottom <= 116, "the textured sky extension stays shallow");
 });
 
 test("renderer guide reads the exact canonical power face", () => {

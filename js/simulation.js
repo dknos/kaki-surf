@@ -1,6 +1,7 @@
 import { BOARDS, CONDITIONS, FIXED_STEP, SCORE, TUNING } from "./config.js";
 import { clamp, damp, shortestAngle, smoothstep, TAU } from "./math.js";
 import { ScoreSystem } from "./scoring.js";
+import { SurfSchool } from "./tutorial.js";
 import { AerialTrickSession, normalizeTrickInput } from "./tricks.js";
 import { GameplayWave } from "./wave.js";
 import { WorldSimulation } from "./world.js";
@@ -57,16 +58,29 @@ const POWERUP_NAMES = Object.freeze({
 });
 
 export class SurfSimulation {
-  constructor({ seed = 0x4b414b49, tuning = TUNING, controlMode = "simple" } = {}) {
+  constructor({
+    seed = 0x4b414b49,
+    tuning = TUNING,
+    controlMode = "simple",
+    tutorialEnabled = false,
+  } = {}) {
     this.seed = seed >>> 0;
     this.tuning = tuning;
     this.wave = new GameplayWave(this.seed);
     this.world = new WorldSimulation({ seed: this.seed, condition: "goldenCoast" });
     this.score = new ScoreSystem();
+    this.tutorialEnabled = Boolean(tutorialEnabled);
+    this.tutorial = new SurfSchool({ enabled: this.tutorialEnabled });
     this.events = new Array(64);
     this.eventCount = 0;
     this._scoreScales = { speed: 1, pocket: 1, flow: 1 };
     this._normalizedInput = {};
+    this._threatContext = {
+      playerX: 212,
+      speed: TUNING.speed,
+      skillMomentum: 0,
+      active: false,
+    };
     this.assists = { steering: false, landing: false };
     this.board = BOARDS.foamPuff;
     this.condition = CONDITIONS.goldenCoast;
@@ -79,7 +93,7 @@ export class SurfSimulation {
     this._worldPreviousPlayerY = 128;
     this._worldContext = createWorldStepContext();
     this.highlights = createRunHighlights();
-    this.reset();
+    this.reset({ tutorialEnabled });
   }
 
   reset({
@@ -87,6 +101,7 @@ export class SurfSimulation {
     condition = this.condition,
     assists = this.assists,
     controlMode = this.controlMode,
+    tutorialEnabled = this.tutorialEnabled,
     seed = this.seed,
     worldQa = null,
   } = {}) {
@@ -105,6 +120,8 @@ export class SurfSimulation {
     this.wave.reset();
     this.world.reset({ seed: this.seed, condition: this.condition.id, qa: worldQa });
     this.score.reset();
+    this.tutorialEnabled = Boolean(tutorialEnabled);
+    this.tutorial.reset(this.tutorialEnabled);
     this.comboCueLevel = 1;
     this.elapsed = 0;
     this.timeRemaining = this.tuning.runDuration;
@@ -112,7 +129,6 @@ export class SurfSimulation {
     this.complete = false;
     this.started = false;
     this.flowRating = 0;
-    this.tutorialStage = 0;
     this.aerialSession = null;
     this.eventCount = 0;
     this.worldTravel = 0;
@@ -145,17 +161,30 @@ export class SurfSimulation {
     player.previousAirY = player.airY;
     player.stateTime += dt;
     this.elapsed += dt;
+    player.skillMomentum = clamp(
+      player.skillMomentum - TUNING.skillMomentumDecay * dt,
+      0,
+      1,
+    );
 
     if (player.state !== "entry" && player.state !== "wipeout") {
       this.timeRemaining = Math.max(0, this.timeRemaining - dt);
     }
 
     const waveSpeed = player.state === "airborne" ? Math.max(56, player.speed) : player.speed;
+    const threatContext = this._threatContext;
+    threatContext.playerX = player.state === "airborne" || player.state === "wipeout"
+      ? player.airX
+      : player.x;
+    threatContext.speed = waveSpeed;
+    threatContext.skillMomentum = player.skillMomentum;
+    threatContext.active = player.state !== "entry" && player.state !== "wipeout";
     this.wave.update(
       dt,
       waveSpeed,
-      this.tuning.curlSpeed * (0.82 + this.wave.pressure * 0.34),
+      this.tuning.curlSpeed,
       waveSpeed * player.travelDirection,
+      threatContext,
     );
     this.worldTravel = this.wave.worldTravel;
     player.worldTravel = this.worldTravel;
@@ -188,7 +217,7 @@ export class SurfSimulation {
     this.updateComboCue();
     player.speedTier = speedTierForSpeed(player.speed);
     player.flow = this.score.flow;
-    this.updateTutorialSignals();
+    this.updateTutorialSignals(dt, input);
 
     if (!this.complete && this.timeRemaining <= 0 && player.state !== "airborne") {
       this.finishRun("time");
@@ -652,7 +681,14 @@ export class SurfSimulation {
       player.compression = damp(player.compression, 0, 10, dt);
     }
 
-    if (input.edgeReleased && player.charge > 0.12 && player.face > 0.12) {
+    const pumpRelease = input.edgeReleased && player.face > 0.12 && player.state !== "lip";
+    const pumpReady = pumpRelease
+      && player.charge >= TUNING.pumpMinCharge
+      && speedPotential.pumpEfficiency >= TUNING.pumpMinEfficiency
+      && inputY <= -TUNING.pumpUpwardIntent
+      && player.faceVelocity <= TUNING.pumpReleaseFaceVelocity
+      && this.elapsed - player.lastPumpAt >= TUNING.pumpCooldown;
+    if (pumpReady) {
       const releasedCharge = player.charge;
       const rhythm = 0.58 + Math.min(0.42, Math.abs(player.faceVelocity) * 0.32);
       const lineTiming = 0.55 + speedPotential.pumpEfficiency * 0.45;
@@ -666,14 +702,29 @@ export class SurfSimulation {
         1,
       );
       player.speed = Math.min(player.speed + boost, this.currentRideSpeedCap());
-      this.score.addFlow(0.035 * releasedCharge);
+      this.score.addFlow(
+        TUNING.pumpFlowGain
+          * releasedCharge
+          * (0.7 + speedPotential.pumpEfficiency * 0.3),
+      );
+      player.skillMomentum = clamp(
+        player.skillMomentum + TUNING.pumpSkillGain,
+        0,
+        1,
+      );
+      player.lastPumpAt = this.elapsed;
       this.emit("pump", {
         strength: releasedCharge,
         efficiency: speedPotential.pumpEfficiency,
+        rhythm,
         zone: speedPotential.zone,
       });
       player.charge = 0;
-    } else if (!input.edge) {
+    } else if (pumpRelease) {
+      // Every off-lip release consumes the stored crouch. Rapid tapping cannot
+      // accumulate charge until a later valid release.
+      player.charge = 0;
+    } else if (!input.edge && !input.edgeReleased) {
       player.charge = Math.max(0, player.charge - dt * 0.55);
     }
 
@@ -734,17 +785,20 @@ export class SurfSimulation {
       dt,
       player.speed,
       pocketRisk,
-      0.065
-        + Math.abs(player.faceVelocity) * 0.22
-        + Math.max(0, player.slopeDrive) * 0.11
-        + Math.max(0, pocketRisk - 0.42) * 0.1,
+      clamp(
+        smoothstep(0.08, 0.58, Math.abs(player.faceVelocity))
+            * smoothstep(0.06, 0.5, Math.abs(inputY))
+            * 0.66
+          + smoothstep(0.08, 0.7, Math.max(0, player.slopeDrive))
+            * smoothstep(0.08, 0.55, Math.max(0, inputY))
+            * 0.34,
+        0,
+        1,
+      ),
       multiplier,
       this.scoreScales(),
     );
-    if (Math.abs(player.faceVelocity) > SCORE.carveMinVelocity) {
-      const carveCallout = this.score.registerCarve(player.faceVelocity, multiplier);
-      if (carveCallout) this.emit("callout", { text: carveCallout, tone: "flow" });
-    }
+    this.updateCarveArc(dt, inputY, multiplier);
 
     if (player.face < 0.13 && player.faceVelocity < -0.12) {
       player.lipMemory = this.tuning.launchCoyote;
@@ -764,6 +818,51 @@ export class SurfSimulation {
     }
 
     this.updateCurlDanger(dt, pocketRisk);
+  }
+
+  updateCarveArc(dt, inputY, multiplier) {
+    const player = this.player;
+    const velocity = player.faceVelocity;
+    const sign = Math.abs(velocity) >= SCORE.carveMinVelocity ? Math.sign(velocity) : 0;
+
+    if (!player.carveArcSign) {
+      if (sign) beginCarveArc(player, sign);
+      return;
+    }
+
+    if (sign === player.carveArcSign) {
+      player.carveArcDuration += dt;
+      player.carveArcExcursion = Math.max(
+        player.carveArcExcursion,
+        Math.abs(player.face - player.carveArcStartFace),
+      );
+      player.carveArcPeakVelocity = Math.max(player.carveArcPeakVelocity, Math.abs(velocity));
+      player.carveArcIdle = 0;
+      return;
+    }
+
+    if (!sign) {
+      if (Math.abs(inputY) < 0.08) player.carveArcIdle += dt;
+      else player.carveArcIdle = 0;
+      if (player.carveArcIdle >= TUNING.carveArcPauseReset) resetCarveArcState(player);
+      return;
+    }
+
+    const completedSign = player.carveArcSign;
+    const qualified = player.carveArcDuration >= TUNING.carveArcMinDuration
+      && player.carveArcExcursion >= TUNING.carveArcMinExcursion
+      && player.carveArcPeakVelocity >= TUNING.carveArcMinPeakVelocity;
+    beginCarveArc(player, sign);
+    if (!qualified) return;
+
+    const carveCallout = this.score.registerCarve(completedSign, multiplier);
+    if (!carveCallout) return;
+    player.skillMomentum = clamp(
+      player.skillMomentum + TUNING.carveSkillGain,
+      0,
+      1,
+    );
+    this.emit("callout", { text: carveCallout, tone: "flow" });
   }
 
   launch(input) {
@@ -824,6 +923,7 @@ export class SurfSimulation {
     player.maneuver.progress = 0;
     player.contactTimer = -1;
     player.charge = 0;
+    resetCarveArcState(player);
     this.setState("airborne");
     if (worldModifiers.launchScale > 1) this.world.consumePowerup("moonPop", "launch");
     if (mountAtLaunch) this.world.releaseMountedAnimal(mountAtLaunch, "launch");
@@ -1057,6 +1157,12 @@ export class SurfSimulation {
       multiplier: manifest?.launchData.multiplier
         ?? this.currentMultiplier() * (this.tuning.scoreAir / 1.25),
     });
+    const landingSkill = quality === "perfect" ? 1 : quality === "clean" ? 0.68 : 0.2;
+    player.skillMomentum = clamp(
+      player.skillMomentum + TUNING.landingSkillGain * landingSkill,
+      0,
+      1,
+    );
 
     player.x = player.airX;
     player.face = player.landingFace;
@@ -1089,6 +1195,7 @@ export class SurfSimulation {
     player.provisionalTrickName = result.trick;
     player.landingQuality = quality;
     player.lastLandingQuality = quality;
+    resetCarveArcState(player);
     this.highlights.biggestAir = Math.max(this.highlights.biggestAir, player.maxAirHeight);
     this.highlights.bestTrick = result.trick || this.highlights.bestTrick;
     if (quality === "perfect") this.highlights.perfectLandings += 1;
@@ -1220,6 +1327,11 @@ export class SurfSimulation {
       turnForce: player.turnForce,
       switchStance: player.switchStance,
     });
+    player.skillMomentum = clamp(
+      player.skillMomentum + TUNING.reversalSkillGain,
+      0,
+      1,
+    );
     this.emit("directionChange", {
       from,
       to: player.travelDirection,
@@ -1298,7 +1410,9 @@ export class SurfSimulation {
     if (typeof this.wave.speedPotential !== "function") return fallback;
     const result = this.wave.speedPotential(player.x, player.face, {
       pumpCharge: player.charge,
-      pumpReleased: input.edgeReleased,
+      // A raw release is not a pump. updateRiding validates charge, line,
+      // direction and cadence before applying the discrete pump impulse.
+      pumpReleased: false,
       board: this.board,
       breaking: player.state === "lip",
       faceVelocity: player.faceVelocity,
@@ -1520,16 +1634,19 @@ export class SurfSimulation {
     };
   }
 
-  updateTutorialSignals() {
-    if (this.tutorialEnabled === false || this.elapsed > 7 || this.complete || this.tutorialStage > 0) return;
-    let text = "";
-    if (this.player.state === "riding" && this.elapsed >= 0.8) {
-      text = "DROP FOR SPEED • HIT THE LIP FOR AIR";
-    }
-    if (!text) return;
-    this.tutorialStage += 1;
-    this.emit("tutorialStep", { index: this.tutorialStage, text });
-    this.emit("callout", { text, tone: "hint" });
+  updateTutorialSignals(dt, input) {
+    this.syncTutorialEnabled();
+    const signal = this.tutorial.update(dt, {
+      elapsed: this.elapsed,
+      player: this.player,
+      input,
+    });
+    if (signal) this.emit(signal.type, signal.payload);
+  }
+
+  syncTutorialEnabled() {
+    const enabled = Boolean(this.tutorialEnabled);
+    if (enabled !== this.tutorial.enabled) this.tutorial.setEnabled(enabled);
   }
 
   updateCurlDanger(dt, risk) {
@@ -1569,6 +1686,7 @@ export class SurfSimulation {
     player.waveMomentum = 0;
     player.lateralVelocity = 0;
     player.travelVelocity = 0;
+    resetCarveArcState(player);
     resetContextTrick(player.contextTrick);
     if (this.aerialSession) this.aerialSession.wipeout();
     player.provisionalScore = 0;
@@ -1590,6 +1708,9 @@ export class SurfSimulation {
     const player = this.player;
     player.airVY += this.tuning.gravity * 0.72 * dt;
     player.airX += player.airVX * dt;
+    const boundedAirX = clamp(player.airX, 50, 360);
+    if (boundedAirX !== player.airX) player.airVX *= -0.18;
+    player.airX = boundedAirX;
     player.airY += player.airVY * dt;
     player.bodyAngle += player.wipeoutSpin * dt;
     player.boardAngle -= player.wipeoutSpin * 0.55 * dt;
@@ -1600,7 +1721,16 @@ export class SurfSimulation {
       return;
     }
 
-    const retreat = Math.max(38, this.wave.curlX - 42);
+    // Respawning is an explicit recovery reset, not ordinary threat motion.
+    // Keep the curl behind the entry endpoint so one mistake cannot cascade
+    // into unavoidable re-catches while the entry animation owns control.
+    const retreat = Math.max(
+      38,
+      Math.min(
+        this.wave.curlX - TUNING.curlRespawnRetreat,
+        TUNING.curlRespawnSafeX,
+      ),
+    );
     this.wave.curlX = retreat;
     resetPlayer(player, false, this.tuning.speed);
     this.aerialSession = null;
@@ -1650,6 +1780,8 @@ export class SurfSimulation {
   }
 
   emit(type, payload = null) {
+    this.syncTutorialEnabled();
+    this.tutorial.observe(type, payload);
     if (this.eventCount >= this.events.length) return;
     this.events[this.eventCount] = { type, payload, time: this.elapsed };
     this.eventCount += 1;
@@ -1718,6 +1850,24 @@ function resetRunHighlights(highlights) {
   highlights.powerups = 0;
 }
 
+function beginCarveArc(player, sign) {
+  player.carveArcSign = Math.sign(sign);
+  player.carveArcStartFace = player.face;
+  player.carveArcDuration = 0;
+  player.carveArcExcursion = 0;
+  player.carveArcPeakVelocity = Math.abs(player.faceVelocity);
+  player.carveArcIdle = 0;
+}
+
+function resetCarveArcState(player) {
+  player.carveArcSign = 0;
+  player.carveArcStartFace = player.face;
+  player.carveArcDuration = 0;
+  player.carveArcExcursion = 0;
+  player.carveArcPeakVelocity = 0;
+  player.carveArcIdle = 0;
+}
+
 function createPlayer() {
   return {
     state: "entry",
@@ -1759,8 +1909,16 @@ function createPlayer() {
     landingPreview: createLandingPreview(),
     speedPotential: createSpeedPotentialState(),
     waveMomentum: 0,
+    skillMomentum: 0,
     compression: 0,
     charge: 0,
+    lastPumpAt: -1e6,
+    carveArcSign: 0,
+    carveArcStartFace: 0.48,
+    carveArcDuration: 0,
+    carveArcExcursion: 0,
+    carveArcPeakVelocity: 0,
+    carveArcIdle: 0,
     contextTrick: createContextTrick(),
     lipMemory: 0,
     curlTimer: 0,
@@ -1845,8 +2003,11 @@ function resetPlayer(player, resetPosition = true, baseSpeed = TUNING.speed) {
   resetLandingPreview(player.landingPreview);
   copySpeedPotential(player.speedPotential, createSpeedPotentialState());
   player.waveMomentum = 0;
+  player.skillMomentum = 0;
   player.compression = 0;
   player.charge = 0;
+  player.lastPumpAt = -1e6;
+  resetCarveArcState(player);
   resetContextTrick(player.contextTrick);
   player.lipMemory = 0;
   player.curlTimer = 0;

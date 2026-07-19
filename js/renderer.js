@@ -2,10 +2,15 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { drawPixelText } from "./pixel-font.js";
 import { drawBoardSprite, drawBoardWake, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
-import { drawLayeredWave, waveGuideAt, waveSurfaceTravel, waveVisualTravel } from "./wave-visuals.js";
+import {
+  advanceWavePresentationClocks,
+  createWavePresentationClocks,
+  drawLayeredWave,
+  waveGuideAt,
+  waveVisualTravel,
+} from "./wave-visuals.js";
 import {
   drawActivePowerupHud,
-  drawAtlasFrame,
   drawCarrierEvent,
   drawWorldFoamGates,
   drawWorldPowerups,
@@ -16,6 +21,7 @@ import {
 const PARTICLE_COUNT = 176;
 const CALLOUT_QUEUE_LIMIT = 4;
 const CALLOUT_GAP = 0.14;
+const CALLOUT_MIN_READ_TIME = 1.05;
 
 export class KakiRenderer {
   constructor(canvas, settings, visualAssets = null) {
@@ -30,6 +36,7 @@ export class KakiRenderer {
     this.particles = Array.from({ length: PARTICLE_COUNT }, createParticle);
     this.activeCallout = createCallout();
     this.calloutQueue = [];
+    this.calloutSequence = 0;
     this.particleCursor = 0;
     this.calloutGap = 0;
     this.cameraY = 0;
@@ -41,6 +48,7 @@ export class KakiRenderer {
     this.time = 0;
     this.pumpRelease = 0;
     this.lastLandingQuality = "clean";
+    this.wavePresentationClocks = createWavePresentationClocks();
   }
 
   applySettings(settings) {
@@ -140,6 +148,10 @@ export class KakiRenderer {
         if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.09);
         this.pushCallout("NEW PERSONAL BEST", "KAKI FLOW", "perfect");
         break;
+      case "tutorialComplete":
+        this.spawnSparkles(192, 64, 12);
+        this.pushCallout("SURF SCHOOL CLEAR", "THE FULL WAVE IS YOURS", "perfect");
+        break;
       case "reversal":
       case "switch":
       case "directionReversed":
@@ -209,6 +221,13 @@ export class KakiRenderer {
     this.shake = Math.max(0, this.shake - dt * 7.5);
 
     const player = simulation.player;
+    advanceWavePresentationClocks(
+      this.wavePresentationClocks,
+      simulation.wave,
+      player,
+      rideSpeedCapFor(simulation),
+      this.settings.reducedMotion,
+    );
     let cameraTarget = 0;
     if (player.state === "airborne") {
       cameraTarget = clamp((player.airY - 74) * 0.18, -19, 0);
@@ -230,6 +249,7 @@ export class KakiRenderer {
       if (this.activeCallout.life === 0) this.calloutGap = CALLOUT_GAP;
     }
     this.calloutGap = Math.max(0, this.calloutGap - dt);
+    this.pruneStaleCallouts();
     if (this.activeCallout.life <= 0 && this.calloutGap <= 0) this.activateNextCallout();
 
     const riding = player.state === "riding" || player.state === "lip" || player.state === "landing" || player.state === "wobble";
@@ -391,9 +411,7 @@ export class KakiRenderer {
     ctx.fillStyle = p.waterDeep;
     ctx.fillRect(0, 78, LOGICAL_WIDTH, LOGICAL_HEIGHT - 78);
 
-    const clock = this.settings.reducedMotion
-      ? 0
-      : waveSurfaceTravel(simulation.wave) * (0.18 + speedRatio * 0.12);
+    const clock = this.settings.reducedMotion ? 0 : this.wavePresentationClocks.backWater;
     const horizonColor = this.conditionId === "twilightGlass" ? p.violet : this.conditionId === "stormbreak" ? p.foamShade : p.crest;
     ctx.save();
     ctx.strokeStyle = horizonColor;
@@ -430,7 +448,50 @@ export class KakiRenderer {
   }
 
   drawWave(simulation) {
-    drawLayeredWave(this.ctx, simulation, this.palette, this.settings, this.time, this.conditionId, this.visualAssets);
+    drawLayeredWave(
+      this.ctx,
+      simulation,
+      this.palette,
+      this.settings,
+      this.time,
+      this.conditionId,
+      this.visualAssets,
+      this.wavePresentationClocks,
+      (window) => {
+        // Repaint the authored sky/horizon through the shallow trailing
+        // breaker cutout so an advancing curl leaves the real coast behind.
+        this.ctx.save();
+        this.ctx.translate(0, -Math.round(this.cameraY));
+        this.drawSky(simulation);
+        this.drawTrailingSkyExtension(window);
+        this.ctx.restore();
+      },
+    );
+  }
+
+  drawTrailingSkyExtension(window) {
+    const ctx = this.ctx;
+    const colors = trailingSkyColors(this.conditionId, this.palette, this.settings.highContrast);
+    const top = Math.round(window?.horizon ?? 80);
+    const bottom = Math.round(window?.bottom ?? top);
+    if (bottom <= top) return;
+    ctx.fillStyle = colors.base;
+    ctx.fillRect(0, top, LOGICAL_WIDTH, bottom - top + 1);
+
+    // Small cloud clusters continue the authored sky without creating another
+    // set of horizontal water bars or a single flat triangular color slab.
+    ctx.save();
+    ctx.globalAlpha = this.settings.highContrast ? 0.82 : 0.62;
+    const count = Math.max(3, Math.ceil((Number(window?.right) || 0) / 28));
+    for (let index = 0; index < count; index += 1) {
+      const x = 7 + index * 29 + (index % 2) * 5;
+      const y = top + 5 + (index * 7) % Math.max(8, bottom - top - 5);
+      ctx.fillStyle = index % 3 === 0 ? colors.light : colors.shadow;
+      ctx.fillRect(x, y, 4, 3);
+      ctx.fillRect(x + 3, y - 2, 5, 5);
+      ctx.fillRect(x + 8, y + 1, 3, 3);
+    }
+    ctx.restore();
   }
 
   drawMaxSpeedFeedback(simulation) {
@@ -445,9 +506,7 @@ export class KakiRenderer {
     const reduced = this.settings.reducedMotion;
     const fullPower = speedRatio >= 0.94;
     const streakCount = reduced ? 4 : 5 + Math.round(intensity * 5);
-    const phase = reduced
-      ? 0
-      : waveSurfaceTravel(simulation.wave) * (0.54 + intensity * 0.36);
+    const phase = reduced ? 0 : this.wavePresentationClocks.speedFeedback;
     ctx.save();
     ctx.globalAlpha = 0.22 + intensity * 0.42;
     for (let index = 0; index < streakCount; index += 1) {
@@ -628,7 +687,7 @@ export class KakiRenderer {
     if (simulation.assists.steering || simulation.assists.landing) {
       drawPixelText(ctx, "ASSIST", 270, 198, { align: "center", color: p.foamShade, shadow: p.ink });
     }
-    this.drawTeachingOverlay(simulation, guide);
+    this.drawTeachingOverlay(simulation);
   }
 
   drawSpeedMeter(player, speedCap) {
@@ -673,23 +732,29 @@ export class KakiRenderer {
     drawTrendArrow(ctx, 234, 196, preview.improving, p);
   }
 
-  drawTeachingOverlay(simulation, guide) {
-    if (String(this.settings.waveReadAssist ?? "full").toLowerCase() !== "full") return;
-    if (simulation.tutorialEnabled === false) return;
+  drawTeachingOverlay(simulation) {
+    const lesson = simulation.tutorial?.snapshot?.() ?? null;
+    const qaText = String(simulation.qaControlHint ?? "").trim();
+    if (!qaText && (!lesson?.enabled || lesson.complete)) return;
     const player = simulation.player;
-    if (simulation.elapsed > 5.5 || player.state === "airborne" || player.state === "wipeout") return;
-    const text = simulation.qaControlHint || "DROP FOR SPEED";
-    const subtext = simulation.qaControlHint
+    if (player.state === "wipeout" || player.state === "complete") return;
+    const text = qaText || lesson.text;
+    const subtext = qaText
       ? "DROP = SPEED / LIP = AIR"
-      : "HIT THE LIP FOR AIR";
-    const alpha = smoothstep(5.5, 4.8, simulation.elapsed);
-    panel(this.ctx, 84, 153, 216, 31, this.palette.deepInk, this.palette.waterDeep, alpha * 0.86);
-    drawAtlasFrame(this.ctx, this.visualAssets, "uiOrnaments", "simpleControlsGlyph", 108, 168, {
-      scale: 0.44,
-      alpha,
-    });
-    drawPixelText(this.ctx, text, 198, 159, { align: "center", color: this.palette.white, shadow: this.palette.ink, alpha });
-    drawPixelText(this.ctx, subtext, 198, 171, { align: "center", color: this.palette.gold, shadow: this.palette.ink, alpha });
+      : lesson.hint;
+    const playerX = player.state === "airborne" ? player.airX : player.x;
+    const x = playerX < LOGICAL_WIDTH * 0.5 ? 197 : 6;
+    const width = 181;
+    const progress = qaText ? 0.18 : clamp(Number(lesson.progress) || 0, 0, 1);
+    const step = qaText ? "SURF SCHOOL" : `SURF SCHOOL ${lesson.index}/${lesson.total}`;
+    panel(this.ctx, x, 150, width, 38, this.palette.deepInk, this.palette.waterDeep, 0.92);
+    drawPixelText(this.ctx, step, x + 6, 154, { color: this.palette.foamShade, shadow: this.palette.ink });
+    drawPixelText(this.ctx, text, x + width / 2, 164, { align: "center", color: this.palette.white, shadow: this.palette.ink });
+    drawPixelText(this.ctx, subtext, x + width / 2, 174, { align: "center", color: this.palette.gold, shadow: this.palette.ink });
+    this.ctx.fillStyle = this.palette.ink;
+    this.ctx.fillRect(x + 6, 183, width - 12, 3);
+    this.ctx.fillStyle = this.palette.crest;
+    this.ctx.fillRect(x + 7, 184, Math.round((width - 14) * progress), 1);
   }
 
   drawCallouts() {
@@ -735,20 +800,48 @@ export class KakiRenderer {
     callout.text = nextText;
     callout.subtext = nextSubtext;
     callout.tone = tone;
-    callout.duration = tone === "hint" ? 2.7 : tone === "perfect" || tone === "risk" || tone === "wipeout" ? 2.35 : 2.05;
+    callout.priority = calloutPriority(tone);
+    callout.sequence = this.calloutSequence;
+    callout.enqueuedAt = this.time;
+    this.calloutSequence += 1;
+    callout.duration = tone === "hint"
+      ? 2.8
+      : tone === "perfect" || tone === "risk" || tone === "wipeout"
+        ? 2.5
+        : 2.25;
     callout.life = callout.duration;
     if (this.activeCallout.life <= 0 && this.calloutGap <= 0) {
       this.activeCallout = callout;
       return;
     }
-    if (this.calloutQueue.length >= CALLOUT_QUEUE_LIMIT) this.calloutQueue.shift();
+
+    // Urgent feedback may shorten an old low-priority hint, but never before
+    // that hint has had a full readable beat. Only one callout is rendered.
+    if (callout.priority >= 4 && callout.priority > this.activeCallout.priority) {
+      const activeAge = this.activeCallout.duration - this.activeCallout.life;
+      const requiredLife = Math.max(0, CALLOUT_MIN_READ_TIME - activeAge);
+      this.activeCallout.life = Math.min(this.activeCallout.life, Math.max(0.28, requiredLife));
+    }
+
     this.calloutQueue.push(callout);
+    this.calloutQueue.sort((a, b) => b.priority - a.priority || a.sequence - b.sequence);
+    if (this.calloutQueue.length > CALLOUT_QUEUE_LIMIT) this.calloutQueue.length = CALLOUT_QUEUE_LIMIT;
   }
 
   activateNextCallout() {
+    this.pruneStaleCallouts();
     const next = this.calloutQueue.shift();
     if (!next) return;
     this.activeCallout = next;
+  }
+
+  pruneStaleCallouts() {
+    for (let index = this.calloutQueue.length - 1; index >= 0; index -= 1) {
+      const callout = this.calloutQueue[index];
+      if (this.time - callout.enqueuedAt > calloutMaxWait(callout.tone)) {
+        this.calloutQueue.splice(index, 1);
+      }
+    }
   }
 
   spawnSpray(x, y, count, force) {
@@ -1145,6 +1238,19 @@ function paletteForCondition(conditionId) {
   return PALETTES.standard;
 }
 
+function trailingSkyColors(conditionId, palette, highContrast) {
+  if (highContrast) {
+    return { base: palette.sky, light: palette.haze, shadow: palette.distant };
+  }
+  if (conditionId === "twilightGlass") {
+    return { base: "#5a4598", light: "#8b5088", shadow: "#3c4a98" };
+  }
+  if (conditionId === "stormbreak") {
+    return { base: "#294858", light: "#466a79", shadow: "#203947" };
+  }
+  return { base: "#e8d48d", light: "#ffe69a", shadow: "#c8ca91" };
+}
+
 function rideSpeedCapFor(simulation) {
   const published = Number(simulation?.currentRideSpeedCap?.());
   if (Number.isFinite(published) && published > 0) return published;
@@ -1225,5 +1331,29 @@ function createParticle() {
 }
 
 function createCallout() {
-  return { text: "", subtext: "", tone: "flow", life: 0, duration: 1 };
+  return {
+    text: "",
+    subtext: "",
+    tone: "flow",
+    life: 0,
+    duration: 1,
+    priority: 0,
+    sequence: 0,
+    enqueuedAt: 0,
+  };
+}
+
+function calloutPriority(tone) {
+  if (tone === "wipeout") return 5;
+  if (tone === "risk") return 4;
+  if (tone === "perfect") return 3;
+  if (tone === "flow") return 2;
+  return 1;
+}
+
+function calloutMaxWait(tone) {
+  if (tone === "wipeout") return 3.8;
+  if (tone === "risk" || tone === "perfect") return 3;
+  if (tone === "flow") return 1.9;
+  return 1.5;
 }

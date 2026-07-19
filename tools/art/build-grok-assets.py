@@ -9,7 +9,9 @@ reduces the palette, and writes small local PNG atlases plus frame metadata.
 from __future__ import annotations
 
 import colorsys
+import hashlib
 import json
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,6 +37,13 @@ class Family:
     foam_only: bool = False
     source_columns: int | None = None
     source_rows: int | None = None
+    connected_chroma: bool = False
+    preserve_layout: bool = False
+    source_inset: int = 0
+    resample: str = "lanczos"
+    sharpen: bool = True
+    source_size: tuple[int, int] | None = None
+    source_sha256: str | None = None
 
 
 FAMILIES = (
@@ -60,6 +69,26 @@ FAMILIES = (
         foam_only=True,
         source_columns=2,
         source_rows=4,
+    ),
+    Family(
+        source="wave-progression-source.png",
+        output="wave-progression-atlas.png",
+        columns=2,
+        rows=2,
+        cell=(160, 96),
+        names=("swell", "pitch", "curl", "impact"),
+        # The breaker advances from screen-left, so the right/bottom corner is
+        # the stable runtime contact anchor for every stage.
+        anchor=(1.0, 1.0),
+        colors=20,
+        padding=0,
+        connected_chroma=True,
+        preserve_layout=True,
+        source_inset=16,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="4f94dc3224049cf3f2e6cce60be8316a97875b2ba87d725e1452891a4d669173",
     ),
     Family(
         source="dolphin-source.png",
@@ -287,6 +316,58 @@ def remove_chroma(image: Image.Image) -> Image.Image:
     return rgba
 
 
+def remove_connected_chroma(image: Image.Image) -> Image.Image:
+    """Flood-key only exterior magenta, including JPEG fringe variation.
+
+    Generated sheets can contain intentional coral pixels with a magenta hue.
+    A global hue key can erase those accents. Starting at the cell boundary and
+    removing only connected chroma keeps enclosed art while clearing gradients,
+    grid gutters, and compression noise around the silhouette.
+    """
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    pixels = list(rgba.get_flattened_data())
+    candidates = bytearray(
+        is_chroma_magenta(red, green, blue)
+        for red, green, blue, _alpha in pixels
+    )
+    exterior = bytearray(width * height)
+    queue: deque[int] = deque()
+
+    def seed(x: int, y: int) -> None:
+        index = y * width + x
+        if candidates[index] and not exterior[index]:
+            exterior[index] = 1
+            queue.append(index)
+
+    for x in range(width):
+        seed(x, 0)
+        seed(x, height - 1)
+    for y in range(1, height - 1):
+        seed(0, y)
+        seed(width - 1, y)
+
+    while queue:
+        index = queue.popleft()
+        x = index % width
+        y = index // width
+        for neighbor in (
+            index - 1 if x else -1,
+            index + 1 if x + 1 < width else -1,
+            index - width if y else -1,
+            index + width if y + 1 < height else -1,
+        ):
+            if neighbor >= 0 and candidates[neighbor] and not exterior[neighbor]:
+                exterior[neighbor] = 1
+                queue.append(neighbor)
+
+    rgba.putdata([
+        (0, 0, 0, 0) if exterior[index] else (red, green, blue, alpha)
+        for index, (red, green, blue, alpha) in enumerate(pixels)
+    ])
+    return rgba
+
+
 def isolate_wave_foam(image: Image.Image) -> Image.Image:
     """Keep organic foam and its nearby ink while dropping rectangular water fill."""
     rgba = image.convert("RGBA")
@@ -326,9 +407,26 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     top = round(source.height * row / source_rows)
     right = round(source.width * (column + 1) / source_columns)
     bottom = round(source.height * (row + 1) / source_rows)
-    keyed = remove_chroma(source.crop((left, top, right, bottom)))
+    source_cell = source.crop((left, top, right, bottom))
+    keyed = remove_connected_chroma(source_cell) if family.connected_chroma else remove_chroma(source_cell)
     if family.foam_only:
         keyed = isolate_wave_foam(keyed)
+
+    if family.preserve_layout:
+        inset = max(0, family.source_inset)
+        if inset * 2 >= keyed.width or inset * 2 >= keyed.height:
+            raise ValueError(f"{family.output}: source inset exceeds cell bounds")
+        subject = keyed.crop((inset, inset, keyed.width - inset, keyed.height - inset))
+        resampling = Image.Resampling.NEAREST if family.resample == "nearest" else Image.Resampling.LANCZOS
+        subject = subject.resize(family.cell, resampling)
+        subject_alpha = subject.getchannel("A").point(lambda value: 255 if value >= 80 else 0)
+        quantized = subject.convert("RGB").quantize(
+            colors=family.colors,
+            method=Image.Quantize.MEDIANCUT,
+        ).convert("RGBA")
+        quantized.putalpha(subject_alpha)
+        return quantized.filter(ImageFilter.SHARPEN) if family.sharpen else quantized
+
     alpha = keyed.getchannel("A")
     bounds = alpha.getbbox()
     if not bounds:
@@ -342,7 +440,8 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
         max(1, round(subject.width * scale)),
         max(1, round(subject.height * scale)),
     )
-    subject = subject.resize(size, Image.Resampling.LANCZOS)
+    resampling = Image.Resampling.NEAREST if family.resample == "nearest" else Image.Resampling.LANCZOS
+    subject = subject.resize(size, resampling)
 
     # A crisp alpha edge and a compact palette turn the large source into an
     # authored logical-pixel sprite rather than a filtered thumbnail.
@@ -350,7 +449,8 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     rgb = subject.convert("RGB")
     quantized = rgb.quantize(colors=family.colors, method=Image.Quantize.MEDIANCUT).convert("RGBA")
     quantized.putalpha(subject_alpha)
-    quantized = quantized.filter(ImageFilter.SHARPEN)
+    if family.sharpen:
+        quantized = quantized.filter(ImageFilter.SHARPEN)
 
     cell = Image.new("RGBA", family.cell, (0, 0, 0, 0))
     x = (family.cell[0] - quantized.width) // 2
@@ -363,7 +463,14 @@ def build_family(family: Family) -> dict[str, object]:
     source_path = SOURCE_DIR / family.source
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
+    source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    if family.source_sha256 and source_digest != family.source_sha256:
+        raise ValueError(
+            f"{family.output}: source SHA-256 {source_digest} does not match {family.source_sha256}"
+        )
     source = Image.open(source_path)
+    if family.source_size and source.size != family.source_size:
+        raise ValueError(f"{family.output}: source size {source.size} does not match {family.source_size}")
     expected = family.columns * family.rows
     if len(family.names) != expected:
         raise ValueError(f"{family.output}: expected {expected} frame names")
@@ -395,13 +502,14 @@ def build_family(family: Family) -> dict[str, object]:
         "height": atlas.height,
         "frames": frames,
         "source": f"docs/art-source/grok/{family.source}",
+        "sourceSha256": source_digest,
     }
 
 
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "version": 1,
+        "version": 2,
         "generator": "tools/art/build-grok-assets.py",
         "families": {},
     }

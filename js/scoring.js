@@ -1,4 +1,4 @@
-import { SCORE } from "./config.js";
+import { SCORE, TUNING } from "./config.js";
 import { clamp } from "./math.js";
 import {
   createLegacyAerialManifest,
@@ -33,6 +33,7 @@ export class ScoreSystem {
     this.bestChain = 1;
     this.flow = 0;
     this.flowPeak = 0;
+    this.flowEventHold = 0;
     this.lastCarveSign = 0;
     this.carveCooldown = 0;
     this.provisionalAerial = null;
@@ -57,18 +58,34 @@ export class ScoreSystem {
   }
 
   updateRide(dt, speed, risk, flowScale, multiplier, scales = DEFAULT_SCORE_SCALES) {
-    this.add("ride", SCORE.ridePerSecond * dt, multiplier * 0.35);
+    const seconds = Math.max(0, Number(dt) || 0);
+    this.add("ride", SCORE.ridePerSecond * seconds, multiplier * 0.35);
     if (speed > SCORE.speedThreshold) {
-      this.add("speed", (speed - SCORE.speedThreshold) * dt * 0.34 * scales.speed, multiplier);
+      this.add("speed", (speed - SCORE.speedThreshold) * seconds * 0.34 * scales.speed, multiplier);
     }
     if (risk > SCORE.pocketStart) {
       const pocket = (risk - SCORE.pocketStart) / (1 - SCORE.pocketStart);
-      this.add("pocket", SCORE.pocketMax * pocket * dt * 30 * scales.pocket, multiplier);
+      this.add("pocket", SCORE.pocketMax * pocket * seconds * 30 * scales.pocket, multiplier);
     }
-    const stalling = speed < 52 ? 0.12 : 0;
-    const delta = dt * (flowScale * scales.flow - 0.055 - stalling);
-    this.addFlow(delta);
-    this.carveCooldown = Math.max(0, this.carveCooldown - dt);
+
+    // Riding a clean line protects recently earned Flow, but never creates it.
+    // Flow comes from discrete acts (carves, pumps, tricks, landings), making
+    // passive cruising and action-button spam score-neutral.
+    const heldSeconds = Math.min(seconds, this.flowEventHold);
+    this.flowEventHold = Math.max(0, this.flowEventHold - seconds);
+    const decaySeconds = seconds - heldSeconds;
+    const scaledActivity = (Number(flowScale) || 0) * (Number(scales.flow) || 0);
+    const sustain = clamp(
+      (scaledActivity - TUNING.flowLineSustainStart)
+        / Math.max(0.001, TUNING.flowLineSustainFull - TUNING.flowLineSustainStart),
+      0,
+      1,
+    );
+    const passiveRate = TUNING.flowPassiveDecay
+      * (1 - sustain * TUNING.flowLineSustainLimit);
+    const stallRate = speed < 52 ? TUNING.flowStallDecay : 0;
+    this.addFlow(-decaySeconds * (passiveRate + stallRate));
+    this.carveCooldown = Math.max(0, this.carveCooldown - seconds);
   }
 
   registerCarve(faceVelocity, multiplier) {
@@ -181,6 +198,7 @@ export class ScoreSystem {
     this.combo = 1;
     this.comboHeat = 0;
     this.flow *= 0.25;
+    this.flowEventHold = 0;
     this.syncCombo();
     this.provisionalAerial = null;
     this.pendingLaunchPotential = 0;
@@ -191,7 +209,9 @@ export class ScoreSystem {
   }
 
   addFlow(amount) {
-    this.flow = clamp(this.flow + (Number(amount) || 0), 0, 1);
+    const delta = Number(amount) || 0;
+    this.flow = clamp(this.flow + delta, 0, 1);
+    if (delta > 0) this.flowEventHold = Math.max(this.flowEventHold, TUNING.flowEventHold);
     this.flowPeak = Math.max(this.flowPeak, this.flow);
     this.syncCombo();
     return this.flow;

@@ -29,6 +29,10 @@ const DEBUG_FIELDS = [
 
 const DEFAULT_TUNING = Object.freeze({ ...TUNING });
 
+export function shouldShowTouchControls(state, enabled, settingsOpen = false) {
+  return Boolean(enabled && state === "running" && !settingsOpen);
+}
+
 export class KakiSurfGame {
   constructor({
     host,
@@ -115,15 +119,14 @@ export class KakiSurfGame {
         landing: this.settings.landingAssist,
       },
       controlMode: this.settings.controlMode,
+      tutorialEnabled: !this.save.tutorialSeen,
     });
-    this.simulation.tutorialEnabled = !this.save.tutorialSeen;
     this.simulation.begin();
     this.accumulator = 0;
     this.state = "running";
     this.pausedFrom = null;
     this.showLayer(null);
     this.elements.canvas.focus({ preventScroll: true });
-    this.elements.touchControls.hidden = !this.settings.touchControls;
     try {
       await this.audio.unlock?.();
     } catch (error) {
@@ -168,7 +171,6 @@ export class KakiSurfGame {
     this.accumulator = 0;
     this.updateMenuStats();
     this.showLayer("menu");
-    this.elements.touchControls.hidden = true;
     this.elements.startButton.focus({ preventScroll: true });
   }
 
@@ -184,6 +186,7 @@ export class KakiSurfGame {
       board: this.selectedBoard,
       condition: this.selectedCondition,
       bestScore: this.save.bestScore,
+      tutorial: this.simulation.tutorial?.snapshot?.() ?? null,
       assists: { ...this.simulation.assists },
       controlMode: this.simulation.controlMode,
       travelDirection: this.simulation.player.travelDirection,
@@ -244,6 +247,10 @@ export class KakiSurfGame {
       this.renderer.onEvent(event, this.simulation);
       this.audio.onEvent?.(event, this.simulation);
       if (event.type === "callout") this.announce(event.payload.subtext ? `${event.payload.text}. ${event.payload.subtext}` : event.payload.text);
+      if (event.type === "tutorialStep") {
+        this.announce(`Surf School ${event.payload.index} of ${event.payload.total}. ${event.payload.text}. ${event.payload.hint}`);
+      }
+      if (event.type === "tutorialComplete") this.handleTutorialComplete();
       if (event.type === "complete") this.handleComplete(event.payload);
       if (event.type === "pump") this.rumble(28, 0.16, 0.08);
       if (event.type === "powerLineEnter") this.rumble(42, 0.12, 0.22);
@@ -274,7 +281,6 @@ export class KakiSurfGame {
   handleComplete(result) {
     const enriched = { ...result, board: this.selectedBoard, condition: this.selectedCondition };
     const isBest = recordRun(this.save, enriched);
-    this.save.tutorialSeen = true;
     writeSave(this.save, this.storage);
     if (isBest) {
       const event = { type: "personalBest", payload: { score: result.score }, time: this.simulation.elapsed };
@@ -284,10 +290,24 @@ export class KakiSurfGame {
     this.state = "results";
     this.renderResults(enriched, isBest);
     this.showLayer("results");
-    this.elements.touchControls.hidden = true;
     this.elements.retryButton.focus({ preventScroll: true });
     this.onRunComplete?.(enriched);
     this.announce(`${result.rank.title}. Score ${Math.round(result.score)}. Flow ${result.flow} percent.`);
+  }
+
+  handleTutorialComplete() {
+    if (this.save.tutorialSeen) return;
+    this.save.tutorialSeen = true;
+    writeSave(this.save, this.storage);
+    this.syncTutorialReplayUI();
+    this.announce("Surf School complete. The full wave is yours.");
+  }
+
+  replayTutorial() {
+    this.save.tutorialSeen = false;
+    writeSave(this.save, this.storage);
+    this.syncTutorialReplayUI();
+    this.announce("Surf School is ready for the next run.");
   }
 
   renderResults(result, isBest) {
@@ -328,6 +348,7 @@ export class KakiSurfGame {
     this.elements.menuButtons.forEach((button) => button.addEventListener("click", () => this.backToMenu(), { signal }));
     this.elements.settingsButtons.forEach((button) => button.addEventListener("click", () => this.openSettings(), { signal }));
     this.elements.closeSettings.addEventListener("click", () => this.closeSettings(), { signal });
+    this.elements.replayTutorial.addEventListener("click", () => this.replayTutorial(), { signal });
     this.elements.settingsDialog.addEventListener("click", (event) => {
       if (event.target === this.elements.settingsDialog) this.closeSettings();
     }, { signal });
@@ -455,7 +476,7 @@ export class KakiSurfGame {
     if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     this.renderer.applySettings(this.settings);
     this.audio.applySettings?.(this.settings);
-    this.elements.touchControls.hidden = !this.settings.touchControls || this.state !== "running";
+    this.syncTouchControlsVisibility();
     this.save.settings = this.settings;
     writeSave(this.save, this.storage);
   }
@@ -479,6 +500,13 @@ export class KakiSurfGame {
     this.selectBoard(this.selectedBoard);
     this.selectCondition(this.selectedCondition);
     this.syncTouchActionState();
+    this.syncTutorialReplayUI();
+  }
+
+  syncTutorialReplayUI() {
+    const armed = !this.save.tutorialSeen;
+    this.elements.replayTutorial.textContent = armed ? "SURF SCHOOL READY" : "REPLAY SURF SCHOOL";
+    this.elements.replayTutorial.setAttribute("aria-pressed", String(armed));
   }
 
   openSettings() {
@@ -504,6 +532,20 @@ export class KakiSurfGame {
     this.elements.pauseLayer.hidden = name !== "pause";
     this.elements.resultsLayer.hidden = name !== "results";
     this.elements.topControls.hidden = name === "menu";
+    this.syncTouchControlsVisibility();
+  }
+
+  syncTouchControlsVisibility() {
+    const controls = this.elements.touchControls;
+    const visible = shouldShowTouchControls(
+      this.state,
+      this.settings.touchControls,
+      this.elements.settingsDialog.open,
+    );
+    if (!visible && !controls.hidden) this.input.clear?.();
+    controls.hidden = !visible;
+    controls.inert = !visible;
+    controls.setAttribute("aria-hidden", String(!visible));
   }
 
   announce(message) {
@@ -523,6 +565,7 @@ export class KakiSurfGame {
   setQaScene(scene) {
     this.qaFreeze = true;
     this.input.clear?.();
+    this.elements.touchControls.classList.remove("qa-visible");
     if ("enabled" in this.input) this.input.enabled = false;
     this.renderer.applySettings({
       ...this.settings,
@@ -804,6 +847,11 @@ export class KakiSurfGame {
         player.bodyAngle = 1.2;
         this.renderer.onEvent({ type: "wipeout", payload: { cause: "landing" } }, this.simulation);
         break;
+      case "pause":
+        this.state = "paused";
+        this.pausedFrom = "qa";
+        this.showLayer("pause");
+        break;
       case "touch":
         this.elements.touchControls.hidden = false;
         this.elements.touchControls.classList.add("qa-visible");
@@ -1011,6 +1059,7 @@ function collectElements(host) {
     breakdown: host.querySelector("[data-result=breakdown]"),
     settingsDialog: host.querySelector(".settings-dialog"),
     closeSettings: host.querySelector("[data-action=close-settings]"),
+    replayTutorial: host.querySelector("[data-action=replay-tutorial]"),
     settingsInputs: host.querySelectorAll("[data-setting]"),
     touchControls: host.querySelector(".touch-controls"),
     touchSpecial: host.querySelector('[data-control="special"]'),
@@ -1130,6 +1179,7 @@ function gameMarkup() {
             <label class="toggle"><input type="checkbox" data-setting="steeringAssist"><span>STEERING ASSIST</span></label>
             <label class="toggle"><input type="checkbox" data-setting="landingAssist"><span>LANDING ASSIST</span></label>
           </section>
+          <button class="secondary-button tutorial-replay" type="button" data-action="replay-tutorial" aria-pressed="false">REPLAY SURF SCHOOL</button>
           <p class="settings-note">Assists widen control and landing margins. They are labeled in play and reduce scoring without changing unlocks.</p>
         </form>
       </dialog>

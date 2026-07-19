@@ -1,6 +1,6 @@
 # Asset manifest and provenance
 
-Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 11 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
+Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 12 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
 
 Gameplay truth remains code-owned. Raster art does not define wave collision, rider motion, wildlife phases, pickup reachability, scoring, or UI state; it renders simulation state and has an independent local fallback.
 
@@ -34,11 +34,12 @@ The three full-resolution environment sources were generated offline, curated, t
 
 ## Generated runtime atlases
 
-All 11 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
+All 12 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
 | `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
+| `waveProgression` | `wave-progression-atlas.png` | 320 x 192 | Four aligned threat stages: broad swell, pitching lip, open curl, whitewater impact | Collision-aligned procedural shoulder, folding lip, shadow wedge, and churn |
 | `dolphin` | `dolphin-atlas.png` | 224 x 80 | Approach, offer, mounted ride, breach, dismount | Code-authored animal silhouette |
 | `shark` | `shark-atlas.png` | 224 x 72 | Shadow, fair fin telegraph, crossing, near miss, retreat | Code-authored shadow/fin/splash |
 | `whale` | `whale-atlas.png` | 352 x 108 | Distant cue, blow, breach, ramp/ride, splash, departure | Code-authored whale/event shapes |
@@ -69,12 +70,12 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 
 ## Offline source and deterministic conversion
 
-The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The latest wave source is 1024 x 1024; the other selected sheets are 1280 x 720. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The modular wave source is 1024 x 1024; the staged wave progression and other selected sheets are 1280 x 720. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
-2. identifies and removes the chroma-magenta field while preserving coral accents, then isolates organic foam from rectangular water fill in the wave family;
+2. identifies and removes the chroma-magenta field while preserving coral accents; the staged JPEG-derived wave uses a boundary-connected chroma flood so interior coral cannot be globally keyed away;
 3. extracts each declared source grid and repacks it into the stable runtime atlas grid;
-4. crops each non-empty silhouette and fits it into a fixed local frame;
+4. crops each non-empty silhouette and fits it into a fixed local frame; the four staged wave cells instead retain one shared grid alignment and a right/bottom contact anchor;
 5. downsamples with Lanczos, thresholds alpha, quantizes the RGB palette, and sharpens;
 6. packs transparent RGBA PNG atlases and writes frame metadata.
 

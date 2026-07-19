@@ -12,15 +12,16 @@ From the repository root:
 python3 tools/art/build-grok-assets.py
 ```
 
-The script reads the preserved sources, removes the chroma-magenta background, extracts each declared source grid, crops silhouettes, downsamples with Lanczos, thresholds alpha, quantizes, sharpens, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
+The script reads the preserved sources, validates the staged breaker's exact hash and dimensions, removes the chroma-magenta background, extracts each declared source grid, crops silhouettes, downsamples with the family-specific filter, thresholds alpha, quantizes, sharpens where appropriate, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
 
 ## Selected source and output record
 
-The latest wave source is 1024 x 1024; the other selected sources are 1280 x 720. SHA-256 values identify the exact files used at this checkpoint.
+The modular wave source is 1024 x 1024; the staged wave progression and other selected sources are 1280 x 720. SHA-256 values identify the exact files used at this checkpoint.
 
 | Family | Selection | Preserved source | Source SHA-256 | Runtime atlas | Atlas dimensions |
 | --- | --- | --- | --- | --- | ---: |
 | Wave breaker | Square polish pass selected; v2 preserved | `docs/art-source/grok/wave-breaker-source-v2.png` | `07554da55eb79d344d60dea70174384c6497146b33a5923e5c913fe98c6b9ca9` | `assets/generated/wave-breaker-atlas.png` | 288 x 128 |
+| Wave progression | Four-stage left breaker selected | `docs/art-source/grok/wave-progression-source.png` | `4f94dc3224049cf3f2e6cce60be8316a97875b2ba87d725e1452891a4d669173` | `assets/generated/wave-progression-atlas.png` | 320 x 192 |
 | Dolphin | First reviewed pass selected | `docs/art-source/grok/dolphin-source.png` | `eac80e5862bb10b89c36fbd04e3f41b3869835d6c34d25edcfe1d0f4ff0f6740` | `assets/generated/dolphin-atlas.png` | 224 x 80 |
 | Shark | First reviewed pass selected | `docs/art-source/grok/shark-source.png` | `044d588bac3ba9d81677228c4b7831859dc94d2bbe6b128c771935bf24f2bd0b` | `assets/generated/shark-atlas.png` | 224 x 72 |
 | Whale | First reviewed pass selected | `docs/art-source/grok/whale-source.png` | `9ff5f93b1fd98a68402c03f8785c5d56e120a0eed2ebb42fd1a3f4770481ca14` | `assets/generated/whale-atlas.png` | 352 x 108 |
@@ -34,9 +35,12 @@ The latest wave source is 1024 x 1024; the other selected sources are 1280 x 720
 
 The rejected UI v1 is preserved as `docs/art-source/grok/ui-ornaments-source.jpg` with SHA-256 `75e36bd84e0c36d17c5b36b5c8dd6307bec95074ca21dcc17c5e9a96b75f10e7`. It was not used by the atlas build. Wave v2 remains preserved as `docs/art-source/grok/wave-breaker-source.jpg`; the rejected first wave and first bird sheets were not promoted from their generation sessions.
 
+The staged wave came from local Grok session `019f7c03-7e1e-7570-acac-8cb1fe5f7ee7`. The untouched selected JPEG at `.grok/sessions/%2Fhome%2Fnemoclaw%2Fkaki-surf/019f7c03-7e1e-7570-acac-8cb1fe5f7ee7/images/1.jpg` is preserved as `docs/art-source/grok/wave-progression-original.jpg`, SHA-256 `cc490bfd6b5fdb4743372b8d53178d5737819e7d2effa6a006f5f534b9030c02`. The same session converted its varying JPEG magenta field to an exact `#ff00ff` PNG without changing the wave composition; that derivative is the deterministic build source recorded above. Its session copy and preserved copy both hash to `4f94dc3224049cf3f2e6cce60be8316a97875b2ba87d725e1452891a4d669173`.
+
 ## Review decisions
 
 - Wave v1 was rejected because the model interpreted “crest feather” and “foam fingers” literally. Wave v2 removed those motifs but was superseded after runtime review found its reduced foam clusters muddy. The selected square pass has cleaner isolated silhouettes; only restrained crest and spray accents are used over simulation-owned geometry.
+- The four-stage wave progression was added after motion review found that one procedural hook could not communicate swell, pitch, curl, and collapse. Its right/bottom anchor follows the simulation-owned contact while runtime masking limits the art to the upper silhouette; code owns the connected water mass, modular foam remains a secondary accent, and the procedural fallback stays complete.
 - Birds v1 was rejected because visible grid dividers became part of the sheet. The corrected prompt required one uninterrupted field with no cell borders, seams, panels, or boxes.
 - UI v1 was rejected because ornaments overlapped or cropped and contained pseudo-text. The corrected prompt reduced each ornament to the middle 60% of its implied cell and prohibited every form of writing.
 - The selected airshow cell contains a four-plane formation rather than the requested three-plane formation. It remains a readable, fictional, nonmilitary airshow sprite and is accepted as a presentation variance.
@@ -67,6 +71,14 @@ Production game-asset source sheet for a side-view 384x216 neo-chibi plush surf 
 ```
 
 Grok returned the eight requested subjects in a 2 x 4 source arrangement. The build record declares that source layout explicitly and repacks the same ordered frames into the existing 4 x 2 runtime atlas.
+
+### 2c. Four-stage wave progression — selected
+
+Selected original: `docs/art-source/grok/wave-progression-original.jpg`. Deterministic build source: `docs/art-source/grok/wave-progression-source.png`.
+
+```text
+Production sprite-sheet source for a side-view 384x216 neo-chibi plush arcade surfing game. A clean 2 columns by 2 rows grid containing four visibly different sequential animation frames of the SAME left-side breaker, with identical base alignment, scale, palette and lighting. TOP LEFT: low broad rising swell with no hollow barrel yet. TOP RIGHT: shoulder steepening and lip beginning to pitch right. BOTTOM LEFT: fully formed but open readable curl with a broad diagonal shoulder and heavy water base. BOTTOM RIGHT: collapsed whitewater impact with chunky foam and spray. Solid wave mass enters from the left and bottom of every cell; energy travels toward the right. Premium hand-cleaned pixel art with large deliberate clusters, crisp silhouette, deep navy water shadows, turquoise, pale aqua and seafoam cream, tiny coral highlights only in impact foam. Perfectly uniform flat pure chroma-magenta #ff00ff background in every cell and gutter, no lighting or texture on the background. Wide magenta gutters separate every cell and every wave stays fully inside its cell. No surfer, board, animals, boats, aircraft, scenery, horizon, UI, text, numbers, logo, watermark, rectangular water panels, dark circular barrel hole, black donut, thin vertical pillar, horizontal speed lines, extra waves, blurry gradients, noisy microtexture, cropped foam, or photorealism.
+```
 
 ### 3. Dolphin — selected
 

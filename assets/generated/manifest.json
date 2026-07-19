@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "generator": "tools/art/build-grok-assets.py",
   "families": {
     "wave-breaker-atlas": {
@@ -88,7 +88,57 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/wave-breaker-source-v2.png"
+      "source": "docs/art-source/grok/wave-breaker-source-v2.png",
+      "sourceSha256": "07554da55eb79d344d60dea70174384c6497146b33a5923e5c913fe98c6b9ca9"
+    },
+    "wave-progression-atlas": {
+      "image": "wave-progression-atlas.png",
+      "width": 320,
+      "height": 192,
+      "frames": {
+        "swell": {
+          "x": 0,
+          "y": 0,
+          "width": 160,
+          "height": 96,
+          "anchor": [
+            1.0,
+            1.0
+          ]
+        },
+        "pitch": {
+          "x": 160,
+          "y": 0,
+          "width": 160,
+          "height": 96,
+          "anchor": [
+            1.0,
+            1.0
+          ]
+        },
+        "curl": {
+          "x": 0,
+          "y": 96,
+          "width": 160,
+          "height": 96,
+          "anchor": [
+            1.0,
+            1.0
+          ]
+        },
+        "impact": {
+          "x": 160,
+          "y": 96,
+          "width": 160,
+          "height": 96,
+          "anchor": [
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/wave-progression-source.png",
+      "sourceSha256": "4f94dc3224049cf3f2e6cce60be8316a97875b2ba87d725e1452891a4d669173"
     },
     "dolphin-atlas": {
       "image": "dolphin-atlas.png",
@@ -176,7 +226,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/dolphin-source.png"
+      "source": "docs/art-source/grok/dolphin-source.png",
+      "sourceSha256": "eac80e5862bb10b89c36fbd04e3f41b3869835d6c34d25edcfe1d0f4ff0f6740"
     },
     "shark-atlas": {
       "image": "shark-atlas.png",
@@ -264,7 +315,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/shark-source.png"
+      "source": "docs/art-source/grok/shark-source.png",
+      "sourceSha256": "044d588bac3ba9d81677228c4b7831859dc94d2bbe6b128c771935bf24f2bd0b"
     },
     "whale-atlas": {
       "image": "whale-atlas.png",
@@ -352,7 +404,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/whale-source.png"
+      "source": "docs/art-source/grok/whale-source.png",
+      "sourceSha256": "9ff5f93b1fd98a68402c03f8785c5d56e120a0eed2ebb42fd1a3f4770481ca14"
     },
     "birds-atlas": {
       "image": "birds-atlas.png",
@@ -440,7 +493,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/birds-source.png"
+      "source": "docs/art-source/grok/birds-source.png",
+      "sourceSha256": "cd9b1ebac9c5eee1f097d19b872aa57057d8c1b2b39bf00eec6e3b174c81d98c"
     },
     "boats-atlas": {
       "image": "boats-atlas.png",
@@ -528,7 +582,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/boats-source.png"
+      "source": "docs/art-source/grok/boats-source.png",
+      "sourceSha256": "31d6d8a98eece8ab7782e7c68ce12b533e21c8859f1c8d69a6e8a52ed7a32561"
     },
     "air-traffic-atlas": {
       "image": "air-traffic-atlas.png",
@@ -616,7 +671,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/air-traffic-source.jpg"
+      "source": "docs/art-source/grok/air-traffic-source.jpg",
+      "sourceSha256": "f05b4d2d6010b4b4edb24e5cfd642f5920680157bbe868a11e1bf002220648b5"
     },
     "powerups-atlas": {
       "image": "powerups-atlas.png",
@@ -704,7 +760,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/powerups-source.png"
+      "source": "docs/art-source/grok/powerups-source.png",
+      "sourceSha256": "7a8e4264488e42510f3a98aaaa88e73e1800131b5929a1b3730c3a2409df8ed9"
     },
     "boards-atlas": {
       "image": "boards-atlas.png",
@@ -832,7 +889,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/boards-source.png"
+      "source": "docs/art-source/grok/boards-source.png",
+      "sourceSha256": "a66241da5d5c2ae38676e703d0c81e5ec3ef6c1045744371018fb2171d14cf23"
     },
     "carrier-atlas": {
       "image": "carrier-atlas.png",
@@ -920,7 +978,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/carrier-source.png"
+      "source": "docs/art-source/grok/carrier-source.png",
+      "sourceSha256": "b456a27cfb3fcd7aa593a68dcf5663f6db6743aa8b873ccdf60fbdd27c71e11c"
     },
     "ui-ornaments-atlas": {
       "image": "ui-ornaments-atlas.png",
@@ -1008,7 +1067,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/ui-ornaments-source-v2.png"
+      "source": "docs/art-source/grok/ui-ornaments-source-v2.png",
+      "sourceSha256": "a5f59884adae0dfa6b624aeee8cedaf64d1ace2544ab65cf29b908363ff9ca8e"
     }
   }
 }

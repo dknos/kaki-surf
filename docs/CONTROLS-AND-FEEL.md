@@ -16,7 +16,7 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 | Pause | Escape or P | Start (9) | Settings |
 | Restart / retry | R; Space on results | B on results; A on results | Results button |
 
-Action is always readable: hold on the face to compress and charge a pump, release to add an efficiency-scaled burst, and carry an uphill line through the lip to launch. It is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
+Action is always readable: hold on the face to compress, then release while carving upward on a useful line to earn an efficiency-scaled pump; carry that uphill line through the lip to launch. Releases below the charge/line gate consume their partial charge without a burst, and a short cadence floor rejects tapping. Action is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
 
 Simple Trick is contextual and buffered. A held request chooses Front Rail Grab, or Tail Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time.
 
@@ -99,7 +99,7 @@ Speed is physical velocity. Its fixed presentation tiers are:
 
 Wake length, directional spray, water streaks, parallax, pose, wave-filter pitch, and speed accents reinforce those tiers. The HUD does not expose a persistent POWER meter.
 
-Flow is a separate 0–100 style/combo state. Alternating carves, committed direction changes, pumping, varied landed tricks, landing quality, wildlife rides, near misses, and set-piece bonuses add Flow. Stalling, repetition, wobble, and wipeouts reduce it. Flow drives the live score multiplier but never replaces physical speed.
+Flow is a separate 0–100 style/combo state. Valid full arcs, committed direction changes, timed pumps, varied landed tricks, landing quality, wildlife rides, near misses, and set-piece bonuses add Flow. A strong line can briefly sustain Flow that an action already earned, but ordinary riding never creates it; passive play, stalling, repetition, wobble, and wipeouts reduce it. Flow drives the live score multiplier but never replaces physical speed.
 
 ## Wave Read Assist and teaching
 
@@ -107,11 +107,11 @@ Wave Read changes presentation only. It does not change slope physics, collision
 
 | Mode | Presentation |
 | --- | --- |
-| Full | Stronger fast-line cue, correction help, landing label, and a short first-run teaching prompt |
+| Full | Stronger fast-line cue, correction help, and landing label |
 | Subtle | Natural streaks, spray, wake, and audio without persistent labels |
 | Off | World and physical wave remain visible; assist-only text and arrows are removed |
 
-The first-run lesson is intentionally one idea: **drop for speed, hit the lip for air**. It avoids teaching the old seam as a requirement. Steering Assist and Landing Assist are separate scoring assists; either applies the displayed 18% score reduction. Simple auto-level is part of the selected control mode, not the Landing Assist setting.
+Surf School is independent of Wave Read and teaches six actions in order: **drop downhill, carve back up, launch, rotate, add a trick, and land board-first**. A lesson remains visible until its physical state or semantic event succeeds; elapsed time alone cannot advance it. Completion is saved immediately, an interrupted first run retries the unfinished lesson, and Settings can arm the full sequence for the next run. Steering Assist and Landing Assist are separate scoring assists; either applies the displayed 18% score reduction. Simple auto-level is part of the selected control mode, not the Landing Assist setting.
 
 ## Wildlife and bonuses
 
