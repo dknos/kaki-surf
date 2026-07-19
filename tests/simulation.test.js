@@ -66,6 +66,11 @@ function simulationSnapshot(simulation) {
       rotationAccum: player.rotationAccum,
       charge: player.charge,
       waveMomentum: player.waveMomentum,
+      skillMomentum: player.skillMomentum,
+      lastPumpAt: player.lastPumpAt,
+      carveArcSign: player.carveArcSign,
+      carveArcDuration: player.carveArcDuration,
+      carveArcExcursion: player.carveArcExcursion,
       lateralVelocity: player.lateralVelocity,
       travelVelocity: player.travelVelocity,
       travelDirection: player.travelDirection,
@@ -506,10 +511,12 @@ test("Flow owns style/combo truth independently from physical speed tiers", () =
   const score = new ScoreSystem();
   score.addFlow(0.2);
   const initial = score.flow;
-  score.updateRide(1, 90, 0, 0.065, 1);
-  assert.ok(score.flow > initial, "an uninterrupted non-stalling ride builds Flow");
+  score.updateRide(TUNING.flowEventHold, 90, 0, 1, 1);
+  assert.equal(score.flow, initial, "a strong line protects a recent skill event");
+  score.updateRide(1, 90, 0, 1, 1);
+  assert.ok(score.flow < initial, "passive riding cannot manufacture Flow");
   const ridingFlow = score.flow;
-  score.updateRide(1, 40, 0, 0.065, 1);
+  score.updateRide(1, 40, 0, 0, 1);
   assert.ok(score.flow < ridingFlow, "stalling drains Flow");
   const stalledFlow = score.flow;
   score.registerDirectionChange({ speed: 110, turnForce: 0.8, switchStance: true });

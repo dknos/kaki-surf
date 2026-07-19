@@ -1,4 +1,5 @@
 import { clamp, smoothstep } from "./math.js";
+import { TUNING } from "./config.js";
 
 export class GameplayWave {
   constructor(seed = 0x4b414b49) {
@@ -20,10 +21,44 @@ export class GameplayWave {
     this.pressure = 0;
   }
 
-  update(dt, speed, curlSpeed, signedSpeed = speed) {
+  update(dt, speed, curlSpeed, signedSpeed = speed, threat = null) {
     this.time += dt;
     this.travel += speed * dt;
     this.worldTravel += (Number.isFinite(signedSpeed) ? signedSpeed : speed) * dt;
+
+    if (threat && Number.isFinite(threat.playerX)) {
+      const temporalPressure = smoothstep(0, TUNING.curlRampEnd, this.time);
+      const gap = threat.playerX - this.curlX;
+      const proximityPressure = 1 - smoothstep(24, 156, gap);
+      this.pressure = clamp(Math.max(temporalPressure * 0.82, proximityPressure), 0, 1);
+
+      if (threat.active !== false && this.time > TUNING.curlGrace) {
+        const escalation = smoothstep(TUNING.curlGrace, TUNING.curlRampEnd, this.time);
+        const paceScale = clamp(
+          (Number.isFinite(curlSpeed) ? curlSpeed : TUNING.curlSpeed) / TUNING.curlSpeed,
+          0.25,
+          2.5,
+        );
+        const skill = clamp(Number(threat.skillMomentum) || 0, 0, 1);
+        const speedRelief = smoothstep(
+          TUNING.curlReliefSpeedStart,
+          TUNING.curlReliefSpeedEnd,
+          Number(threat.speed) || 0,
+        );
+        const relief = clamp(
+          skill * TUNING.curlSkillRelief + speedRelief * TUNING.curlSpeedRelief,
+          0,
+          TUNING.curlMaxRelief,
+        );
+        const advance = TUNING.curlThreatMaxSpeed * paceScale * escalation * (1 - relief);
+        // The threat can slow when Kaki surfs well, but it never moves backward
+        // merely because the rider reverses direction.
+        this.curlX += Math.max(0, advance) * dt;
+      }
+      return;
+    }
+
+    // Keep the standalone/legacy wave API stable for visual and unit probes.
     const pulse = Math.sin(this.time * 0.44 + this.phaseB) * 0.22;
     this.curlX += (curlSpeed + pulse) * dt;
     this.pressure = smoothstep(0, 72, this.time);

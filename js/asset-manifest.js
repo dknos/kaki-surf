@@ -26,6 +26,9 @@ export const GENERATED_ASSET_MANIFEST = Object.freeze({
     "crestFeatherA", "crestFeatherB", "risingCurl", "impact",
     "whitewaterChurn", "foamTendrils", "sprayBurst", "seaMist",
   ], { anchor: [0.5, 1] }),
+  waveProgression: atlas("wave-progression-atlas.png", 2, 2, 160, 96, [
+    "swell", "pitch", "curl", "impact",
+  ], { anchor: [1, 1] }),
   dolphin: atlas("dolphin-atlas.png", 4, 2, 56, 40, [
     "approach", "offer", "mountedGlide", "compress",
     "breach", "corkscrew", "tailSlap", "dismount",

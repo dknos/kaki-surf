@@ -657,11 +657,30 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.45;
 }
 
+.tutorial-replay {
+  display: block;
+  width: calc(100% - 44px);
+  margin: 2px 22px 14px;
+  color: var(--foam);
+}
+
+.tutorial-replay[aria-pressed="true"] {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
 .touch-controls {
   position: absolute;
   z-index: 6;
   inset: 0;
   pointer-events: none;
+}
+
+.touch-controls[hidden],
+.touch-controls[inert],
+.touch-controls[hidden] button,
+.touch-controls[inert] button {
+  pointer-events: none !important;
 }
 
 .touch-controls button {
@@ -1405,4 +1424,60 @@ input[type="range"]::-moz-range-thumb {
 
 #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin span::after {
   content: " TRICK";
+}
+
+@media (max-width: 430px) and (orientation: portrait) {
+  .touch-dpad {
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  .touch-actions {
+    right: max(12px, env(safe-area-inset-right));
+    width: 202px;
+    height: 132px;
+  }
+
+  .touch-actions .touch-spin {
+    top: 0;
+    bottom: auto;
+    width: 44px;
+    height: 44px;
+  }
+
+  .touch-actions .touch-spin--left {
+    left: 0;
+    top: 0;
+  }
+
+  .touch-actions .touch-spin--right {
+    left: 46px;
+    top: 0;
+  }
+}
+
+@media (max-width: 370px) and (orientation: portrait) {
+  .touch-dpad {
+    transform: scale(0.86);
+    transform-origin: left bottom;
+  }
+
+  .touch-actions {
+    transform: scale(0.86);
+    transform-origin: right bottom;
+  }
+}
+
+@media (max-width: 350px) and (orientation: portrait) {
+  .touch-dpad,
+  .touch-actions {
+    transform: scale(0.8);
+  }
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .touch-dpad,
+  .touch-actions {
+    /* Clear the in-canvas FAST and FLOW panels at the lower corners. */
+    bottom: max(62px, calc(env(safe-area-inset-bottom) + 52px));
+  }
 }

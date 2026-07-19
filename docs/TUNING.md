@@ -32,8 +32,15 @@ The game loop accumulates at most 14 fixed steps per frame. Render interpolation
 | `wavePush` | 15.5 | Acceleration scaled by shared speed potential |
 | `curlSpeed` | 2.35 | Base advance of the breaking curl |
 | `curlCatchDelay` | 0.58 s | Continuous curl contact before a wipeout |
+| `curlGrace` / `curlRampEnd` | 8 s / 72 s | No-advance opening and end of the smooth threat ramp |
+| `curlThreatMaxSpeed` | 10.8 | Maximum late-run threat advance before skill relief |
+| `curlSkillRelief` / `curlSpeedRelief` / `curlMaxRelief` | 0.46 / 0.18 / 0.58 | Bounded reduction earned by recent valid play and real speed |
 | `pumpStrength` | 18.5 | Maximum pump impulse before line, rhythm, and board factors |
 | `pumpChargeRate` | 1.55/s | Hold-to-compress charge rate |
+| `pumpMinCharge` / `pumpMinEfficiency` | 0.28 / 0.15 | Minimum stored compression and useful line quality |
+| `pumpCooldown` | 0.34 s | Cadence floor between valid pump releases |
+| `carveArcMinDuration` / `carveArcMinExcursion` | 0.18 s / 0.075 | Full-arc gate that rejects rapid direction flicks |
+| `flowEventHold` / `flowPassiveDecay` | 0.9 s / 0.055/s | Brief sustain after a scored action, then ordinary decay |
 | `rideSpeedResponse` | 0.82/s | Pull toward base target; lower values retain earned speed longer |
 | `waveMomentumBuild` / `waveMomentumDecay` | 1.9/s / 0.55/s | Response rates for the smooth natural-momentum signal |
 | `waveMomentumPumpGain` | 0.14 | Momentum signal added by a fully charged, efficient release |
@@ -47,6 +54,10 @@ The power zone requires an absolute face error no greater than 0.12 and pocket v
 `seamDrive` has a glassy core through 0.025 face error, fades out by 0.115, enters across pocket values 0.16-0.34, and fades before the critical band across 0.68-0.82. It remains useful for pump efficiency, presentation, and compatibility telemetry. It no longer grants permission to reach the board's hard speed cap.
 
 Primary drive comes from `GameplayWave.surfaceGradientAt(x, face)`. Simulation projects signed x travel and face movement through that gradient to produce `slopeDrive` in `-1..1`. Positive values receive `downhillAcceleration`, negative values pay `uphillSpeedCost`, and a traverse receives `traverseDrive`. Mango Rush scales uphill loss while active. The fast-line query adds a smaller broad local contribution and a released pump adds a bounded burst.
+
+A release qualifies as a pump only after enough charge, a useful line, upward intent, compatible face velocity, and the cadence floor. Invalid releases consume their partial charge so tapping cannot bank hidden energy. Carve score/Flow likewise requires a sustained arc with real face excursion and peak velocity. These gates make rhythm and line choice outperform input spam.
+
+The curl stays at its start point through `curlGrace`, then accelerates smoothly toward `curlThreatMaxSpeed`. Recent valid pumps, full carves, reversals, clean landings, and high physical speed provide bounded relief; signed rider travel never reverses the threat. Recovery may explicitly retreat the curl to a safe respawn position.
 
 `player.waveMomentum` follows a mix of downhill drive, line quality, and pocket position. It is a smooth presentation/launch-history value rather than a speed-cap gate. A correctly timed pump can still add up to 0.14. The ride cap is:
 

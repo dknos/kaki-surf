@@ -141,7 +141,7 @@ test("landing and result poses resolve from state the simulation actually publis
   assert.equal(resolveKakiPose(strongRun.player), "victory");
 });
 
-test("gameplay callouts queue one at a time and remain readable", () => {
+test("gameplay callouts queue one at a time, preserve a readable beat, and prioritize danger", () => {
   const canvas = {
     getContext() {
       return { imageSmoothingEnabled: false };
@@ -159,10 +159,30 @@ test("gameplay callouts queue one at a time and remain readable", () => {
 
   assert.equal(renderer.activeCallout.text, "FIRST");
   assert.ok(renderer.activeCallout.duration >= 2, "ordinary messages stay up long enough to read");
-  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["SECOND", "THIRD"]);
+  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["THIRD", "SECOND"]);
+  assert.ok(renderer.activeCallout.life >= 1, "risk feedback cannot erase a freshly shown message");
 
   renderer.activeCallout.life = 0;
   renderer.activateNextCallout();
-  assert.equal(renderer.activeCallout.text, "SECOND");
-  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["THIRD"]);
+  assert.equal(renderer.activeCallout.text, "THIRD");
+  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["SECOND"]);
+});
+
+test("stale queued hints expire instead of replacing current action feedback late", () => {
+  const canvas = {
+    getContext() {
+      return { imageSmoothingEnabled: false };
+    },
+  };
+  const renderer = new KakiRenderer(canvas, {
+    highContrast: false,
+    reducedMotion: true,
+    reducedFlash: true,
+    screenShake: 0,
+  });
+  renderer.pushCallout("CURRENT", "", "perfect");
+  renderer.pushCallout("OLD HINT", "", "hint");
+  renderer.time = 1.6;
+  renderer.pruneStaleCallouts();
+  assert.deepEqual(renderer.calloutQueue, []);
 });

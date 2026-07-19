@@ -38,9 +38,11 @@ Wave geometry now supplies the main drive. Dropping down the face adds speed, cl
 Speed and Flow are separate:
 
 - **Speed** is physical motion, reported as `STALLING`, `GLIDING`, `FAST`, `FLYING`, or `BLASTING` and reinforced by wake, spray, parallax, animation, and audio.
-- **Flow** is the run's combo/style state. Direction changes, varied tricks, clean landings, wildlife moments, and sustained committed surfing build it; repetition, stalling, wobble, and wipeouts reduce it.
+- **Flow** is the run's combo/style state. Valid full carves, timed pumps, direction changes, varied tricks, clean landings, and wildlife moments build it. A strong line can briefly sustain earned Flow, but passive riding, repetition, stalling, wobble, and wipeouts reduce it.
 
 Simple Controls buffer one Trick request into the aerial context, choose an eligible move, fall back to a readable grab when a large move no longer fits, and begin helping the board toward the nearest valid landing tangent late in descent. Advanced Controls retain direct on-wave maneuvers and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
+
+Fresh profiles receive a six-step in-play **Surf School**: drop, carve, launch, rotate, trick, and land. Each lesson advances only after the physical action succeeds, persists until learned, and can be armed again from Settings.
 
 ## A living coast
 
@@ -67,7 +69,7 @@ Golden Coast, Twilight Glass, and Stormbreak share fair gameplay geometry while 
 
 ## Local art pipeline
 
-The static game includes six condition backgrounds and 11 compact generated atlas families for wave-breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the latest wave source is a 1024 x 1024 polish pass and the other selected families are 1280 x 720. `tools/art/build-grok-assets.py` deterministically removes chroma, isolates organic foam from the wave sheet, extracts cells, downsamples, sharpens, quantizes, and rebuilds the transparent atlases under `assets/generated`.
+The static game includes six condition backgrounds and 12 compact generated atlas families for four-stage wave progression, modular breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the modular wave source is 1024 x 1024, the staged swell/pitch/curl/collapse source is 1280 x 720, and the other selected sheets are 1280 x 720. `tools/art/build-grok-assets.py` deterministically validates source hashes, removes connected chroma, extracts cells, downsamples, quantizes, and rebuilds the transparent atlases under `assets/generated`.
 
 Every atlas is optional. `js/asset-loader.js` validates each family independently, and the Canvas renderer keeps a local code-authored fallback when one is absent or invalid. The browser never calls Grok, Blender, an image API, a CDN, or a remote asset host. Exact prompts, selections, source hashes, and output dimensions are recorded in [Grok asset provenance](docs/GROK-ASSET-PROVENANCE.md).
 
@@ -79,7 +81,7 @@ npm run check
 git diff --check
 ```
 
-The final native suite passes **93/93 tests**, and the syntax gate checks **26 JavaScript modules**. The refreshed real-browser gallery contains **112 deterministic 1280 x 720 captures**; its reviewed [production contact sheet](docs/images/qa-contact-sheet.png) covers controls, bidirectional movement, curl states, air/tricks, wildlife, traffic, couriers, races, powerups, Fleet Airshow, all boards/conditions, and access modes. See [Validation results](docs/TEST-RESULTS.md) and [QA matrix](docs/QA.md).
+The native suite passes **116/116 tests**, and the syntax gate checks **27 JavaScript modules**. The canonical real-browser gallery contains **112 deterministic 1280 x 720 captures**; the current wave/mastery pass additionally has real-browser motion, console, lifecycle, and true 390 x 844 device-emulation checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), and [Responsive QA](docs/RESPONSIVE-QA.md).
 
 ## Static deployment and integration
 
