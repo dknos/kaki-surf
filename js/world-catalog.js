@@ -6,6 +6,7 @@ export const WORLD_LAYER_CONFIG = Object.freeze({
     parallax: 0.08,
     interval: Object.freeze([4.8, 8.2]),
     yRange: Object.freeze([48, 78]),
+    waterYRange: Object.freeze([73, 78]),
     cullMargin: 72,
   }),
   mid: Object.freeze({
@@ -13,6 +14,7 @@ export const WORLD_LAYER_CONFIG = Object.freeze({
     parallax: 0.32,
     interval: Object.freeze([3.2, 6.4]),
     yRange: Object.freeze([34, 91]),
+    waterYRange: Object.freeze([82, 94]),
     cullMargin: 82,
   }),
   near: Object.freeze({
@@ -20,6 +22,7 @@ export const WORLD_LAYER_CONFIG = Object.freeze({
     parallax: 0.88,
     interval: Object.freeze([7.5, 12.5]),
     yRange: Object.freeze([24, 142]),
+    waterYRange: Object.freeze([92, 112]),
     cullMargin: 96,
   }),
 });

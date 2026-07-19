@@ -5,19 +5,17 @@ import { drawAtlasFrame } from "./asset-drawing.js";
 const EDGE_STEPS = Object.freeze([0, 1, 0, -1, 0, 2, 1, 0, -2, -1, 1, 0, 2, 0, -1, 0, 1, -2, 0, 1, 0, -1, 2, 1]);
 const RIBBON_LENGTHS = Object.freeze([8, 15, 5, 22, 11, 18, 7, 26, 13, 9, 20, 6, 17, 12, 24, 10]);
 const RIBBON_GAPS = Object.freeze([13, 7, 19, 11, 5, 17, 9, 21, 8, 15, 6, 18, 10, 23, 12, 7]);
-const CURL_WHITEWATER = Object.freeze([
-  [-72, 7, 28, 3], [-55, 13, 35, 4], [-82, 20, 24, 3], [-64, 27, 42, 4],
-  [-89, 36, 31, 4], [-69, 45, 48, 5], [-94, 57, 37, 4], [-76, 68, 55, 5],
-  [-101, 82, 42, 5], [-81, 94, 59, 5], [-105, 108, 51, 6], [-84, 123, 63, 6],
-]);
-const CURL_FINGERS = Object.freeze([
-  [-30, 8, 17, 3], [-25, 18, 11, 3], [-31, 30, 19, 4], [-22, 44, 12, 3],
-  [-29, 57, 16, 4], [-20, 72, 10, 3], [-27, 88, 15, 4], [-18, 105, 9, 3],
-]);
 
 /** Pure bridge used by renderer tests to prove the visual seam is canonical. */
 export function powerSeamFaceAt(wave, x) {
   return wave.powerFaceAt(x);
+}
+
+export function waveVisualTravel(wave) {
+  const signed = Number(wave?.worldTravel);
+  if (Number.isFinite(signed)) return signed;
+  const fallback = Number(wave?.travel);
+  return Number.isFinite(fallback) ? fallback : 0;
 }
 
 export function waveGuideAt(wave, player, board, options = {}) {
@@ -43,113 +41,108 @@ export function drawLayeredWave(ctx, simulation, palette, settings, time, condit
   ctx.fillStyle = palette.waterDeep;
   ctx.fill();
 
-  drawRampBand(ctx, wave, 0.015, 0.78, palette.water, 5);
-  drawRampBand(ctx, wave, 0.015, 0.43, palette.waterLight, 13);
-  drawRampBand(ctx, wave, 0.01, 0.17, mixTone(palette.waterLight, palette.crest, conditionId), 19);
-  drawDeepSwellMasses(ctx, wave, palette, time, settings, speedRatio, momentum);
-  drawCurrentRibbons(ctx, wave, palette, time, settings, speedRatio, momentum);
-  drawPowerSeam(ctx, wave, player, palette, time, settings);
+  drawRampBand(ctx, wave, 0.015, 0.78, palette.water);
+  drawRampBand(ctx, wave, 0.015, 0.43, palette.waterLight);
+  drawRampBand(ctx, wave, 0.01, 0.17, mixTone(palette.waterLight, palette.crest, conditionId));
+  drawSwellContours(ctx, wave, palette, settings, speedRatio, momentum);
+  drawFaceGlints(ctx, wave, palette, settings, speedRatio, momentum);
+  drawPowerSeam(ctx, wave, player, palette, settings);
   drawCurlMass(ctx, wave, palette, time, conditionId, settings, assets);
-  drawCrestAndLip(ctx, wave, player, palette, time, conditionId, settings, speedRatio, momentum);
+  drawCrestAndLip(ctx, wave, player, palette, conditionId, settings, speedRatio, momentum);
   drawWaveReadAssist(ctx, wave, player, simulation.board, palette, settings, time);
 }
 
 function traceWaveFace(ctx, wave, topFace, bottomFace, start = 0, end = LOGICAL_WIDTH) {
   ctx.beginPath();
   ctx.moveTo(start, Math.round(wave.ridingY(start, topFace)));
-  for (let x = start; x <= end; x += 4) ctx.lineTo(x, Math.round(wave.ridingY(x, topFace)));
-  for (let x = end; x >= start; x -= 4) ctx.lineTo(x, Math.round(wave.ridingY(x, bottomFace)));
+  for (let x = start; x <= end; x += 2) ctx.lineTo(x, Math.round(wave.ridingY(x, topFace)));
+  for (let x = end; x >= start; x -= 2) ctx.lineTo(x, Math.round(wave.ridingY(x, bottomFace)));
   ctx.closePath();
 }
 
-function traceIrregularWaveFace(ctx, wave, topFace, bottomFace, seed) {
-  ctx.beginPath();
-  for (let x = 0; x <= LOGICAL_WIDTH; x += 2) {
-    const index = (Math.floor(x / 4) + seed) % EDGE_STEPS.length;
-    const face = clamp(topFace + EDGE_STEPS[index] * 0.0045, 0, 1.36);
-    const y = Math.round(wave.ridingY(x, face));
-    if (x === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  for (let x = LOGICAL_WIDTH; x >= 0; x -= 2) {
-    const index = (Math.floor(x / 5) + seed * 3 + 7) % EDGE_STEPS.length;
-    const face = clamp(bottomFace + EDGE_STEPS[index] * 0.007, 0, 1.36);
-    ctx.lineTo(x, Math.round(wave.ridingY(x, face)));
-  }
-  ctx.closePath();
-}
-
-function drawRampBand(ctx, wave, top, bottom, color, seed) {
-  traceIrregularWaveFace(ctx, wave, top, bottom, seed);
+function drawRampBand(ctx, wave, top, bottom, color) {
+  traceWaveFace(ctx, wave, top, bottom);
   ctx.fillStyle = color;
   ctx.fill();
 }
 
-function drawDeepSwellMasses(ctx, wave, p, time, settings, speedRatio, momentum) {
-  const clock = settings.reducedMotion ? 0 : wave.travel * (0.05 + speedRatio * 0.045) + time * momentum * 8;
+function drawSwellContours(ctx, wave, p, settings, speedRatio, momentum) {
+  const clock = settings.reducedMotion
+    ? 0
+    : waveVisualTravel(wave) * (0.035 + speedRatio * 0.028);
   ctx.save();
-  ctx.globalAlpha = settings.highContrast ? 0.42 : 0.3;
-  for (let lane = 0; lane < 5; lane += 1) {
-    const face = 0.55 + lane * 0.145;
-    for (let segment = 0; segment < 8; segment += 1) {
+  ctx.globalAlpha = settings.highContrast ? 0.3 : 0.18;
+  ctx.lineWidth = 1;
+  for (let lane = 0; lane < 4; lane += 1) {
+    const face = 0.58 + lane * 0.18;
+    ctx.strokeStyle = lane % 2 === 0 ? p.deepInk : p.waterLight;
+    for (let segment = 0; segment < 6; segment += 1) {
       const pattern = (segment + lane * 5) % RIBBON_LENGTHS.length;
-      const travel = segment * 67 + lane * 29 + RIBBON_GAPS[pattern] - clock * (0.24 + lane * 0.035);
-      const x = Math.round(((travel % 520) + 520) % 520) - 72;
-      if (x <= wave.curlX + 12) continue;
-      const length = 28 + RIBBON_LENGTHS[pattern] + Math.round(momentum * 12);
+      const travel = segment * 89 + lane * 31 + RIBBON_GAPS[pattern] - clock * (0.31 + lane * 0.04);
+      const x = Math.round(((travel % 520) + 520) % 520) - 68;
+      if (x <= wave.curlX + 18) continue;
+      const length = 12 + (RIBBON_LENGTHS[pattern] % 12) + Math.round(momentum * 4);
       const y = Math.round(wave.ridingY(x, face)) + EDGE_STEPS[(pattern + lane) % EDGE_STEPS.length];
-      ctx.fillStyle = lane % 2 === 0 ? p.deepInk : p.waterDeep;
-      ctx.fillRect(x, y, length, 3);
-      ctx.fillRect(x + 9, y + 3, Math.max(7, length - 19), 2);
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1);
+      ctx.quadraticCurveTo(x + length * 0.48, y - 2 - lane % 2, x + length, y);
+      ctx.stroke();
     }
   }
   ctx.restore();
 }
 
-function drawCurrentRibbons(ctx, wave, p, time, settings, speedRatio, momentum) {
-  const clock = settings.reducedMotion ? 0 : wave.travel * (0.11 + speedRatio * 0.14) + time * (5 + momentum * 16);
-  for (let lane = 0; lane < 9; lane += 1) {
-    const face = 0.14 + lane * 0.105;
-    for (let segment = 0; segment < 12; segment += 1) {
+function drawFaceGlints(ctx, wave, p, settings, speedRatio, momentum) {
+  const clock = settings.reducedMotion
+    ? 0
+    : waveVisualTravel(wave) * (0.075 + speedRatio * 0.065);
+  ctx.save();
+  ctx.globalAlpha = settings.highContrast ? 0.62 : 0.38;
+  for (let lane = 0; lane < 6; lane += 1) {
+    const face = 0.17 + lane * 0.15;
+    for (let segment = 0; segment < 7; segment += 1) {
       const pattern = (segment * 3 + lane * 7) % RIBBON_LENGTHS.length;
-      const travel = segment * 43 + lane * 17 + RIBBON_GAPS[pattern] - clock * (0.55 + lane * 0.035);
-      const x = Math.round(((travel % 470) + 470) % 470) - 43;
-      if (x <= wave.curlX + 24) continue;
+      const travel = segment * 71 + lane * 23 + RIBBON_GAPS[pattern] - clock * (0.42 + lane * 0.035);
+      const x = Math.round(((travel % 480) + 480) % 480) - 48;
+      if (x <= wave.curlX + 28) continue;
       const guide = wave.speedPotential(x, face, { breaking: false });
       const nearSeam = Math.abs(face - powerSeamFaceAt(wave, x)) < 0.1;
-      const length = RIBBON_LENGTHS[pattern] + Math.round(speedRatio * 6 + guide.potential * 5);
       const y = Math.round(wave.ridingY(x, face)) + EDGE_STEPS[(pattern + lane) % EDGE_STEPS.length];
-      ctx.fillStyle = nearSeam ? p.crest : lane > 5 ? p.waterLight : lane % 3 === 0 ? p.foamShade : p.crest;
-      ctx.fillRect(x, y, length, 1);
-      if (length > 13) ctx.fillRect(x + 4, y + 2, Math.max(3, length - 10), 1);
-      if (guide.potential > 0.78 && pattern % 4 === 0) ctx.fillRect(x + length - 2, y - 1, 2, 1);
+      ctx.fillStyle = nearSeam ? p.crest : lane >= 4 ? p.waterLight : lane % 3 === 0 ? p.foamShade : p.crest;
+      const size = 2 + (pattern % 4) + Math.round((speedRatio + guide.potential) * 0.75);
+      ctx.fillRect(x, y, size, 1);
+      ctx.fillRect(x + Math.max(1, size - 2), y - 1, 2, 1);
+      if (momentum > 0.74 && pattern % 4 === 0) ctx.fillRect(x + size + 2, y + 1, 1, 1);
     }
   }
+  ctx.restore();
 }
 
-function drawPowerSeam(ctx, wave, player, p, time, settings) {
+function drawPowerSeam(ctx, wave, player, p, settings) {
   const strong = Boolean(settings.highContrast);
   const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
   const start = Math.max(0, Math.floor(wave.curlX + 49));
-  const phase = settings.reducedMotion ? 0 : Math.floor((wave.travel * 0.4 + time * (13 + momentum * 20)) % 19);
-  for (let index = 0; index < 18; index += 1) {
+  const phase = settings.reducedMotion
+    ? 0
+    : Math.floor((waveVisualTravel(wave) * (0.22 + momentum * 0.16)) % 31);
+  ctx.save();
+  ctx.globalAlpha = strong ? 0.76 : 0.3;
+  for (let index = 0; index < 12; index += 1) {
     const pattern = (index * 5 + 3) % RIBBON_LENGTHS.length;
-    const x = start + index * 27 + EDGE_STEPS[(pattern + index) % EDGE_STEPS.length] * 2 - phase;
+    const x = start + index * 36 + EDGE_STEPS[(pattern + index) % EDGE_STEPS.length] * 2 - phase;
     if (x < start || x >= LOGICAL_WIDTH) continue;
     const face = powerSeamFaceAt(wave, x);
     const y = Math.round(wave.ridingY(x, face));
-    const length = 4 + (RIBBON_LENGTHS[pattern] % 7) + Math.round(momentum * 4);
     if (strong) {
       ctx.fillStyle = p.waterDeep;
-      ctx.fillRect(x - 1, y + 1, length + 2, 1);
+      ctx.fillRect(x - 1, y - 2, 6, 6);
     }
-    ctx.globalAlpha = strong ? 0.78 : 0.34;
     ctx.fillStyle = index % 3 === 0 ? p.foam : p.crest;
-    ctx.fillRect(x, y, length, 1);
-    ctx.fillRect(x + 2, y - 1, Math.max(2, length - 5), 1);
-    if (momentum > 0.72 && index % 5 === 0) ctx.fillRect(x + length - 2, y - 3, 2, 2);
+    ctx.fillRect(x, y - 1, 4 + Math.round(momentum * 2), 2);
+    ctx.fillRect(x + 2, y - 3, 2, 1);
+    if (momentum > 0.72 && index % 4 === 0) ctx.fillRect(x + 5, y - 4, 2, 2);
   }
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawCurlMass(ctx, wave, p, time, conditionId, settings, assets) {
@@ -157,150 +150,111 @@ function drawCurlMass(ctx, wave, p, time, conditionId, settings, assets) {
   const crest = Math.round(wave.crestY(curl));
   const pulse = settings.reducedMotion ? 0 : EDGE_STEPS[Math.floor(time * 7) % EDGE_STEPS.length];
 
-  if (drawGeneratedCurl(ctx, wave, p, time, settings, assets, curl, crest, pulse)) return;
-
-  // Connected foam islands create mass without the old horizontal barcode.
-  ctx.fillStyle = p.foamShade;
-  for (let index = 0; index < CURL_WHITEWATER.length; index += 1) {
-    const cluster = CURL_WHITEWATER[index];
-    const x = curl + cluster[0] + (index % 3 === 0 ? pulse : 0);
-    const y = crest + cluster[1];
-    ctx.fillRect(x, y, cluster[2], cluster[3]);
-    ctx.fillRect(x + 5, y - 2, Math.max(4, cluster[2] - 13), 2);
-    if (index % 3 === 1) {
-      ctx.fillStyle = p.foam;
-      ctx.fillRect(x + 2, y, Math.max(5, cluster[2] - 9), 2);
-      ctx.fillStyle = p.foamShade;
-    }
-  }
-
-  // A glassy folding face surrounds a smaller, readable tube shadow.
+  // One continuous silhouette owns the curl. Generated art is restricted to
+  // foam accents below, so atlas cell edges can never become wave geometry.
   ctx.save();
-  ctx.globalAlpha = settings.highContrast ? 1 : 0.86;
+  ctx.globalAlpha = settings.highContrast ? 1 : 0.88;
   ctx.fillStyle = p.waterDeep;
   ctx.beginPath();
-  ctx.moveTo(curl - 35, crest + 1);
-  ctx.lineTo(curl + 10, crest + 2);
-  ctx.lineTo(curl + 25 + pulse, crest + 19);
-  ctx.lineTo(curl + 20, crest + 44);
-  ctx.lineTo(curl + 7, crest + 70);
-  ctx.lineTo(curl - 13, crest + 92);
-  ctx.lineTo(curl - 37, LOGICAL_HEIGHT - 5);
-  ctx.lineTo(curl - 51, LOGICAL_HEIGHT - 5);
-  ctx.lineTo(curl - 36, crest + 75);
-  ctx.lineTo(curl - 28, crest + 36);
+  ctx.moveTo(curl - 92, LOGICAL_HEIGHT);
+  ctx.bezierCurveTo(curl - 80, crest + 112, curl - 84, crest + 35, curl - 49, crest + 4);
+  ctx.bezierCurveTo(curl - 23, crest - 14, curl + 19, crest - 8, curl + 31 + pulse, crest + 18);
+  ctx.bezierCurveTo(curl + 42, crest + 44, curl + 16, crest + 72, curl - 5, crest + 91);
+  ctx.bezierCurveTo(curl - 29, crest + 113, curl - 36, LOGICAL_HEIGHT - 17, curl - 38, LOGICAL_HEIGHT);
   ctx.closePath();
   ctx.fill();
 
-  ctx.globalAlpha = settings.highContrast ? 0.82 : 0.55;
+  ctx.globalAlpha = settings.highContrast ? 0.9 : 0.74;
   ctx.fillStyle = p.waterLight;
   ctx.beginPath();
-  ctx.moveTo(curl - 27, crest + 3);
-  ctx.lineTo(curl + 8, crest + 4);
-  ctx.lineTo(curl + 18 + pulse, crest + 20);
-  ctx.lineTo(curl + 9, crest + 43);
-  ctx.lineTo(curl - 10, crest + 62);
-  ctx.lineTo(curl - 26, crest + 61);
+  ctx.moveTo(curl - 82, LOGICAL_HEIGHT);
+  ctx.bezierCurveTo(curl - 68, crest + 108, curl - 72, crest + 37, curl - 43, crest + 8);
+  ctx.bezierCurveTo(curl - 18, crest - 9, curl + 14, crest - 3, curl + 24 + pulse, crest + 17);
+  ctx.bezierCurveTo(curl + 30, crest + 34, curl + 14, crest + 53, curl - 1, crest + 61);
+  ctx.bezierCurveTo(curl + 6, crest + 45, curl + 4, crest + 30, curl - 8, crest + 22);
+  ctx.bezierCurveTo(curl - 25, crest + 10, curl - 43, crest + 18, curl - 53, crest + 40);
+  ctx.bezierCurveTo(curl - 67, crest + 72, curl - 50, crest + 117, curl - 44, LOGICAL_HEIGHT);
   ctx.closePath();
   ctx.fill();
 
-  ctx.globalAlpha = settings.highContrast ? 1 : 0.82;
+  ctx.globalAlpha = settings.highContrast ? 1 : 0.9;
   ctx.fillStyle = p.deepInk;
   ctx.beginPath();
-  ctx.moveTo(curl - 9, crest + 9);
-  ctx.lineTo(curl + 7, crest + 10);
-  ctx.lineTo(curl + 14 + pulse, crest + 23);
-  ctx.lineTo(curl + 7, crest + 45);
-  ctx.lineTo(curl - 7, crest + 63);
-  ctx.lineTo(curl - 19, crest + 72);
-  ctx.lineTo(curl - 24, crest + 61);
-  ctx.lineTo(curl - 14, crest + 35);
+  ctx.moveTo(curl - 22, crest + 10);
+  ctx.bezierCurveTo(curl + 1, crest + 4, curl + 18, crest + 15, curl + 17 + pulse, crest + 30);
+  ctx.bezierCurveTo(curl + 16, crest + 44, curl + 1, crest + 55, curl - 13, crest + 62);
+  ctx.bezierCurveTo(curl - 1, crest + 47, curl, crest + 33, curl - 10, crest + 25);
+  ctx.bezierCurveTo(curl - 20, crest + 17, curl - 32, crest + 20, curl - 41, crest + 30);
+  ctx.bezierCurveTo(curl - 36, crest + 19, curl - 31, crest + 13, curl - 22, crest + 10);
   ctx.closePath();
   ctx.fill();
+
+  ctx.globalAlpha = settings.highContrast ? 0.78 : 0.5;
+  ctx.strokeStyle = p.water;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(curl - 71, crest + 47);
+  ctx.bezierCurveTo(curl - 57, crest + 24, curl - 42, crest + 15, curl - 25, crest + 15);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = p.foam;
+  ctx.lineWidth = settings.highContrast ? 5 : 4;
+  ctx.beginPath();
+  ctx.moveTo(curl - 62, crest + 12);
+  ctx.bezierCurveTo(curl - 43, crest - 5, curl - 17, crest - 8, curl + 6, crest + 2);
+  ctx.bezierCurveTo(curl + 18, crest + 7, curl + 24, crest + 13, curl + 25 + pulse, crest + 20);
+  ctx.stroke();
   ctx.restore();
 
   if (conditionId === "twilightGlass") {
-    ctx.fillStyle = p.violet;
-    ctx.fillRect(curl - 24, crest + 8, 25, 2);
+    ctx.strokeStyle = p.violet;
   } else if (conditionId === "stormbreak") {
-    ctx.fillStyle = p.haze;
-    ctx.fillRect(curl - 27, crest + 6, 19, 2);
+    ctx.strokeStyle = p.haze;
+  } else {
+    ctx.strokeStyle = p.crest;
   }
-
-  // Inward hooks and light beads communicate the critical pocket by shape.
-  for (let index = 0; index < CURL_FINGERS.length; index += 1) {
-    const finger = CURL_FINGERS[index];
-    const x = curl + finger[0] + (index % 2 === 0 ? pulse : 0);
-    const y = crest + finger[1];
-    ctx.fillStyle = index % 3 === 0 ? p.foam : p.foamShade;
-    ctx.fillRect(x, y, finger[2], finger[3]);
-    ctx.fillRect(x + finger[2] - 4, y + finger[3], 4, 2);
-  }
-
-  ctx.fillStyle = p.crest;
-  ctx.fillRect(curl - 5, crest + 17, 8, 1);
-  ctx.fillRect(curl - 10, crest + 34, 6, 1);
-  ctx.fillRect(curl - 15, crest + 51, 5, 1);
-}
-
-function drawGeneratedCurl(ctx, wave, p, time, settings, assets, curl, crest, pulse) {
-  const hasAtlas = Boolean(assets?.generated?.waveBreaker && assets?.generatedManifest?.waveBreaker);
-  if (!hasAtlas) return false;
-
-  // Simulation geometry still owns the danger boundary; generated modular
-  // water pieces supply the readable feather, fold, impact, and recovery.
   ctx.save();
-  ctx.globalAlpha = settings.highContrast ? 0.92 : 0.74;
-  ctx.fillStyle = p.waterDeep;
+  ctx.globalAlpha = 0.72;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(curl - 39, crest + 3);
-  ctx.bezierCurveTo(curl + 30, crest - 5, curl + 34, crest + 29, curl + 9, crest + 56);
-  ctx.bezierCurveTo(curl - 15, crest + 81, curl - 31, crest + 112, curl - 43, LOGICAL_HEIGHT);
-  ctx.lineTo(curl - 78, LOGICAL_HEIGHT);
-  ctx.bezierCurveTo(curl - 55, crest + 105, curl - 48, crest + 38, curl - 39, crest + 3);
-  ctx.fill();
+  ctx.moveTo(curl - 43, crest + 13);
+  ctx.quadraticCurveTo(curl - 24, crest + 4, curl - 7, crest + 10);
+  ctx.stroke();
   ctx.restore();
 
-  const phase = settings.reducedMotion ? 0 : Math.floor((time * 5 + wave.pressure * 7) % 4);
-  drawAtlasFrame(ctx, assets, "waveBreaker", phase < 2 ? "crestFeatherA" : "crestFeatherB", curl - 5 + pulse, crest - 5, {
-    scale: 0.82,
-    scaleX: 1.14,
-    alpha: 0.94,
-  });
-  drawAtlasFrame(ctx, assets, "waveBreaker", "risingCurl", curl - 3, crest + 23, {
-    scale: 1.05,
-    scaleX: 1.12,
-    scaleY: 1.22,
-  });
-  drawAtlasFrame(ctx, assets, "waveBreaker", "impact", curl - 29 - pulse, crest + 70, {
-    scale: 1.08,
-    scaleX: 1.12,
-  });
-  drawAtlasFrame(ctx, assets, "waveBreaker", "whitewaterChurn", curl - 35, crest + 112, {
-    scale: 1.14,
-    scaleX: 1.22,
-  });
-  drawAtlasFrame(ctx, assets, "waveBreaker", "foamTendrils", curl + 12 + pulse, crest + 91, {
-    scale: 0.86,
-    scaleY: 1.18,
-    alpha: 0.9,
-  });
-  if (!settings.reducedMotion) {
-    drawAtlasFrame(ctx, assets, "waveBreaker", "sprayBurst", curl + 8, crest + 4 - phase * 2, {
-      scale: 0.72,
-      alpha: 0.72,
-    });
-    drawAtlasFrame(ctx, assets, "waveBreaker", "seaMist", curl + 22, crest + 49 + pulse, {
-      scale: 0.86,
-      scaleX: 1.2,
-      alpha: 0.42,
-    });
-  }
-  return true;
+  drawGeneratedCurlAccents(ctx, wave, time, settings, assets, curl, crest, pulse);
 }
 
-function drawCrestAndLip(ctx, wave, player, p, time, conditionId, settings, speedRatio, momentum) {
-  const phase = settings.reducedMotion ? 0 : Math.floor((time * 9 + wave.travel * 0.12) % 31);
+function drawGeneratedCurlAccents(ctx, wave, time, settings, assets, curl, crest, pulse) {
+  const hasAtlas = Boolean(assets?.generated?.waveBreaker && assets?.generatedManifest?.waveBreaker);
+  if (!hasAtlas || settings.highContrast) return;
+
+  const phase = settings.reducedMotion ? 0 : Math.floor((time * 5 + wave.pressure * 7) % 4);
+  drawAtlasFrame(ctx, assets, "waveBreaker", phase < 2 ? "crestFeatherB" : "risingCurl", curl - 13 + pulse, crest + 17, {
+    scale: 0.76,
+    scaleX: 1.02,
+    alpha: 0.68,
+  });
+  if (!settings.reducedMotion) {
+    drawAtlasFrame(ctx, assets, "waveBreaker", "crestFeatherA", curl - 17, crest - 9 - phase, {
+      scale: 0.78,
+      alpha: 0.62,
+    });
+    drawAtlasFrame(ctx, assets, "waveBreaker", "seaMist", curl + 9, crest + 47 + pulse, {
+      scale: 0.52,
+      scaleX: 1.1,
+      alpha: 0.16,
+    });
+  }
+}
+
+function drawCrestAndLip(ctx, wave, player, p, conditionId, settings, speedRatio, momentum) {
+  const phase = settings.reducedMotion
+    ? 0
+    : Math.floor((waveVisualTravel(wave) * 0.14) % 31);
   ctx.fillStyle = p.crest;
   for (let x = 0; x < LOGICAL_WIDTH; x += 2) {
     const y = Math.round(wave.crestY(x));
@@ -311,10 +265,10 @@ function drawCrestAndLip(ctx, wave, player, p, time, conditionId, settings, spee
   }
 
   ctx.fillStyle = p.foam;
-  for (let index = 0; index < 30; index += 1) {
+  for (let index = 0; index < 20; index += 1) {
     const pattern = (index * 7 + 2) % RIBBON_LENGTHS.length;
-    const travel = index * 23 + EDGE_STEPS[pattern] * 3 - phase;
-    const x = Math.round(((travel % 430) + 430) % 430) - 22;
+    const travel = index * 34 + EDGE_STEPS[pattern] * 3 - phase;
+    const x = Math.round(((travel % 450) + 450) % 450) - 26;
     if (x < 0 || x >= LOGICAL_WIDTH) continue;
     const y = Math.round(wave.crestY(x));
     const length = 5 + (RIBBON_LENGTHS[pattern] % 9) + Math.round(speedRatio * 3);

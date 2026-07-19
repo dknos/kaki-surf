@@ -17,6 +17,7 @@ import {
   sweptCircleContact,
   worldXForScreenX,
 } from "../js/world-collision.js";
+import { trafficScreenDirection } from "../js/world-visuals.js";
 import { WorldSimulation } from "../js/world.js";
 
 const STEP = 1 / 120;
@@ -76,6 +77,38 @@ test("catalog fixes bounded layer pools and only exposes the final three powerup
   for (const kind of ["propPlane", "seaplane", "helicopter", "bannerPlane"]) {
     assert.equal(TRAFFIC_CATALOG[kind].aircraft, true);
   }
+});
+
+test("watercraft stay in water bands and face their projected screen motion", () => {
+  const world = new WorldSimulation({ seed: 0x0cea51de });
+  const speedboat = world.spawnTraffic("speedboat", {
+    layer: "mid",
+    screenX: 192,
+    y: 30,
+    speed: 0,
+    duration: 20,
+  });
+  const sailboat = world.spawnTraffic("sailboat", {
+    layer: "far",
+    screenX: 192,
+    y: 120,
+    speed: 0,
+    duration: 20,
+  });
+  assert.equal(speedboat.y, WORLD_LAYER_CONFIG.mid.waterYRange[0]);
+  assert.equal(sailboat.y, WORLD_LAYER_CONFIG.far.waterYRange[1]);
+
+  const projectedBoat = {
+    previousWorldX: 100,
+    worldX: 101,
+    direction: 1,
+  };
+  assert.equal(trafficScreenDirection(projectedBoat, {
+    context: { previousCameraWorldX: 0, cameraWorldX: 0 },
+  }, "mid"), 1, "self-propelled screen motion faces right");
+  assert.equal(trafficScreenDirection(projectedBoat, {
+    context: { previousCameraWorldX: 0, cameraWorldX: 10 },
+  }, "mid"), -1, "an overtaken boat faces its apparent leftward motion");
 });
 
 test("spatial helpers catch swept contacts, invert projection, and distinguish reachable paths", () => {

@@ -2,7 +2,7 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { drawPixelText } from "./pixel-font.js";
 import { drawBoardSprite, drawBoardWake, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
-import { drawLayeredWave, waveGuideAt } from "./wave-visuals.js";
+import { drawLayeredWave, waveGuideAt, waveVisualTravel } from "./wave-visuals.js";
 import {
   drawActivePowerupHud,
   drawAtlasFrame,
@@ -306,12 +306,13 @@ export class KakiRenderer {
     ctx.fillRect(0, 66, LOGICAL_WIDTH, 15);
 
     drawPixelSun(ctx, 318, 28, 16, p.sun, p.gold);
-    const cloudShift = Math.floor((simulation.wave.travel * 0.018) % 440);
+    const visualTravel = waveVisualTravel(simulation.wave);
+    const cloudShift = Math.floor((visualTravel * 0.018) % 440);
     drawCloud(ctx, 58 - cloudShift * 0.12, 29, p.white, p.haze);
     drawCloud(ctx, 212 - cloudShift * 0.06, 18, p.white, p.haze);
     drawCloud(ctx, 430 - cloudShift * 0.1, 42, p.white, p.haze);
 
-    const islandShift = Math.floor((simulation.wave.travel * 0.035) % 450);
+    const islandShift = Math.floor((visualTravel * 0.035) % 450);
     ctx.fillStyle = p.distant;
     drawSteppedHill(ctx, -24 - islandShift * 0.06, 71, 120, 15);
     drawSteppedHill(ctx, 250 - islandShift * 0.04, 73, 152, 12);
@@ -343,7 +344,7 @@ export class KakiRenderer {
       const y = 8 + (index * 19) % 43;
       ctx.fillRect(x, y, index % 4 === 0 ? 2 : 1, 1);
     }
-    const shift = Math.floor(simulation.wave.travel * 0.025) % 460;
+    const shift = Math.floor(waveVisualTravel(simulation.wave) * 0.025) % 460;
     ctx.fillStyle = p.distant;
     drawSteppedHill(ctx, -48 - shift * 0.025, 72, 178, 10);
     drawSteppedHill(ctx, 226 - shift * 0.018, 70, 190, 12);
@@ -362,7 +363,7 @@ export class KakiRenderer {
     ctx.fillRect(0, 27, LOGICAL_WIDTH, 38);
     ctx.fillStyle = p.distant;
     ctx.fillRect(0, 65, LOGICAL_WIDTH, 15);
-    const shift = Math.floor((simulation.wave.travel * 0.02 + (this.settings.reducedMotion ? 0 : this.time * 5)) % 430);
+    const shift = Math.floor((waveVisualTravel(simulation.wave) * 0.02 + (this.settings.reducedMotion ? 0 : this.time * 5)) % 430);
     drawStormCloud(ctx, 24 - shift * 0.08, 16, p.deepInk, p.distant);
     drawStormCloud(ctx, 178 - shift * 0.04, 7, p.ink, p.distant);
     drawStormCloud(ctx, 342 - shift * 0.07, 22, p.deepInk, p.distant);
@@ -385,29 +386,42 @@ export class KakiRenderer {
     ctx.fillStyle = p.waterDeep;
     ctx.fillRect(0, 78, LOGICAL_WIDTH, LOGICAL_HEIGHT - 78);
 
-    const clock = this.settings.reducedMotion ? 0 : simulation.wave.travel + this.time * (6 + speedRatio * 18);
+    const clock = this.settings.reducedMotion
+      ? 0
+      : waveVisualTravel(simulation.wave) * (0.18 + speedRatio * 0.12);
     const horizonColor = this.conditionId === "twilightGlass" ? p.violet : this.conditionId === "stormbreak" ? p.foamShade : p.crest;
-    ctx.fillStyle = horizonColor;
-    for (let segment = 0; segment < 18; segment += 1) {
-      const length = 7 + ((segment * 11 + 5) % 19);
-      const x = Math.round(((segment * 31 - clock * 0.018) % 430 + 430) % 430) - 24;
+    ctx.save();
+    ctx.strokeStyle = horizonColor;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = this.settings.highContrast ? 0.9 : 0.68;
+    for (let segment = 0; segment < 12; segment += 1) {
+      const length = 7 + ((segment * 7 + 5) % 11);
+      const x = Math.round(((segment * 43 - clock * 0.12) % 450 + 450) % 450) - 28;
       const y = 79 + ((segment * 7) % 3);
-      ctx.fillRect(x, y, length, 1);
-      if (segment % 4 === 0) ctx.fillRect(x + 3, y - 1, Math.max(2, length - 8), 1);
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1);
+      ctx.quadraticCurveTo(x + length * 0.5, y - 2, x + length, y);
+      ctx.stroke();
     }
 
-    for (let row = 0; row < 6; row += 1) {
-      const baseY = 86 + row * 9;
-      const rowClock = clock * (0.026 + row * 0.006);
+    ctx.globalAlpha = this.settings.highContrast ? 0.42 : 0.22;
+    for (let row = 0; row < 5; row += 1) {
+      const baseY = 88 + row * 13;
+      const rowClock = clock * (0.3 + row * 0.055);
       ctx.fillStyle = row < 2 ? p.waterLight : row < 4 ? p.water : p.crest;
-      for (let segment = 0; segment < 10; segment += 1) {
-        const x = Math.round(((segment * 53 + row * 19 - rowClock) % 470 + 470) % 470) - 46;
-        const length = 10 + ((segment * 13 + row * 17) % 27) + Math.round(momentum * 7);
-        const step = ((segment * 5 + row * 3) % 5) - 2;
-        ctx.fillRect(x, baseY + step, length, 1);
-        if ((segment + row) % 3 === 0) ctx.fillRect(x + 4, baseY + step + 2, Math.max(3, length - 11), 1);
+      for (let segment = 0; segment < 7; segment += 1) {
+        const x = Math.round(((segment * 73 + row * 29 - rowClock) % 500 + 500) % 500) - 58;
+        const width = 7 + ((segment * 11 + row * 7) % 13) + Math.round(momentum * 3);
+        const height = 2 + ((segment + row) % 2);
+        const y = baseY + ((segment * 5 + row * 3) % 7) - 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + width * 0.45, y - height, x + width, y + 1);
+        ctx.quadraticCurveTo(x + width * 0.55, y + height, x, y);
+        ctx.fill();
       }
     }
+    ctx.restore();
   }
 
   drawWave(simulation) {
@@ -425,20 +439,27 @@ export class KakiRenderer {
     const p = this.palette;
     const reduced = this.settings.reducedMotion;
     const fullPower = speedRatio >= 0.94;
-    const streakCount = reduced ? 5 : 7 + Math.round(intensity * 7);
-    const phase = reduced ? 0 : Math.floor((simulation.wave.travel * 0.7 + this.time * 44) % 83);
+    const streakCount = reduced ? 4 : 5 + Math.round(intensity * 5);
+    const phase = reduced
+      ? 0
+      : waveVisualTravel(simulation.wave) * (0.54 + intensity * 0.36);
     ctx.save();
-    ctx.globalAlpha = 0.34 + intensity * 0.52;
+    ctx.globalAlpha = 0.22 + intensity * 0.42;
     for (let index = 0; index < streakCount; index += 1) {
       const lane = (index * 5 + 2) % 13;
       const y = 92 + lane * 8 + ((index * 7) % 3);
-      const travel = (index * 61 + phase * (1 + index % 3)) % 470;
-      const x = LOGICAL_WIDTH - travel;
-      const length = 9 + ((index * 17) % 22) + Math.round(intensity * 16);
+      const travel = ((index * 71 - phase * (0.72 + index % 3 * 0.12)) % 480 + 480) % 480;
+      const x = travel - 42;
+      const length = 6 + ((index * 7) % 9) + Math.round(intensity * 7);
       ctx.fillStyle = fullPower && index % 4 === 0 ? p.gold : index % 3 === 0 ? p.foam : p.crest;
-      ctx.fillRect(x, y, length, 1);
-      ctx.fillRect(x + Math.round(length * 0.28), y + 2, Math.max(3, Math.round(length * 0.52)), 1);
-      if (fullPower && index % 3 === 0) ctx.fillRect(x + length - 3, y - 1, 2, 1);
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1);
+      ctx.lineTo(x + length, y - 2);
+      ctx.lineTo(x + length - 3, y + 1);
+      ctx.lineTo(x + 2, y + 3);
+      ctx.closePath();
+      ctx.fill();
+      if (fullPower && index % 3 === 0) ctx.fillRect(Math.round(x + length - 2), y - 4, 2, 2);
     }
     ctx.restore();
   }

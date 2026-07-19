@@ -14,18 +14,18 @@ npm run check
 git diff --check
 ```
 
-Final result: **88/88 tests pass** and **26 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
+Final result: **90/90 tests pass** and **26 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
 
 ## Browser capture matrix
 
 | Group | Required scenes | What must be visible | Status |
 | --- | --- | --- | --- |
 | Entry/UI | Menu, settings Simple, settings Advanced, keyboard/gamepad teaching, results | Simple selected for a fresh save; Advanced legacy mapping; no stale POWER meter or seam-required copy; score and Flow distinct | Pass |
-| Core ride | Neutral, right travel, left travel, committed reversal, downhill, four curl states, max speed, pump | Facing, board, wake, streaks, and parallax agree with direction; reversal reads as committed movement; downhill visibly accelerates | Pass |
+| Core ride | Neutral, right travel, left travel, committed reversal, downhill, four curl states, max speed, pump | Facing, board, wake, sparse water contours, and parallax agree with direction; curl has no rectangular seams; reversal reads as committed movement | Pass |
 | Air/landing | Small/medium/huge air, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Big-air scale; board/body separation; nearest valid landing tangent; signed landing direction; carry and callout hierarchy | Pass |
 | Wildlife | Dolphin approach/ride/dismount/gates, shark telegraph/near miss/contact, whale distant/breach/ramp/ride/splash, reduced variants | Minimum danger telegraph, friendly mount readability, no harmful animal reward, coherent phase silhouettes | Pass |
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, active HUD, expiration, consumption, protected event, plane drop | Unique silhouettes and labels; active effect reads without obscuring Speed/Flow; consumption and harmless misses are visible | Pass |
-| Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation, signed movement, layer ordering, readable reactive text, visible background-safe watercraft | Pass |
+| Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation, signed movement, projected facing, layer ordering, readable reactive text, and watercraft grounded in waterline bands | Pass |
 | Set piece | Carrier haze, arrival, deck activity, launch, Fleet Airshow and foam gates | Whimsical/nonmilitary identity, horizon scale, airshow hierarchy, no gameplay collision | Pass |
 | Conditions | Every board in Golden Coast, Twilight Glass, and Stormbreak; condition-specific traffic | Correct local strip, palette and readable player/world contrast | Pass |
 | Access | Touch Simple, touch Advanced, High Contrast, Reduced Motion, Reduced Flash | No clipped primary controls, hidden Simple Special until ready, readable danger and reduced effects | Pass |
@@ -40,6 +40,7 @@ Final result: **88/88 tests pass** and **26 JavaScript modules pass syntax check
 - Verify the rider does not face away from the wake after reversal, takeoff, animal dismount, or switch landing.
 - Verify the world never renders a pickup or hazard that the simulation has already culled.
 - Verify far and mid traffic stay behind the wave/player and near traffic stays decorative without covering actionable telegraphs.
+- Verify every boat hull intersects its assigned waterline and faces its projected screen motion when the camera overtakes or reverses past it.
 - Verify Speed tiers read `STALLING`, `GLIDING`, `FAST`, `FLYING`, `BLASTING`; Flow remains a separate combo/style indicator.
 - Verify Simple teaching says to drop for speed and hit the lip for air, not that a narrow seam is required.
 - Verify Reduced Motion suppresses large presentation motion without changing seeded spawns or collisions; Reduced Flash suppresses flashes without removing state cues.
@@ -47,7 +48,7 @@ Final result: **88/88 tests pass** and **26 JavaScript modules pass syntax check
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, and contact-sheet source match at 112 identifiers. Every capture exists, an exact-hash scan reports no duplicates, and the assembled sheet plus key native-size states were inspected. Rebuild deterministically with:
+The gallery scene list, capture script, and contact-sheet source match at 112 identifiers. Every capture exists; an exact-hash scan reports 109 unique renders, with only the three intentional Foam Puff/default-condition identity pairs matching. The assembled sheet plus key native-size states were inspected. Rebuild deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py

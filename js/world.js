@@ -160,7 +160,13 @@ export class WorldSimulation {
       : (options.sideRoll ?? random()) < 0.5 ? 1 : -1;
     const speed = Number.isFinite(options.speed) ? options.speed : randomBetween(random, definition.speed);
     const duration = Number.isFinite(options.duration) ? options.duration : randomBetween(random, definition.duration);
-    const y = Number.isFinite(options.y) ? options.y : randomBetween(random, layerConfig.yRange);
+    const yRange = definition.boat
+      ? layerConfig.waterYRange ?? layerConfig.yRange
+      : layerConfig.yRange;
+    const requestedY = Number.isFinite(options.y) ? options.y : randomBetween(random, yRange);
+    const y = definition.boat
+      ? clamp(requestedY, yRange[0], yRange[1])
+      : requestedY;
     const screenX = finite(options.screenX, direction > 0 ? -28 : WORLD_LIMITS.logicalWidth + 28);
     const screenVelocity = direction * Math.abs(speed);
 
@@ -750,7 +756,11 @@ export class WorldSimulation {
       layer: "mid",
       direction,
       screenX: finite(options.screenX, this.context.player.x - direction * 58),
-      y: clamp(finite(options.y, 82), WORLD_LAYER_CONFIG.mid.yRange[0], WORLD_LAYER_CONFIG.mid.yRange[1]),
+      y: clamp(
+        finite(options.y, 86),
+        WORLD_LAYER_CONFIG.mid.waterYRange[0],
+        WORLD_LAYER_CONFIG.mid.waterYRange[1],
+      ),
       speed: finite(options.screenSpeed, kind === "jetSki" ? 18 : 15),
       duration: finite(options.duration, 12),
       scale: finite(options.scale, kind === "jetSki" ? 0.9 : 1.05),
@@ -1144,10 +1154,13 @@ export class WorldSimulation {
       };
       const definition = TRAFFIC_CATALOG[packet.kind];
       const layerConfig = WORLD_LAYER_CONFIG[layer];
+      const yRange = definition.boat
+        ? layerConfig.waterYRange ?? layerConfig.yRange
+        : layerConfig.yRange;
       this.spawnTraffic(packet.kind, {
         layer,
         direction: packet.direction,
-        y: lerpRange(layerConfig.yRange, packet.yRoll),
+        y: lerpRange(yRange, packet.yRoll),
         speed: lerpRange(definition.speed, packet.speedRoll),
         duration: lerpRange(definition.duration, packet.durationRoll),
         scale: packet.scale,

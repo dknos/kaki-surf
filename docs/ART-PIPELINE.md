@@ -91,7 +91,7 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 Eleven modular source families were generated with the local Grok Imagine workflow at 1280 x 720, visually reviewed at source and atlas size, and preserved without modification under `docs/art-source/grok`. Corrected second passes were selected for the wave-breaker, birds, and UI-ornament families; the rejected UI first pass is also preserved for auditability. The rejected first wave and bird outputs were not promoted into the repository.
 
-`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source name, 4 x 2 or 4 x 3 grid, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta, extracts and tightly crops each cell, reduces with Lanczos, thresholds alpha, quantizes and sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`.
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source name, 4 x 2 or 4 x 3 grid, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta, extracts and tightly crops each cell, reduces with Lanczos, thresholds alpha, quantizes and sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes the teal water fill that previously exposed rectangular source-cell edges when pieces overlapped.
 
 ```console
 python3 tools/art/build-grok-assets.py

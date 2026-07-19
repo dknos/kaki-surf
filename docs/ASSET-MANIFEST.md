@@ -38,7 +38,7 @@ All 11 families are optional. Missing or invalid art falls back independently; o
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
-| `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Crest, curl, impact, churn, tendrils, spray, mist | Procedural face, curl, foam, spray |
+| `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
 | `dolphin` | `dolphin-atlas.png` | 224 x 80 | Approach, offer, mounted ride, breach, dismount | Code-authored animal silhouette |
 | `shark` | `shark-atlas.png` | 224 x 72 | Shadow, fair fin telegraph, crossing, near miss, retreat | Code-authored shadow/fin/splash |
 | `whale` | `whale-atlas.png` | 352 x 108 | Distant cue, blow, breach, ramp/ride, splash, departure | Code-authored whale/event shapes |
@@ -72,7 +72,7 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 The selected Grok sheets are preserved at their original 1280 x 720 dimensions under `docs/art-source/grok`. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
-2. identifies and removes the chroma-magenta field while preserving coral accents;
+2. identifies and removes the chroma-magenta field while preserving coral accents, then isolates organic foam from rectangular water fill in the wave family;
 3. extracts the declared 4 x 2 or 4 x 3 source cells;
 4. crops each non-empty silhouette and fits it into a fixed local frame;
 5. downsamples with Lanczos, thresholds alpha, quantizes the RGB palette, and sharpens;
