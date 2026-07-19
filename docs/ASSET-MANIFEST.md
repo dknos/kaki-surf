@@ -69,11 +69,11 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 
 ## Offline source and deterministic conversion
 
-The selected Grok sheets are preserved at their original 1280 x 720 dimensions under `docs/art-source/grok`. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The latest wave source is 1024 x 1024; the other selected sheets are 1280 x 720. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
 2. identifies and removes the chroma-magenta field while preserving coral accents, then isolates organic foam from rectangular water fill in the wave family;
-3. extracts the declared 4 x 2 or 4 x 3 source cells;
+3. extracts each declared source grid and repacks it into the stable runtime atlas grid;
 4. crops each non-empty silhouette and fits it into a fixed local frame;
 5. downsamples with Lanczos, thresholds alpha, quantizes the RGB palette, and sharpens;
 6. packs transparent RGBA PNG atlases and writes frame metadata.

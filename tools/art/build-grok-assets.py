@@ -33,11 +33,13 @@ class Family:
     colors: int = 28
     padding: int = 2
     foam_only: bool = False
+    source_columns: int | None = None
+    source_rows: int | None = None
 
 
 FAMILIES = (
     Family(
-        source="wave-breaker-source.jpg",
+        source="wave-breaker-source-v2.png",
         output="wave-breaker-atlas.png",
         columns=4,
         rows=2,
@@ -56,6 +58,8 @@ FAMILIES = (
         colors=30,
         padding=4,
         foam_only=True,
+        source_columns=2,
+        source_rows=4,
     ),
     Family(
         source="dolphin-source.png",
@@ -314,12 +318,14 @@ def isolate_wave_foam(image: Image.Image) -> Image.Image:
 
 
 def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image:
-    column = index % family.columns
-    row = index // family.columns
-    left = round(source.width * column / family.columns)
-    top = round(source.height * row / family.rows)
-    right = round(source.width * (column + 1) / family.columns)
-    bottom = round(source.height * (row + 1) / family.rows)
+    source_columns = family.source_columns or family.columns
+    source_rows = family.source_rows or family.rows
+    column = index % source_columns
+    row = index // source_columns
+    left = round(source.width * column / source_columns)
+    top = round(source.height * row / source_rows)
+    right = round(source.width * (column + 1) / source_columns)
+    bottom = round(source.height * (row + 1) / source_rows)
     keyed = remove_chroma(source.crop((left, top, right, bottom)))
     if family.foam_only:
         keyed = isolate_wave_foam(keyed)

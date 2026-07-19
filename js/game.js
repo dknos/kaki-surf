@@ -1260,11 +1260,12 @@ function qaWorldOverride(scene) {
         : ["gullFlock", "ternFlock", "cormorantFlock", "pelican"].includes(trafficKind)
           ? 50
           : layer === "far" ? 68 : 82;
+    const trafficX = ["speedboat", "tugboat", "jetSki", "rescueCraft"].includes(trafficKind) ? 308 : 196;
     return {
       traffic: [{
         kind: trafficKind,
         layer,
-        screenX: 196,
+        screenX: trafficX,
         y: trafficY,
         direction: 1,
         message: trafficKind === "bannerPlane" ? "GIANT AIR KAKI" : "",

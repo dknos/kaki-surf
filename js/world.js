@@ -1268,7 +1268,7 @@ export class WorldSimulation {
         entity.previousWorldX = entity.worldX;
         entity.previousY = entity.y;
         entity.previousPhase = entity.phase;
-        entity.worldX += entity.vx * dt;
+        entity.worldX += stableTrafficWorldDelta(entity, config, this.context, dt);
         entity.y += entity.vy * dt;
         entity.phaseTime += dt;
         entity.animationTime += dt;
@@ -1762,6 +1762,26 @@ export class WorldSimulation {
     writeSignalRecord(this.interactions[this.interactionCount], type, this.elapsed, source, details);
     this.interactionCount += 1;
   }
+}
+
+/**
+ * Preserve an ambient traffic entity's intended screen direction while still
+ * allowing a small parallax response to rider movement. Camera reversals can
+ * change its apparent speed, but can no longer make it ping-pong backward.
+ */
+export function stableTrafficWorldDelta(entity, config, context, dt) {
+  const seconds = Math.max(0, finite(dt));
+  const parallax = Math.max(0.0001, finite(config?.parallax, 1));
+  const selfWorldDelta = finite(entity?.vx) * seconds;
+  const cameraDelta = finite(context?.cameraWorldX) - finite(context?.previousCameraWorldX);
+  const selfScreenDelta = selfWorldDelta * parallax;
+  const cameraScreenDelta = cameraDelta * parallax;
+  const retainedParallax = clamp(
+    cameraScreenDelta,
+    -Math.abs(selfScreenDelta) * 0.35,
+    Math.abs(selfScreenDelta) * 0.35,
+  );
+  return selfWorldDelta + cameraDelta - retainedParallax / parallax;
 }
 
 function createStreams(seed, conditionId) {

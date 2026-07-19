@@ -18,6 +18,13 @@ export function waveVisualTravel(wave) {
   return Number.isFinite(fallback) ? fallback : 0;
 }
 
+/** Decorative water flow is monotonic; rider reversals must not reverse the sea. */
+export function waveSurfaceTravel(wave) {
+  const travel = Number(wave?.travel);
+  if (Number.isFinite(travel)) return travel;
+  return Math.abs(waveVisualTravel(wave));
+}
+
 export function waveGuideAt(wave, player, board, options = {}) {
   const x = Number(player?.x ?? 0);
   const face = Number(player?.face ?? 0.5);
@@ -69,7 +76,7 @@ function drawRampBand(ctx, wave, top, bottom, color) {
 function drawSwellContours(ctx, wave, p, settings, speedRatio, momentum) {
   const clock = settings.reducedMotion
     ? 0
-    : waveVisualTravel(wave) * (0.035 + speedRatio * 0.028);
+    : waveSurfaceTravel(wave) * (0.035 + speedRatio * 0.028);
   ctx.save();
   ctx.globalAlpha = settings.highContrast ? 0.3 : 0.18;
   ctx.lineWidth = 1;
@@ -95,7 +102,7 @@ function drawSwellContours(ctx, wave, p, settings, speedRatio, momentum) {
 function drawFaceGlints(ctx, wave, p, settings, speedRatio, momentum) {
   const clock = settings.reducedMotion
     ? 0
-    : waveVisualTravel(wave) * (0.075 + speedRatio * 0.065);
+    : waveSurfaceTravel(wave) * (0.075 + speedRatio * 0.065);
   ctx.save();
   ctx.globalAlpha = settings.highContrast ? 0.62 : 0.38;
   for (let lane = 0; lane < 6; lane += 1) {
@@ -124,7 +131,7 @@ function drawPowerSeam(ctx, wave, player, p, settings) {
   const start = Math.max(0, Math.floor(wave.curlX + 49));
   const phase = settings.reducedMotion
     ? 0
-    : Math.floor((waveVisualTravel(wave) * (0.22 + momentum * 0.16)) % 31);
+    : Math.floor((waveSurfaceTravel(wave) * (0.22 + momentum * 0.16)) % 31);
   ctx.save();
   ctx.globalAlpha = strong ? 0.76 : 0.3;
   for (let index = 0; index < 12; index += 1) {
@@ -149,63 +156,81 @@ function drawCurlMass(ctx, wave, p, time, conditionId, settings, assets) {
   const curl = Math.round(wave.curlX);
   const crest = Math.round(wave.crestY(curl));
   const pulse = settings.reducedMotion ? 0 : EDGE_STEPS[Math.floor(time * 7) % EDGE_STEPS.length];
+  const fold = Math.round(clamp(Number(wave.pressure ?? 0), 0, 1) * 4);
 
-  // One continuous silhouette owns the curl. Generated art is restricted to
-  // foam accents below, so atlas cell edges can never become wave geometry.
+  // A broad water-colored shoulder and compact shaded pocket read as a folding
+  // breaker. The old near-black ring made the curl look like a hole.
   ctx.save();
-  ctx.globalAlpha = settings.highContrast ? 1 : 0.88;
-  ctx.fillStyle = p.waterDeep;
-  ctx.beginPath();
-  ctx.moveTo(curl - 92, LOGICAL_HEIGHT);
-  ctx.bezierCurveTo(curl - 80, crest + 112, curl - 84, crest + 35, curl - 49, crest + 4);
-  ctx.bezierCurveTo(curl - 23, crest - 14, curl + 19, crest - 8, curl + 31 + pulse, crest + 18);
-  ctx.bezierCurveTo(curl + 42, crest + 44, curl + 16, crest + 72, curl - 5, crest + 91);
-  ctx.bezierCurveTo(curl - 29, crest + 113, curl - 36, LOGICAL_HEIGHT - 17, curl - 38, LOGICAL_HEIGHT);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.globalAlpha = settings.highContrast ? 0.9 : 0.74;
+  ctx.globalAlpha = settings.highContrast ? 1 : 0.96;
   ctx.fillStyle = p.waterLight;
   ctx.beginPath();
-  ctx.moveTo(curl - 82, LOGICAL_HEIGHT);
-  ctx.bezierCurveTo(curl - 68, crest + 108, curl - 72, crest + 37, curl - 43, crest + 8);
-  ctx.bezierCurveTo(curl - 18, crest - 9, curl + 14, crest - 3, curl + 24 + pulse, crest + 17);
-  ctx.bezierCurveTo(curl + 30, crest + 34, curl + 14, crest + 53, curl - 1, crest + 61);
-  ctx.bezierCurveTo(curl + 6, crest + 45, curl + 4, crest + 30, curl - 8, crest + 22);
-  ctx.bezierCurveTo(curl - 25, crest + 10, curl - 43, crest + 18, curl - 53, crest + 40);
-  ctx.bezierCurveTo(curl - 67, crest + 72, curl - 50, crest + 117, curl - 44, LOGICAL_HEIGHT);
+  ctx.moveTo(curl - 78, LOGICAL_HEIGHT);
+  ctx.bezierCurveTo(curl - 75, crest + 116, curl - 67, crest + 44, curl - 47, crest + 17);
+  ctx.bezierCurveTo(curl - 34, crest - 1, curl - 8, crest - 8, curl + 15, crest + 1);
+  ctx.bezierCurveTo(curl + 34, crest + 7, curl + 45 + fold + pulse, crest + 20, curl + 44 + fold, crest + 34);
+  ctx.bezierCurveTo(curl + 43, crest + 49, curl + 26, crest + 61, curl + 14, crest + 75);
+  ctx.bezierCurveTo(curl - 3, crest + 94, curl - 7, crest + 121, curl - 5, LOGICAL_HEIGHT);
   ctx.closePath();
   ctx.fill();
 
-  ctx.globalAlpha = settings.highContrast ? 1 : 0.9;
-  ctx.fillStyle = p.deepInk;
+  ctx.globalAlpha = settings.highContrast ? 0.94 : 0.88;
+  ctx.fillStyle = p.water;
   ctx.beginPath();
-  ctx.moveTo(curl - 22, crest + 10);
-  ctx.bezierCurveTo(curl + 1, crest + 4, curl + 18, crest + 15, curl + 17 + pulse, crest + 30);
-  ctx.bezierCurveTo(curl + 16, crest + 44, curl + 1, crest + 55, curl - 13, crest + 62);
-  ctx.bezierCurveTo(curl - 1, crest + 47, curl, crest + 33, curl - 10, crest + 25);
-  ctx.bezierCurveTo(curl - 20, crest + 17, curl - 32, crest + 20, curl - 41, crest + 30);
-  ctx.bezierCurveTo(curl - 36, crest + 19, curl - 31, crest + 13, curl - 22, crest + 10);
+  ctx.moveTo(curl - 66, LOGICAL_HEIGHT);
+  ctx.bezierCurveTo(curl - 62, crest + 107, curl - 57, crest + 48, curl - 39, crest + 25);
+  ctx.bezierCurveTo(curl - 23, crest + 5, curl + 2, crest + 1, curl + 23, crest + 11);
+  ctx.bezierCurveTo(curl + 38, crest + 19, curl + 40 + fold, crest + 31, curl + 34, crest + 41);
+  ctx.bezierCurveTo(curl + 25, crest + 55, curl + 8, crest + 67, curl - 1, crest + 88);
+  ctx.bezierCurveTo(curl - 13, crest + 116, curl - 19, crest + 133, curl - 17, LOGICAL_HEIGHT);
   ctx.closePath();
   ctx.fill();
 
-  ctx.globalAlpha = settings.highContrast ? 0.78 : 0.5;
-  ctx.strokeStyle = p.water;
-  ctx.lineWidth = 2;
+  ctx.globalAlpha = settings.highContrast ? 0.78 : 0.46;
+  ctx.strokeStyle = p.waterLight;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(curl - 71, crest + 47);
-  ctx.bezierCurveTo(curl - 57, crest + 24, curl - 42, crest + 15, curl - 25, crest + 15);
+  ctx.moveTo(curl - 52, LOGICAL_HEIGHT);
+  ctx.bezierCurveTo(curl - 50, crest + 102, curl - 43, crest + 48, curl - 27, crest + 28);
+  ctx.bezierCurveTo(curl - 13, crest + 11, curl + 4, crest + 8, curl + 18, crest + 14);
   ctx.stroke();
-  ctx.restore();
 
-  ctx.save();
+  // The barrel shadow is deliberately small and blue, never a black donut.
+  ctx.globalAlpha = settings.highContrast ? 0.94 : 0.82;
+  ctx.fillStyle = p.waterDeep;
+  ctx.beginPath();
+  ctx.moveTo(curl + 4, crest + 16);
+  ctx.bezierCurveTo(curl + 18, crest + 10, curl + 33 + fold, crest + 18, curl + 34 + fold, crest + 30);
+  ctx.bezierCurveTo(curl + 35, crest + 42, curl + 23, crest + 51, curl + 12, crest + 58);
+  ctx.bezierCurveTo(curl + 20, crest + 46, curl + 20, crest + 33, curl + 13, crest + 27);
+  ctx.bezierCurveTo(curl + 7, crest + 22, curl + 1, crest + 23, curl - 5, crest + 29);
+  ctx.bezierCurveTo(curl - 2, crest + 22, curl, crest + 18, curl + 4, crest + 16);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.globalAlpha = settings.highContrast ? 1 : 0.94;
   ctx.lineCap = "round";
   ctx.strokeStyle = p.foam;
   ctx.lineWidth = settings.highContrast ? 5 : 4;
   ctx.beginPath();
-  ctx.moveTo(curl - 62, crest + 12);
-  ctx.bezierCurveTo(curl - 43, crest - 5, curl - 17, crest - 8, curl + 6, crest + 2);
-  ctx.bezierCurveTo(curl + 18, crest + 7, curl + 24, crest + 13, curl + 25 + pulse, crest + 20);
+  ctx.moveTo(curl - 49, crest + 14);
+  ctx.bezierCurveTo(curl - 31, crest - 5, curl - 4, crest - 8, curl + 18, crest + 2);
+  ctx.bezierCurveTo(curl + 34, crest + 9, curl + 41 + fold, crest + 19, curl + 40 + fold + pulse, crest + 31);
+  ctx.stroke();
+
+  ctx.globalAlpha = settings.highContrast ? 0.9 : 0.72;
+  ctx.strokeStyle = p.crest;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(curl - 40, crest + 29);
+  ctx.bezierCurveTo(curl - 25, crest + 10, curl - 4, crest + 7, curl + 12, crest + 14);
+  ctx.stroke();
+
+  ctx.globalAlpha = settings.highContrast ? 0.92 : 0.62;
+  ctx.strokeStyle = p.foamShade;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(curl - 61, crest + 65);
+  ctx.bezierCurveTo(curl - 52, crest + 58, curl - 43, crest + 58, curl - 35, crest + 65);
   ctx.stroke();
   ctx.restore();
 
@@ -217,11 +242,11 @@ function drawCurlMass(ctx, wave, p, time, conditionId, settings, assets) {
     ctx.strokeStyle = p.crest;
   }
   ctx.save();
-  ctx.globalAlpha = 0.72;
+  ctx.globalAlpha = 0.56;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(curl - 43, crest + 13);
-  ctx.quadraticCurveTo(curl - 24, crest + 4, curl - 7, crest + 10);
+  ctx.moveTo(curl - 36, crest + 22);
+  ctx.quadraticCurveTo(curl - 18, crest + 10, curl + 2, crest + 15);
   ctx.stroke();
   ctx.restore();
 
@@ -233,20 +258,15 @@ function drawGeneratedCurlAccents(ctx, wave, time, settings, assets, curl, crest
   if (!hasAtlas || settings.highContrast) return;
 
   const phase = settings.reducedMotion ? 0 : Math.floor((time * 5 + wave.pressure * 7) % 4);
-  drawAtlasFrame(ctx, assets, "waveBreaker", phase < 2 ? "crestFeatherB" : "risingCurl", curl - 13 + pulse, crest + 17, {
-    scale: 0.76,
-    scaleX: 1.02,
-    alpha: 0.68,
+  drawAtlasFrame(ctx, assets, "waveBreaker", "crestFeatherA", curl - 10 + pulse, crest + 8, {
+    scale: 0.27,
+    scaleX: 1.14,
+    alpha: 0.5,
   });
   if (!settings.reducedMotion) {
-    drawAtlasFrame(ctx, assets, "waveBreaker", "crestFeatherA", curl - 17, crest - 9 - phase, {
-      scale: 0.78,
-      alpha: 0.62,
-    });
-    drawAtlasFrame(ctx, assets, "waveBreaker", "seaMist", curl + 9, crest + 47 + pulse, {
-      scale: 0.52,
-      scaleX: 1.1,
-      alpha: 0.16,
+    drawAtlasFrame(ctx, assets, "waveBreaker", "sprayBurst", curl + 4, crest - 1 - phase, {
+      scale: 0.28,
+      alpha: 0.4,
     });
   }
 }
@@ -254,7 +274,7 @@ function drawGeneratedCurlAccents(ctx, wave, time, settings, assets, curl, crest
 function drawCrestAndLip(ctx, wave, player, p, conditionId, settings, speedRatio, momentum) {
   const phase = settings.reducedMotion
     ? 0
-    : Math.floor((waveVisualTravel(wave) * 0.14) % 31);
+    : Math.floor((waveSurfaceTravel(wave) * 0.14) % 31);
   ctx.fillStyle = p.crest;
   for (let x = 0; x < LOGICAL_WIDTH; x += 2) {
     const y = Math.round(wave.crestY(x));

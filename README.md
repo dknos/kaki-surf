@@ -44,7 +44,7 @@ Simple Controls buffer one Trick request into the aerial context, choose an elig
 
 ## A living coast
 
-`WorldSimulation` owns a seeded, bounded world layer that is independent from the renderer. Far, mid, and near traffic includes sailboats, fishing boats, speedboats, birds, planes, helicopters, banner flights, and rare Fleet Airshow/carrier events. Signed `worldTravel` makes that traffic and its parallax agree with the rider's direction; boat-only waterline bands and projected facing keep hulls out of the sky and aligned with their visible motion.
+`WorldSimulation` owns a seeded, bounded world layer that is independent from the renderer. Far, mid, and near traffic includes sailboats, fishing boats, speedboats, birds, planes, helicopters, banner flights, and rare Fleet Airshow/carrier events. Signed `worldTravel` keeps scenic parallax direction-aware, while bounded camera influence prevents ambient traffic from ping-ponging when the rider reverses. Boat-only waterline bands and breaker-aware occlusion keep ordinary hulls off the curl while preserving deliberate wake-race craft ahead of it.
 
 Wildlife and bonuses are gameplay, not decoration:
 
@@ -67,7 +67,7 @@ Golden Coast, Twilight Glass, and Stormbreak share fair gameplay geometry while 
 
 ## Local art pipeline
 
-The static game includes six condition backgrounds and 11 compact generated atlas families for wave-breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their 1280 x 720 Grok source sheets are preserved under `docs/art-source/grok`; `tools/art/build-grok-assets.py` deterministically removes chroma, isolates organic foam from the wave sheet, extracts cells, downsamples, sharpens, quantizes, and rebuilds the transparent atlases under `assets/generated`.
+The static game includes six condition backgrounds and 11 compact generated atlas families for wave-breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the latest wave source is a 1024 x 1024 polish pass and the other selected families are 1280 x 720. `tools/art/build-grok-assets.py` deterministically removes chroma, isolates organic foam from the wave sheet, extracts cells, downsamples, sharpens, quantizes, and rebuilds the transparent atlases under `assets/generated`.
 
 Every atlas is optional. `js/asset-loader.js` validates each family independently, and the Canvas renderer keeps a local code-authored fallback when one is absent or invalid. The browser never calls Grok, Blender, an image API, a CDN, or a remote asset host. Exact prompts, selections, source hashes, and output dimensions are recorded in [Grok asset provenance](docs/GROK-ASSET-PROVENANCE.md).
 
@@ -79,7 +79,7 @@ npm run check
 git diff --check
 ```
 
-The final native suite passes **90/90 tests**, and the syntax gate checks **26 JavaScript modules**. The refreshed real-browser gallery contains **112 deterministic 1280 x 720 captures**; its reviewed [production contact sheet](docs/images/qa-contact-sheet.png) covers controls, bidirectional movement, curl states, air/tricks, wildlife, traffic, couriers, races, powerups, Fleet Airshow, all boards/conditions, and access modes. See [Validation results](docs/TEST-RESULTS.md) and [QA matrix](docs/QA.md).
+The final native suite passes **93/93 tests**, and the syntax gate checks **26 JavaScript modules**. The refreshed real-browser gallery contains **112 deterministic 1280 x 720 captures**; its reviewed [production contact sheet](docs/images/qa-contact-sheet.png) covers controls, bidirectional movement, curl states, air/tricks, wildlife, traffic, couriers, races, powerups, Fleet Airshow, all boards/conditions, and access modes. See [Validation results](docs/TEST-RESULTS.md) and [QA matrix](docs/QA.md).
 
 ## Static deployment and integration
 

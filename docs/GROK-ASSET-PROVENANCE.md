@@ -12,15 +12,15 @@ From the repository root:
 python3 tools/art/build-grok-assets.py
 ```
 
-The script reads the preserved sources, removes the chroma-magenta background, extracts equal grid cells, crops silhouettes, downsamples with Lanczos, thresholds alpha, quantizes, sharpens, packs RGBA PNGs, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
+The script reads the preserved sources, removes the chroma-magenta background, extracts each declared source grid, crops silhouettes, downsamples with Lanczos, thresholds alpha, quantizes, sharpens, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
 
 ## Selected source and output record
 
-Every preserved source is 1280 x 720. SHA-256 values identify the exact files used at this checkpoint.
+The latest wave source is 1024 x 1024; the other selected sources are 1280 x 720. SHA-256 values identify the exact files used at this checkpoint.
 
 | Family | Selection | Preserved source | Source SHA-256 | Runtime atlas | Atlas dimensions |
 | --- | --- | --- | --- | --- | ---: |
-| Wave breaker | Corrected pass selected; first pass rejected | `docs/art-source/grok/wave-breaker-source.jpg` | `f245ff17c5259e920ac3abb644d598e5537589d125f6f600720d586b927de38e` | `assets/generated/wave-breaker-atlas.png` | 288 x 128 |
+| Wave breaker | Square polish pass selected; v2 preserved | `docs/art-source/grok/wave-breaker-source-v2.png` | `07554da55eb79d344d60dea70174384c6497146b33a5923e5c913fe98c6b9ca9` | `assets/generated/wave-breaker-atlas.png` | 288 x 128 |
 | Dolphin | First reviewed pass selected | `docs/art-source/grok/dolphin-source.png` | `eac80e5862bb10b89c36fbd04e3f41b3869835d6c34d25edcfe1d0f4ff0f6740` | `assets/generated/dolphin-atlas.png` | 224 x 80 |
 | Shark | First reviewed pass selected | `docs/art-source/grok/shark-source.png` | `044d588bac3ba9d81677228c4b7831859dc94d2bbe6b128c771935bf24f2bd0b` | `assets/generated/shark-atlas.png` | 224 x 72 |
 | Whale | First reviewed pass selected | `docs/art-source/grok/whale-source.png` | `9ff5f93b1fd98a68402c03f8785c5d56e120a0eed2ebb42fd1a3f4770481ca14` | `assets/generated/whale-atlas.png` | 352 x 108 |
@@ -32,11 +32,11 @@ Every preserved source is 1280 x 720. SHA-256 values identify the exact files us
 | Carrier | First reviewed pass selected | `docs/art-source/grok/carrier-source.png` | `b456a27cfb3fcd7aa593a68dcf5663f6db6743aa8b873ccdf60fbdd27c71e11c` | `assets/generated/carrier-atlas.png` | 384 x 100 |
 | UI ornaments | Corrected v2 selected; v1 rejected and preserved | `docs/art-source/grok/ui-ornaments-source-v2.png` | `a5f59884adae0dfa6b624aeee8cedaf64d1ace2544ab65cf29b908363ff9ca8e` | `assets/generated/ui-ornaments-atlas.png` | 320 x 104 |
 
-The rejected UI v1 is preserved as `docs/art-source/grok/ui-ornaments-source.jpg` with SHA-256 `75e36bd84e0c36d17c5b36b5c8dd6307bec95074ca21dcc17c5e9a96b75f10e7`. It was not used by the atlas build. The rejected first wave and first bird sheets were not promoted from the generation session into the repository.
+The rejected UI v1 is preserved as `docs/art-source/grok/ui-ornaments-source.jpg` with SHA-256 `75e36bd84e0c36d17c5b36b5c8dd6307bec95074ca21dcc17c5e9a96b75f10e7`. It was not used by the atlas build. Wave v2 remains preserved as `docs/art-source/grok/wave-breaker-source.jpg`; the rejected first wave and first bird sheets were not promoted from their generation sessions.
 
 ## Review decisions
 
-- Wave v1 was rejected because the model interpreted “crest feather” and “foam fingers” literally, introducing feather/hand-like motifs. The corrected prompt explicitly constrained every cell to water, foam, spray, or mist.
+- Wave v1 was rejected because the model interpreted “crest feather” and “foam fingers” literally. Wave v2 removed those motifs but was superseded after runtime review found its reduced foam clusters muddy. The selected square pass has cleaner isolated silhouettes; only restrained crest and spray accents are used over simulation-owned geometry.
 - Birds v1 was rejected because visible grid dividers became part of the sheet. The corrected prompt required one uninterrupted field with no cell borders, seams, panels, or boxes.
 - UI v1 was rejected because ornaments overlapped or cropped and contained pseudo-text. The corrected prompt reduced each ornament to the middle 60% of its implied cell and prohibited every form of writing.
 - The selected airshow cell contains a four-plane formation rather than the requested three-plane formation. It remains a readable, fictional, nonmilitary airshow sprite and is accepted as a presentation variance.
@@ -50,13 +50,23 @@ The rejected UI v1 is preserved as `docs/art-source/grok/ui-ornaments-source.jpg
 Production source sheet for a 384x216 neo-chibi plush surf arcade game: one cohesive family of animated breaking-wave and whitewater pixel-art elements, arranged as eight clean equal cells in a 4-column by 2-row layout showing distant crest feather, rising curl, folding lip, impact, churn, foam fingers, spray burst, and dissipating mist; powerful water with chunky hand-cleaned pixel clusters, strong deep-navy contour accents, controlled turquoise sea-glass cream and coral palette, late-8-bit handheld clarity with modern animation density, each element centered with generous padding on a perfectly flat solid chroma-magenta background. No surfer, board, animals, scenery, UI, text, labels, logos, signature, watermark, grid lines, photorealism, gradients, noisy microtexture, or cropped elements.
 ```
 
-### 2. Wave breaker v2 — selected
+### 2. Wave breaker v2 — superseded and preserved
 
 Selected source: `docs/art-source/grok/wave-breaker-source.jpg`.
 
 ```text
 Production source sheet for a 384x216 neo-chibi plush surf arcade game: one cohesive family of eight animated breaking-wave and whitewater pixel-art elements, arranged as exact equal cells in a 4-column by 2-row layout: distant crest feathering made only of water spray, rising curl, folding lip, impact, whitewater churn, narrow branching foam tendrils, directional spray burst, and dissipating sea mist; powerful water with chunky hand-cleaned pixel clusters, strong deep-navy contour accents, controlled turquoise sea-glass cream and coral palette, late-8-bit handheld clarity, every water element centered with generous padding on a perfectly flat solid chroma-magenta background. Water and foam only: absolutely no literal feathers, hands, fingers, arms, animals, faces, surfer, board, scenery, UI, text, labels, logos, signature, watermark, grid lines, photorealism, gradients, noisy microtexture, or cropped elements.
 ```
+
+### 2b. Wave breaker square polish — selected
+
+Selected source: `docs/art-source/grok/wave-breaker-source-v2.png`.
+
+```text
+Production game-asset source sheet for a side-view 384x216 neo-chibi plush surf arcade game. Exactly eight isolated modular breaking-wave foam pieces arranged in a clean 4 columns by 2 rows grid with generous separation: crest feather, curling lip foam, rising curl spray, impact burst, whitewater churn, foam tendrils, directional spray fan, and soft sea mist. Chunky hand-cleaned pixel clusters, rounded powerful ocean shapes, deep navy outlines only where needed, controlled seafoam white, pale aqua, turquoise, and muted blue palette. Every piece must have a crisp readable silhouette and stay fully inside its grid cell. Flat solid chroma-magenta background #ff00ff. No full rectangular water panels, no dark barrel holes, no scenery, no horizon, no boats, no surfers, no animals, no text, no logos, no watermark, no photorealism, no noisy microtexture, no gradients bleeding into the background.
+```
+
+Grok returned the eight requested subjects in a 2 x 4 source arrangement. The build record declares that source layout explicitly and repacks the same ordered frames into the existing 4 x 2 runtime atlas.
 
 ### 3. Dolphin — selected
 
@@ -154,7 +164,7 @@ Corrected production UI ornament sheet for a 384x216 neo-chibi plush surf arcade
 
 ## Runtime policy
 
-- The 1280 x 720 sources are preserved for provenance and future curation but are not runtime dependencies.
+- Original source dimensions are preserved for provenance and future curation but are not runtime dependencies.
 - Runtime PNGs are local, relative, independently optional, and dimension-validated.
 - Code-authored fallback art remains available for every generated gameplay family.
 - A generated pose never owns collision or scoring. The wave, world, rider, trick, and bonus simulations select semantics first; presentation chooses a frame second.

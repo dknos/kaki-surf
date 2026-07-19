@@ -17,8 +17,8 @@ import {
   sweptCircleContact,
   worldXForScreenX,
 } from "../js/world-collision.js";
-import { trafficScreenDirection } from "../js/world-visuals.js";
-import { WorldSimulation } from "../js/world.js";
+import { trafficScreenDirection, watercraftClearsBreaker } from "../js/world-visuals.js";
+import { stableTrafficWorldDelta, WorldSimulation } from "../js/world.js";
 
 const STEP = 1 / 120;
 
@@ -106,9 +106,28 @@ test("watercraft stay in water bands and face their projected screen motion", ()
   assert.equal(trafficScreenDirection(projectedBoat, {
     context: { previousCameraWorldX: 0, cameraWorldX: 0 },
   }, "mid"), 1, "self-propelled screen motion faces right");
-  assert.equal(trafficScreenDirection(projectedBoat, {
-    context: { previousCameraWorldX: 0, cameraWorldX: 10 },
-  }, "mid"), -1, "an overtaken boat faces its apparent leftward motion");
+  const config = WORLD_LAYER_CONFIG.mid;
+  const cameraContext = { previousCameraWorldX: 0, cameraWorldX: 10 };
+  const stableDelta = stableTrafficWorldDelta({ vx: 12 / config.parallax }, config, cameraContext, STEP);
+  const stableBoat = {
+    previousWorldX: 100,
+    worldX: 100 + stableDelta,
+    direction: 1,
+  };
+  assert.equal(trafficScreenDirection(stableBoat, { context: cameraContext }, "mid"), 1,
+    "camera motion changes boat speed without reversing its intended travel");
+
+  const previousScreenX = projectWorldX(stableBoat.previousWorldX, cameraContext.previousCameraWorldX, config.parallax);
+  const currentScreenX = projectWorldX(stableBoat.worldX, cameraContext.cameraWorldX, config.parallax);
+  assert.ok(currentScreenX > previousScreenX, "forward-moving traffic never ping-pongs backward on screen");
+});
+
+test("ordinary boats disappear behind the curl while race craft remain safely ahead", () => {
+  const simulation = { wave: { curlX: 72 }, player: { x: 232 } };
+  assert.equal(watercraftClearsBreaker({ kind: "fishingBoat" }, 130, simulation), false);
+  assert.equal(watercraftClearsBreaker({ kind: "fishingBoat" }, 300, simulation), true);
+  assert.equal(watercraftClearsBreaker({ kind: "speedboat", activity: "race" }, 204, simulation), true);
+  assert.equal(watercraftClearsBreaker({ kind: "speedboat", activity: "race" }, 148, simulation), false);
 });
 
 test("spatial helpers catch swept contacts, invert projection, and distinguish reachable paths", () => {

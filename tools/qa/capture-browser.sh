@@ -27,7 +27,7 @@ scenes=(
 
 mkdir -p "$capture_dir"
 for scene in "${scenes[@]}"; do
-  chromium \
+  timeout 20s chromium \
     --headless \
     --no-sandbox \
     --disable-gpu \
@@ -36,10 +36,10 @@ for scene in "${scenes[@]}"; do
     --virtual-time-budget=900 \
     --window-size=1280,720 \
     --screenshot="$capture_dir/$scene.png" \
-    "$base_url?qa=$scene&capture=20260719" >/dev/null 2>&1
+    "$base_url?qa=$scene&capture=20260719b" >/dev/null 2>&1
 done
 
 cp "$capture_dir/menu.png" "$project_root/docs/images/menu.png"
-cp "$capture_dir/neutral.png" "$project_root/docs/images/ride.png"
+cp "$capture_dir/maxSpeed.png" "$project_root/docs/images/ride.png"
 python3 "$project_root/tools/qa/build-contact-sheet.py"
 echo "Captured ${#scenes[@]} deterministic browser QA scenes."
