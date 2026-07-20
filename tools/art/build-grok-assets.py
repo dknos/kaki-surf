@@ -52,45 +52,25 @@ class Family:
 
 FAMILIES = (
     Family(
-        source="twilight-long-barrel-back-edit-v1.png",
-        output="twilight-long-barrel-back-atlas.png",
-        columns=1,
-        rows=1,
-        cell=(352, 198),
-        names=("longBarrelBack",),
-        # The empty pocket sits just ahead of the canonical falling edge. Kaki
-        # is rendered between this stable mass and the code-authored front rim.
-        # The source's lip tip lands on the live curtain tip at this anchor;
-        # Kaki then sits inside the negative-space pocket instead of ahead of it.
-        anchor=(0.48, 0.92),
-        colors=32,
-        padding=0,
+        source="twilight-travelling-break-v2-source.png",
+        output="twilight-travelling-break-v2-atlas.png",
+        columns=3,
+        rows=2,
+        cell=(112, 104),
+        names=("spill", "steepen", "fall", "pocket", "curtain", "collapse"),
+        # Every pose is registered to the visible front/bottom of the moving
+        # edge. Runtime motion owns screen position; the sheet only changes the
+        # connected spill -> waterfall -> collapse silhouette.
+        anchor=(0.82, 1.0),
+        colors=24,
+        padding=2,
+        foam_only=True,
         connected_chroma=True,
-        edge_blend=True,
-        passing_left_blend=True,
-        preserve_layout=True,
+        lower_continuation_blend=True,
         resample="nearest",
         sharpen=False,
-        source_size=(1280, 720),
-        source_sha256="269800eda215821d40c9bbf24eaf7fa77f47e3a2159e36b9221720892975e05b",
-    ),
-    Family(
-        source="twilight-hero-barrel-source.png",
-        output="twilight-hero-barrel-atlas.png",
-        columns=1,
-        rows=1,
-        cell=(256, 144),
-        names=("heroBarrel",),
-        anchor=(0.0, 0.0),
-        colors=32,
-        padding=0,
-        connected_chroma=True,
-        edge_blend=True,
-        preserve_layout=True,
-        resample="nearest",
-        sharpen=False,
-        source_size=(1280, 720),
-        source_sha256="197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf",
+        source_size=(384, 216),
+        source_sha256="8cad52668112bb477e4bb8923693333848b631662fe2ab3f3f2307b40b88fd1f",
     ),
     Family(
         source="twilight-hero-wave-components-source.png",
@@ -109,43 +89,6 @@ FAMILIES = (
         sharpen=False,
         source_size=(1280, 720),
         source_sha256="bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600",
-    ),
-    Family(
-        source="twilight-waterfall-curtain-source.png",
-        output="twilight-waterfall-curtain-atlas.png",
-        columns=4,
-        rows=1,
-        cell=(88, 112),
-        names=("pourA", "pourB", "pourC", "pourD"),
-        # The sheet is anchored at the churn line so every frame can share the
-        # canonical breaking edge while its internal water falls downward.
-        anchor=(0.5, 1.0),
-        colors=24,
-        padding=2,
-        connected_chroma=True,
-        resample="nearest",
-        sharpen=False,
-        source_size=(1280, 720),
-        source_sha256="5e0d4166e0b46681b9aaf477d37aeb8503989289ad67ea2552df1422291fb2c3",
-    ),
-    Family(
-        source="twilight-breaking-wave-source.jpg",
-        output="twilight-breaking-wave-atlas.png",
-        columns=4,
-        rows=1,
-        cell=(128, 136),
-        names=("curlA", "curlB", "pour", "collapse"),
-        # The lower breaking shoulder stays welded to the canonical contact
-        # while the staged crest pitches and falls around it.
-        anchor=(0.66, 1.0),
-        colors=28,
-        padding=2,
-        connected_chroma=True,
-        lower_continuation_blend=True,
-        resample="nearest",
-        sharpen=False,
-        source_size=(1280, 720),
-        source_sha256="803b17d83dbf2b9f6c03973dfee5074b188b163d2077cb0efa2f14a2ca2f52e1",
     ),
     Family(
         source="wave-breaker-source-v2.png",

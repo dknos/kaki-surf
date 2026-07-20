@@ -89,24 +89,21 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-Seventeen source families were generated with the local Grok Imagine workflow, visually reviewed at source and runtime size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the Twilight wave studies and other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage classic progression, Twilight components, falling curtain, coherent travelling break, long barrel back layer, birds, and UI ornaments, while superseded sources remain preserved for auditability.
+The active build publishes 14 generated families from sources reviewed at source and runtime size. The latest Twilight travelling-break source is a 384 x 216 six-cell sheet; superseded 1280 x 720 full-wave, curtain, and long-back studies remain under `docs/art-source/grok` for auditability but are no longer converted or shipped as runtime atlases.
 
-`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source directory, source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts each cell, applies either tight-crop or contact-preserving layout rules, uses the declared family filter, thresholds alpha unless soft continuation is declared, quantizes and conditionally sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave-breaker family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges. Twilight components preserve their 2 x 2 source layout; the 4 x 1 curtain and coherent-break sheets use connected-chroma removal and nearest-neighbor reduction. The long barrel retains its one-cell framing and receives a deterministic stepped alpha blend only along the passing left edge, eliminating the vertical source boundary without softening the crest or pocket.
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source directory, source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta, extracts each cell, applies tight-crop or contact-preserving layout rules, quantizes the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The modular breaker and Twilight travelling-break families receive a foam-isolation pass so generated art can add organic detail without reintroducing rectangular water slabs.
 
-Normal Twilight rendering places the selected 352 x 198 long barrel behind Kaki as the stable face and pocket, aligns its lip tip to the canonical pitching contact, then draws Kaki, the segmented forward curtain, low foreground foam, and component `contactSpray`. The coherent-break frames remain available for the active edge and fallback transitions; the earlier curtain study is restrained internal texture only. This back/rider/front stack makes Kaki visibly ride inside the barrel while the left edge opens onto real sky. Runtime geometry still owns the playable surface, contact, collision, stage pressure, passed-sky extent, and monotonic left-to-right break direction. High Contrast or a missing long-back asset falls through the coherent break, earlier full-barrel study, and complete connected procedural break. The component cells `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for provenance but are not rendered.
+Normal Twilight rendering draws one live horizon-to-trough wall and unstriped face, adds selected `fall`/`pocket` detail from the travelling-break atlas, then draws Kaki, the segmented forward curtain, low foreground foam, and component `contactSpray`. Runtime geometry owns the playable surface, crest, collision, stage pressure, passed-sky extent, tube pocket, collapse, and monotonic left-to-right break direction. Missing generated art and High Contrast use the same complete live break rather than a retired full-wave fallback.
 
 ```console
 python3 tools/art/build-grok-assets.py
 ```
 
-Outputs are the 17 PNGs under `assets/generated`:
+Outputs are the 14 PNGs under `assets/generated`:
 
 | Family | Atlas dimensions |
 | --- | ---: |
-| Twilight long barrel back | 352 x 198 |
-| Twilight hero barrel | 256 x 144 |
-| Twilight waterfall curtain | 352 x 112 |
-| Twilight coherent break | 512 x 136 |
+| Twilight travelling break | 336 x 208 |
 | Wave breaker | 288 x 128 |
 | Wave progression | 320 x 192 |
 | Twilight hero wave | 256 x 144 |
@@ -123,7 +120,7 @@ Outputs are the 17 PNGs under `assets/generated`:
 
 The source sheets, SHA-256 values, selected/rejected decisions, and every Grok prompt are in [Grok asset provenance](./GROK-ASSET-PROVENANCE.md). The runtime/frame mapping is in [Asset manifest](./ASSET-MANIFEST.md).
 
-`tools/art/run-qwen-edit.mjs` is an optional offline experiment helper for the local ComfyUI Qwen Image Edit workflow. It is not part of the deterministic build. Both preserved seam experiments were rejected after they damaged framing/chroma or regenerated horizontal rails; the browser never loads them.
+`tools/art/run-qwen-edit.mjs` is an optional offline experiment helper for the local ComfyUI Qwen Image Edit workflow. It is not part of the deterministic build. Three preserved experiments were rejected after they damaged framing/chroma, regenerated horizontal rails, or dropped sprite cells into block slabs; the browser never loads them.
 
 ## Blender wave/curl study
 

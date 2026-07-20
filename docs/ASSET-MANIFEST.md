@@ -1,6 +1,6 @@
 # Asset manifest and provenance
 
-Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 17 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
+Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 14 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
 
 Gameplay truth remains code-owned. Raster art does not define wave collision, rider motion, wildlife phases, pickup reachability, scoring, or UI state; it renders simulation state and has an independent local fallback.
 
@@ -35,15 +35,12 @@ The three full-resolution environment sources were generated offline, curated, t
 
 ## Generated runtime atlases
 
-All 17 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
+All 14 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
-| `twilightLongBarrelBack` | `twilight-long-barrel-back-atlas.png` | 352 x 198 | Stable normal-palette back wall, D-shaped pocket, curved face planes, and left passing edge behind Kaki | Coherent-break/full-barrel/procedural fallback chain |
-| `twilightHeroBarrel` | `twilight-hero-barrel-atlas.png` | 256 x 144 | Preserved earlier coherent curl; tertiary fallback when the long back and coherent break are unavailable or High Contrast bypasses generated normal-palette art | Complete connected procedural curl and falling sheet |
+| `twilightTravellingBreak` | `twilight-travelling-break-v2-atlas.png` | 336 x 208 | Six registered spill/steepen/fall/pocket/curtain/collapse cells; selected falling-water detail is layered over the live travelling wall | Collision-aligned procedural wall, crest, curtain, tube shadow, and churn |
 | `twilightHeroWave` | `twilight-hero-wave-components-atlas.png` | 256 x 144 | `contactSpray` at the board; `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for reproducibility but are not currently rendered | Procedural board-contact spray |
-| `twilightHeroCurtain` | `twilight-waterfall-curtain-atlas.png` | 352 x 112 | Three forward-looping pour poses plus a dense collapse pose; restrained internal texture only inside a successfully composed generated break | Coherent break without the optional texture |
-| `twilightHeroBreak` | `twilight-breaking-wave-atlas.png` | 512 x 136 | Coherent Twilight crest/curl/pour/collapse silhouettes used for the active edge and as the first fallback behind the long back layer | Connected procedural curling lip, falling sheet, tube shadow, and churn |
 | `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
 | `waveProgression` | `wave-progression-atlas.png` | 320 x 192 | Four tapered threat stages: rounded swell, pitching lip, open curl, airy whitewater impact | Collision-aligned procedural shoulder, folding lip, shadow wedge, and churn |
 | `dolphin` | `dolphin-atlas.png` | 224 x 80 | Approach, offer, mounted ride, breach, dismount | Code-authored animal silhouette |
@@ -77,7 +74,7 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 
 ## Offline source and deterministic conversion
 
-The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The wave-breaker polish source is 1024 x 1024; the selected long Twilight back layer, earlier full Twilight barrel, staged wave progression, Twilight components, curtain/break sheets, and other selected sheets are 1280 x 720. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. All are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The active travelling-break sheet is 384 x 216, the wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, retired complete-wave studies, and other selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. All are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
 2. identifies and removes the chroma-magenta field while preserving coral accents; the staged JPEG-derived wave uses a boundary-connected chroma flood so interior coral cannot be globally keyed away;

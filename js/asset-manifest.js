@@ -22,21 +22,12 @@ function atlas(filename, columns, rows, cellWidth, cellHeight, names, {
 }
 
 export const GENERATED_ASSET_MANIFEST = Object.freeze({
-  twilightLongBarrelBack: atlas("twilight-long-barrel-back-atlas.png", 1, 1, 352, 198, [
-    "longBarrelBack",
-  ], { anchor: [0.48, 0.92] }),
-  twilightHeroBarrel: atlas("twilight-hero-barrel-atlas.png", 1, 1, 256, 144, [
-    "heroBarrel",
-  ], { anchor: [0, 0] }),
+  twilightTravellingBreak: atlas("twilight-travelling-break-v2-atlas.png", 3, 2, 112, 104, [
+    "spill", "steepen", "fall", "pocket", "curtain", "collapse",
+  ], { anchor: [0.82, 1] }),
   twilightHeroWave: atlas("twilight-hero-wave-components-atlas.png", 2, 2, 128, 72, [
     "foamCrown", "faceRibbons", "foregroundShoulder", "contactSpray",
   ]),
-  twilightHeroCurtain: atlas("twilight-waterfall-curtain-atlas.png", 4, 1, 88, 112, [
-    "pourA", "pourB", "pourC", "pourD",
-  ], { anchor: [0.5, 1] }),
-  twilightHeroBreak: atlas("twilight-breaking-wave-atlas.png", 4, 1, 128, 136, [
-    "curlA", "curlB", "pour", "collapse",
-  ], { anchor: [0.66, 1] }),
   waveBreaker: atlas("wave-breaker-atlas.png", 4, 2, 72, 64, [
     "crestFeatherA", "crestFeatherB", "risingCurl", "impact",
     "whitewaterChurn", "foamTendrils", "sprayBurst", "seaMist",

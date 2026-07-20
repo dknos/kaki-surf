@@ -2,43 +2,74 @@
   "version": 2,
   "generator": "tools/art/build-grok-assets.py",
   "families": {
-    "twilight-long-barrel-back-atlas": {
-      "image": "twilight-long-barrel-back-atlas.png",
-      "width": 352,
-      "height": 198,
+    "twilight-travelling-break-v2-atlas": {
+      "image": "twilight-travelling-break-v2-atlas.png",
+      "width": 336,
+      "height": 208,
       "frames": {
-        "longBarrelBack": {
+        "spill": {
           "x": 0,
           "y": 0,
-          "width": 352,
-          "height": 198,
+          "width": 112,
+          "height": 104,
           "anchor": [
-            0.48,
-            0.92
+            0.82,
+            1.0
+          ]
+        },
+        "steepen": {
+          "x": 112,
+          "y": 0,
+          "width": 112,
+          "height": 104,
+          "anchor": [
+            0.82,
+            1.0
+          ]
+        },
+        "fall": {
+          "x": 224,
+          "y": 0,
+          "width": 112,
+          "height": 104,
+          "anchor": [
+            0.82,
+            1.0
+          ]
+        },
+        "pocket": {
+          "x": 0,
+          "y": 104,
+          "width": 112,
+          "height": 104,
+          "anchor": [
+            0.82,
+            1.0
+          ]
+        },
+        "curtain": {
+          "x": 112,
+          "y": 104,
+          "width": 112,
+          "height": 104,
+          "anchor": [
+            0.82,
+            1.0
+          ]
+        },
+        "collapse": {
+          "x": 224,
+          "y": 104,
+          "width": 112,
+          "height": 104,
+          "anchor": [
+            0.82,
+            1.0
           ]
         }
       },
-      "source": "docs/art-source/grok/twilight-long-barrel-back-edit-v1.png",
-      "sourceSha256": "269800eda215821d40c9bbf24eaf7fa77f47e3a2159e36b9221720892975e05b"
-    },
-    "twilight-hero-barrel-atlas": {
-      "image": "twilight-hero-barrel-atlas.png",
-      "width": 256,
-      "height": 144,
-      "frames": {
-        "heroBarrel": {
-          "x": 0,
-          "y": 0,
-          "width": 256,
-          "height": 144,
-          "anchor": [
-            0.0,
-            0.0
-          ]
-        }
-      },
-      "source": "docs/art-source/grok/twilight-hero-barrel-source.png",
-      "sourceSha256": "197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf"
+      "source": "docs/art-source/grok/twilight-travelling-break-v2-source.png",
+      "sourceSha256": "8cad52668112bb477e4bb8923693333848b631662fe2ab3f3f2307b40b88fd1f"
     },
     "twilight-hero-wave-components-atlas": {
       "image": "twilight-hero-wave-components-atlas.png",
@@ -88,104 +119,6 @@
       },
       "source": "docs/art-source/grok/twilight-hero-wave-components-source.png",
       "sourceSha256": "bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600"
-    },
-    "twilight-waterfall-curtain-atlas": {
-      "image": "twilight-waterfall-curtain-atlas.png",
-      "width": 352,
-      "height": 112,
-      "frames": {
-        "pourA": {
-          "x": 0,
-          "y": 0,
-          "width": 88,
-          "height": 112,
-          "anchor": [
-            0.5,
-            1.0
-          ]
-        },
-        "pourB": {
-          "x": 88,
-          "y": 0,
-          "width": 88,
-          "height": 112,
-          "anchor": [
-            0.5,
-            1.0
-          ]
-        },
-        "pourC": {
-          "x": 176,
-          "y": 0,
-          "width": 88,
-          "height": 112,
-          "anchor": [
-            0.5,
-            1.0
-          ]
-        },
-        "pourD": {
-          "x": 264,
-          "y": 0,
-          "width": 88,
-          "height": 112,
-          "anchor": [
-            0.5,
-            1.0
-          ]
-        }
-      },
-      "source": "docs/art-source/grok/twilight-waterfall-curtain-source.png",
-      "sourceSha256": "5e0d4166e0b46681b9aaf477d37aeb8503989289ad67ea2552df1422291fb2c3"
-    },
-    "twilight-breaking-wave-atlas": {
-      "image": "twilight-breaking-wave-atlas.png",
-      "width": 512,
-      "height": 136,
-      "frames": {
-        "curlA": {
-          "x": 0,
-          "y": 0,
-          "width": 128,
-          "height": 136,
-          "anchor": [
-            0.66,
-            1.0
-          ]
-        },
-        "curlB": {
-          "x": 128,
-          "y": 0,
-          "width": 128,
-          "height": 136,
-          "anchor": [
-            0.66,
-            1.0
-          ]
-        },
-        "pour": {
-          "x": 256,
-          "y": 0,
-          "width": 128,
-          "height": 136,
-          "anchor": [
-            0.66,
-            1.0
-          ]
-        },
-        "collapse": {
-          "x": 384,
-          "y": 0,
-          "width": 128,
-          "height": 136,
-          "anchor": [
-            0.66,
-            1.0
-          ]
-        }
-      },
-      "source": "docs/art-source/grok/twilight-breaking-wave-source.jpg",
-      "sourceSha256": "803b17d83dbf2b9f6c03973dfee5074b188b163d2077cb0efa2f14a2ca2f52e1"
     },
     "wave-breaker-atlas": {
       "image": "wave-breaker-atlas.png",
