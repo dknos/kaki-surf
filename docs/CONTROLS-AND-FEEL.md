@@ -18,7 +18,7 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 
 Action is always readable: hold on the face to compress, then release while carving upward on a useful line to earn an efficiency-scaled pump; carry that uphill line through the lip to launch. Releases below the charge/line gate consume their partial charge without a burst, and a short cadence floor rejects tapping. Action is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
 
-Simple Trick is contextual and buffered. A held request chooses Front Rail Grab, or Tail Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time.
+Simple Trick is contextual and buffered. On Twilight's wave face, holding it inside the eligible critical pocket tucks Kaki into the tube; Moon Log uses its Soul Arch variant. Releasing Trick or leaving the pocket returns immediately to the ordinary riding pose. Around a launch, a held request chooses Front Rail Grab, or Tail Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time.
 
 Late in descent, Simple mode nudges the board toward whichever landing tangent is nearer: normal or opposite-facing. The board-specific correction is strongest on Foam Puff and lightest on Moon Log. This is not a guaranteed landing; speed, trick-relative board motion, contact error, and the normal landing bands still apply.
 
@@ -64,6 +64,8 @@ When a change commits:
 
 In the air, the nearest of the regular and opposite-facing landing tangents is valid. A clean opposite-facing landing commits the new direction and keeps quality-dependent momentum carry.
 
+Rider direction never mirrors Twilight's environmental animation. Its breaking edge continues left-to-right, falling water continues top-to-bottom, and the sparse water clock never runs backward when Kaki carves or reverses. Only rider-facing elements such as the board-contact spray and wake flip with the surfer.
+
 ## Slope drive, Action, and big air
 
 The rider samples the same animated ride surface used for drawing and landing. The simulation projects signed x travel and face movement through that surface gradient:
@@ -75,7 +77,7 @@ The rider samples the same animated ride surface used for drawing and landing. T
 
 The old narrow seam is no longer required to unlock the board's maximum speed. The readable fast line remains useful guidance and improves pump efficiency, but `currentRideSpeedCap()` is the board's actual hard cap. A poor line can still move; it simply gives back speed through slope and reduced local drive.
 
-Launch height comes from current speed, uphill approach, Action charge, pocket position, board launch identity, and bonuses such as Moon Pop. A basic lip pop retains a useful floor. A fast bottom turn and climb makes the larger arc. Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample.
+Launch height comes from current speed, uphill approach, Action charge, pocket position, board launch identity, and bonuses such as Moon Pop. A basic lip pop retains a useful floor. A fast bottom turn and climb makes the larger arc. Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample. Large aerials automatically pan the world down to expose more sky and landing room, then ease home; the shift is clamped and disabled by Reduced Motion.
 
 Perfect, clean, and wobble landings preserve progressively less speed. A short carry timer prevents a successful landing from collapsing immediately back to baseline glide.
 
@@ -119,7 +121,7 @@ Surf School is independent of Wave Read and teaches six actions in order: **drop
 
 ## Wildlife and bonuses
 
-Dolphin and whale offers can temporarily mount Kitty. While mounted, the ride preserves a minimum speed and grows Flow; Special or a lip launch triggers a large animal-assisted dismount. A shark uses a minimum telegraph before crossing. Contact wipes out unless Star Foam is ready, while threading the crossing grants score and Flow.
+Dolphin and whale offers can temporarily mount Kitty. While mounted, the ride preserves a minimum speed and grows Flow; Special or a lip launch triggers a large animal-assisted dismount. A shark uses a minimum telegraph before crossing. Contact wipes out unless Star Foam is ready, while threading the crossing grants score and Flow. Twilight suppresses boat and aircraft traffic so no decorative craft can appear inside or behind its hero break; wildlife and bonuses remain simulation-owned opportunities.
 
 Mango Rush reduces uphill loss for its active duration, Moon Pop multiplies the next launch and is consumed on use, and Star Foam protects one shark contact or wobble landing before being consumed. Powerups, mounts, and active timers come from `WorldSimulation.getModifiers()`; their sprites and HUD are presentation only.
 

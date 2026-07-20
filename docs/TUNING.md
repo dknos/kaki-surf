@@ -57,7 +57,7 @@ Primary drive comes from `GameplayWave.surfaceGradientAt(x, face)`. Simulation p
 
 A release qualifies as a pump only after enough charge, a useful line, upward intent, compatible face velocity, and the cadence floor. Invalid releases consume their partial charge so tapping cannot bank hidden energy. Carve score/Flow likewise requires a sustained arc with real face excursion and peak velocity. These gates make rhythm and line choice outperform input spam.
 
-The curl stays at its start point through `curlGrace`, then accelerates smoothly toward `curlThreatMaxSpeed`. Recent valid pumps, full carves, reversals, clean landings, and high physical speed provide bounded relief; signed rider travel never reverses the threat. Recovery may explicitly retreat the curl to a safe respawn position.
+The curl stays at its start point through `curlGrace`, then accelerates smoothly toward `curlThreatMaxSpeed`. Recent valid pumps, full carves, reversals, clean landings, and high physical speed provide bounded relief; signed rider travel never reverses the threat. Recovery may explicitly retreat the curl to a safe respawn position. Twilight's visible curtain edge is welded three logical pixels behind the canonical contact and therefore advances left-to-right with the threat rather than mirroring the rider.
 
 `player.waveMomentum` follows a mix of downhill drive, line quality, and pocket position. It is a smooth presentation/launch-history value rather than a speed-cap gate. A correctly timed pump can still add up to 0.14. The ride cap is:
 
@@ -68,6 +68,14 @@ rideCap = hardMax
 ```
 
 Travel velocity is bounded to `-48..48`. Same-direction input accelerates toward its signed target. Opposite input responds more slowly at high speed, scrubs velocity, and must satisfy both reversal thresholds before `travelDirection` changes. Releasing input coasts toward the current signed glide. Playfield edges remove only the outward component.
+
+### Twilight travelling break and tube
+
+`heroBarrel` remains the internal profile ID for save/config compatibility, but its presentation is a long travelling break rather than one screen-shaped C-wave. The profile's ride bounds are x = 156..306, air bounds are x = 138..326, and `contactOffset` is 96. The visible break consumes the same canonical `contactX()` as collision; the left-side sky window grows monotonically behind that edge.
+
+The falling-water clock advances by `deltaWaveTime * 14`. It is fixed-step and pause-safe, ignores rider speed and direction, and freezes under Reduced Motion. Three ordinary curtain poses cycle forward; the fourth pose is reserved for deep collapse. Other surface clocks still respond to accumulated nonnegative wave travel, so a direction reversal may change rider/world parallax without running water animation backward.
+
+A riding Tube Tuck is eligible when the local zone is `critical` or risk is at least 0.58, while face position remains within 0.16..0.76. Holding Simple Trick or Advanced `trick4` sustains the pose; Moon Log resolves the pose as Soul Arch. Tube time scales both steering axes to 46%, adds a small 8%-scaled local wave-push contribution, and scores `58 * (1 + risk * 0.55) * multiplier` style points per second plus 0.025 normalized Flow per second. Releasing the input or leaving the eligible pocket clears the pose immediately.
 
 ## Air and landing defaults
 
@@ -159,7 +167,7 @@ The four numbers multiply base entry duration, points, risk, and board-motion ti
 | ID | Name | Wave style | Presentation identity |
 | --- | --- | --- | --- |
 | `goldenCoast` | Golden Coast | `classic` | Sunlit coast, warm seafoam palette, sunset music pattern |
-| `twilightGlass` | Twilight Glass | `heroBarrel` | Violet horizon, star points, cool glass palette, staged three-quarter hero barrel, night arrangement |
+| `twilightGlass` | Twilight Glass | `heroBarrel` | Violet horizon, long side-scroller face, coherent left-to-right break, downward whitewater, rideable tube, night arrangement |
 | `stormbreak` | Stormbreak | `classic` | Squalls, rain, pier silhouette, silver-green face, storm arrangement |
 
 All styles expose the same collision, slope, speed-potential, contact, and projection queries, while their authored geometry may differ. Twilight's `heroBarrel` therefore changes the physical line as well as its presentation; Golden Coast and Stormbreak preserve the existing `classic` line. Future levels can select their own reviewed profiles without duplicating wave math in the renderer. Board and condition selections persist locally.
@@ -181,6 +189,7 @@ All styles expose the same collision, slope, speed-potential, contact, and proje
 | `cleanLanding` | 95 | Clean landing bucket |
 | `wobbleSave` | 55 | Wobble landing bucket |
 | `comboMax` | 4.2 | Combo component cap |
+| Tube style rate | 58/s before risk and multiplier | Continuous reward while a valid Tube Tuck/Soul Arch is held |
 
 Rotation names and points use actual accumulated rotation quantized to the nearest 180 degrees after a 135-degree meaningful threshold. Perfect multiplies air/style by 1.1, clean by 1, and wobble by 0.55. Aerial buckets also receive board style, launch multiplier, full-signature repeat factor, variety, and manifest risk.
 
@@ -188,4 +197,4 @@ Exact signatures retain direction, rotation size, ordered trick IDs, grab hold b
 
 ## Presentation and access defaults
 
-`cameraResponse` is 5.8 and `juiceIntensity` is 1; both are presentation-only. New saves use Simple Controls, Wave Read Assist `full`, Reduced Flash on, 70% screen shake, touch controls on, and steering/landing assists off. Saves created before `controlMode` existed migrate to Advanced so their learned mapping remains intact; fresh and malformed saves use Simple. Either steering or landing assistance multiplies the score by 0.82. Reduced Motion, Reduced Flash, High Contrast, and Wave Read modes do not change physics or scoring.
+`cameraResponse` is 5.8 and `juiceIntensity` is 1; both are presentation-only. While airborne, the vertical camera target combines distance above logical y = 68 with up to 10 pixels of max-height contribution and clamps the result to 0..62. It eases back to zero outside air; Reduced Motion forces the target to zero. New saves use Simple Controls, Wave Read Assist `full`, Reduced Flash on, 70% screen shake, touch controls on, and steering/landing assists off. Saves created before `controlMode` existed migrate to Advanced so their learned mapping remains intact; fresh and malformed saves use Simple. Either steering or landing assistance multiplies the score by 0.82. Reduced Motion, Reduced Flash, High Contrast, and Wave Read modes do not change physics or scoring.

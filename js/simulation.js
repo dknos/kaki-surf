@@ -625,7 +625,7 @@ export class SurfSimulation {
     const preliminaryPotential = this.querySpeedPotential(input);
     const steeringScale = this.controlMode === "advanced"
       ? this.updateRidingManeuvers(dt, input, preliminaryPotential)
-      : 1;
+      : this.updateSimpleRidingManeuver(dt, input, preliminaryPotential);
     const inputY = (Math.abs(input.y) < 0.02 ? 0 : input.y) * steeringScale;
     const inputX = (Math.abs(input.x) < 0.02 ? 0 : input.x) * steeringScale;
 
@@ -1474,27 +1474,54 @@ export class SurfSimulation {
     if (presses.trick2) this.tryCutback(potential);
     if (presses.trick3) this.tryFloater(potential);
 
-    const tubeEligible = (potential.zone === "critical" || potential.risk >= 0.58)
-      && player.face >= 0.16
-      && player.face <= 0.76;
+    const tubeEligible = isTubeRideEligible(potential, player);
     if (input.trick4 && tubeEligible) {
-      const id = this.board.id === "moonLog" ? "soulArch" : "tubeTuck";
-      if (player.maneuver.id !== id) this.startManeuver(id, 0.8, potential);
-      player.maneuverTime += dt;
-      player.maneuver.progress = clamp(player.maneuverTime / 0.8, 0, 1);
-      this.score.updateTube(dt, potential.risk, this.currentMultiplier());
-      player.speed += this.tuning.wavePush * potential.acceleration * 0.08 * dt;
-      return 0.46;
+      return this.sustainTubeRide(dt, potential);
     }
     if (presses.trick4 && !tubeEligible) {
       this.rejectManeuver("trick4", "tubeTuck", "FIND POCKET");
     }
-    if (!input.trick4 && (player.maneuver.id === "tubeTuck" || player.maneuver.id === "soulArch")) {
+    if ((!input.trick4 || !tubeEligible)
+      && (player.maneuver.id === "tubeTuck" || player.maneuver.id === "soulArch")) {
       player.maneuver.id = "";
       player.maneuver.progress = 0;
       player.maneuverTime = 0;
     }
     return 1;
+  }
+
+  updateSimpleRidingManeuver(dt, input, potential) {
+    const player = this.player;
+    const tubeEligible = isTubeRideEligible(potential, player);
+    if (input.trick && tubeEligible) {
+      // In Simple Controls, TRICK is contextual. Holding it inside the pocket
+      // tucks Kaki into the tube instead of reserving that press for an aerial.
+      const context = player.contextTrick;
+      context.consumedId = context.requestId;
+      context.pending = false;
+      context.released = false;
+      context.activeAction = "";
+      context.syntheticHold = 0;
+      return this.sustainTubeRide(dt, potential);
+    }
+    if ((!input.trick || !tubeEligible)
+      && (player.maneuver.id === "tubeTuck" || player.maneuver.id === "soulArch")) {
+      player.maneuver.id = "";
+      player.maneuver.progress = 0;
+      player.maneuverTime = 0;
+    }
+    return 1;
+  }
+
+  sustainTubeRide(dt, potential) {
+    const player = this.player;
+    const id = this.board.id === "moonLog" ? "soulArch" : "tubeTuck";
+    if (player.maneuver.id !== id) this.startManeuver(id, 0.8, potential);
+    player.maneuverTime += dt;
+    player.maneuver.progress = clamp(player.maneuverTime / 0.8, 0, 1);
+    this.score.updateTube(dt, potential.risk, this.currentMultiplier());
+    player.speed += this.tuning.wavePush * potential.acceleration * 0.08 * dt;
+    return 0.46;
   }
 
   consumeTrickPresses(input) {
@@ -2176,6 +2203,12 @@ function resetContextTrick(state) {
   state.vertical = 0;
   state.activeAction = "";
   state.syntheticHold = 0;
+}
+
+function isTubeRideEligible(potential, player) {
+  return (potential?.zone === "critical" || Number(potential?.risk ?? 0) >= 0.58)
+    && Number(player?.face ?? 0) >= 0.16
+    && Number(player?.face ?? 0) <= 0.76;
 }
 
 function simpleTapTrickFor(manifest) {

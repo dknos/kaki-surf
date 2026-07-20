@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { BOARDS, WAVE_STYLES } from "../js/config.js";
+import { BOARDS, TUNING, WAVE_STYLES } from "../js/config.js";
 import {
   contactX,
   GameplayWave,
@@ -23,6 +23,8 @@ import {
 import {
   heroBarrelGeometry,
   heroBarrelStage,
+  heroPassedSkyWindow,
+  heroWaterfallFrame,
   isHeroBarrelWave,
 } from "../js/hero-wave-visuals.js";
 
@@ -175,6 +177,51 @@ test("hero presentation stages keep an open aperture and the exact collision edg
   assert.ok(caughtGeometry.aperture.bottom > caughtGeometry.aperture.top + 28, "catch animation cannot close the sky window into a wall");
 });
 
+test("Twilight's passing curtain advances right without following rider direction", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  const player = { x: 224, face: 0.58, state: "riding", curlTimer: 0, travelDirection: 1 };
+  const samples = [];
+  for (const curlX of [28, 64, 108, 164]) {
+    wave.curlX = curlX;
+    const right = heroPassedSkyWindow(wave, player).right;
+    const geometry = heroBarrelGeometry(wave, player);
+    samples.push(right);
+    assert.ok(right < geometry.contactX, "revealed sky remains behind the falling edge");
+    assert.equal(geometry.curtain.edgeX, geometry.contactX - 3);
+    assert.ok(geometry.curtain.baseX < geometry.curtain.edgeX, "the waterfall leans back into churn");
+
+    player.travelDirection = -1;
+    assert.equal(heroPassedSkyWindow(wave, player).right, right, "reversal cannot mirror the passing wave");
+    assert.equal(heroBarrelGeometry(wave, player).curtain.edgeX, geometry.curtain.edgeX);
+    player.travelDirection = 1;
+  }
+  assert.deepEqual(samples, [...samples].sort((a, b) => a - b));
+  assert.equal(new Set(samples).size, samples.length, "each advancing contact reveals more horizon");
+});
+
+test("Twilight waterfall frames pour forward, freeze for Reduced Motion, and densify on collapse", () => {
+  const sequence = Array.from({ length: 18 }, (_, index) => heroWaterfallFrame(index * 0.5, 0, false));
+  assert.ok(sequence.includes("pourA"));
+  assert.ok(sequence.includes("pourB"));
+  assert.ok(sequence.includes("pourC"));
+  assert.equal(heroWaterfallFrame(0, 0, true), "pourB");
+  assert.equal(heroWaterfallFrame(999, 0, true), "pourB");
+  assert.equal(heroWaterfallFrame(0, 0.7, false), "pourD");
+});
+
+test("contact collapse deepens the curtain without making its lip retreat", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  wave.curlX = 92;
+  wave.pressure = 0.88;
+  const player = { x: 224, face: 0.58, state: "riding", curlTimer: 0 };
+  const safe = heroBarrelGeometry(wave, player);
+  player.curlTimer = TUNING.curlCatchDelay * 0.7;
+  const caught = heroBarrelGeometry(wave, player);
+  assert.equal(caught.curtain.edgeX, safe.curtain.edgeX);
+  assert.equal(caught.contactX, safe.contactX);
+  assert.ok(caught.curtain.baseX < safe.curtain.baseX, "collapse adds downward/backward wash only");
+});
+
 test("speedPotential is deterministic and side-effect free", () => {
   const wave = new GameplayWave(0x1234abcd);
   wave.update(2.25, 94, 2.8);
@@ -325,20 +372,20 @@ test("decorative surface flow stays monotonic when the rider reverses", () => {
 
 test("presentation clocks never reverse across sharp speed, momentum, or direction changes", () => {
   const clocks = createWavePresentationClocks();
-  const wave = { travel: 0, worldTravel: 0 };
+  const wave = { travel: 0, worldTravel: 0, time: 0 };
   const player = { speed: 132, waveMomentum: 1, travelDirection: 1 };
-  const phaseKeys = ["backWater", "speedFeedback", "swellContours", "faceGlints", "powerSeam", "crest"];
+  const phaseKeys = ["backWater", "speedFeedback", "swellContours", "faceGlints", "powerSeam", "crest", "fall"];
   advanceWavePresentationClocks(clocks, wave, player, 138);
 
   const samples = [
-    { travel: 96, worldTravel: 96, speed: 132, momentum: 1, direction: 1 },
-    { travel: 97, worldTravel: 95, speed: 8, momentum: 0.02, direction: -1 },
-    { travel: 101, worldTravel: 91, speed: 42, momentum: 0.18, direction: -1 },
-    { travel: 109, worldTravel: 99, speed: 96, momentum: 0.76, direction: 1 },
+    { travel: 96, worldTravel: 96, time: 1, speed: 132, momentum: 1, direction: 1 },
+    { travel: 97, worldTravel: 95, time: 2, speed: 8, momentum: 0.02, direction: -1 },
+    { travel: 101, worldTravel: 91, time: 3, speed: 42, momentum: 0.18, direction: -1 },
+    { travel: 109, worldTravel: 99, time: 4, speed: 96, momentum: 0.76, direction: 1 },
   ];
   let previous = Object.fromEntries(phaseKeys.map((key) => [key, clocks[key]]));
   for (const sample of samples) {
-    Object.assign(wave, { travel: sample.travel, worldTravel: sample.worldTravel });
+    Object.assign(wave, { travel: sample.travel, worldTravel: sample.worldTravel, time: sample.time });
     Object.assign(player, {
       speed: sample.speed,
       waveMomentum: sample.momentum,
@@ -350,6 +397,27 @@ test("presentation clocks never reverse across sharp speed, momentum, or directi
       previous[key] = clocks[key];
     }
   }
+});
+
+test("waterfall gravity clock advances from wave time, not rider speed", () => {
+  const clocks = createWavePresentationClocks();
+  const wave = { travel: 0, worldTravel: 0, time: 0 };
+  const player = { speed: 8, waveMomentum: 0, travelDirection: -1 };
+  advanceWavePresentationClocks(clocks, wave, player, 138);
+
+  Object.assign(wave, { travel: 2, time: 1 });
+  advanceWavePresentationClocks(clocks, wave, player, 138);
+  const slowDelta = clocks.fall;
+
+  Object.assign(wave, { travel: 142, time: 2 });
+  Object.assign(player, { speed: 138, waveMomentum: 1, travelDirection: 1 });
+  advanceWavePresentationClocks(clocks, wave, player, 138);
+  assert.equal(clocks.fall - slowDelta, slowDelta);
+
+  const frozen = clocks.fall;
+  Object.assign(wave, { travel: 282, time: 3 });
+  advanceWavePresentationClocks(clocks, wave, player, 138, true);
+  assert.equal(clocks.fall, frozen, "Reduced Motion freezes falling-water animation");
 });
 
 test("wave progression stages and gold glints follow readable forward motion", () => {

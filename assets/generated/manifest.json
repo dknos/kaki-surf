@@ -70,6 +70,104 @@
       "source": "docs/art-source/grok/twilight-hero-wave-components-source.png",
       "sourceSha256": "bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600"
     },
+    "twilight-waterfall-curtain-atlas": {
+      "image": "twilight-waterfall-curtain-atlas.png",
+      "width": 352,
+      "height": 112,
+      "frames": {
+        "pourA": {
+          "x": 0,
+          "y": 0,
+          "width": 88,
+          "height": 112,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "pourB": {
+          "x": 88,
+          "y": 0,
+          "width": 88,
+          "height": 112,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "pourC": {
+          "x": 176,
+          "y": 0,
+          "width": 88,
+          "height": 112,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        },
+        "pourD": {
+          "x": 264,
+          "y": 0,
+          "width": 88,
+          "height": 112,
+          "anchor": [
+            0.5,
+            1.0
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/twilight-waterfall-curtain-source.png",
+      "sourceSha256": "5e0d4166e0b46681b9aaf477d37aeb8503989289ad67ea2552df1422291fb2c3"
+    },
+    "twilight-breaking-wave-atlas": {
+      "image": "twilight-breaking-wave-atlas.png",
+      "width": 512,
+      "height": 136,
+      "frames": {
+        "curlA": {
+          "x": 0,
+          "y": 0,
+          "width": 128,
+          "height": 136,
+          "anchor": [
+            0.66,
+            1.0
+          ]
+        },
+        "curlB": {
+          "x": 128,
+          "y": 0,
+          "width": 128,
+          "height": 136,
+          "anchor": [
+            0.66,
+            1.0
+          ]
+        },
+        "pour": {
+          "x": 256,
+          "y": 0,
+          "width": 128,
+          "height": 136,
+          "anchor": [
+            0.66,
+            1.0
+          ]
+        },
+        "collapse": {
+          "x": 384,
+          "y": 0,
+          "width": 128,
+          "height": 136,
+          "anchor": [
+            0.66,
+            1.0
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/twilight-breaking-wave-source.jpg",
+      "sourceSha256": "803b17d83dbf2b9f6c03973dfee5074b188b163d2077cb0efa2f14a2ca2f52e1"
+    },
     "wave-breaker-atlas": {
       "image": "wave-breaker-atlas.png",
       "width": 288,

@@ -1,6 +1,6 @@
 # ADR-001: Standalone fixed-step Canvas core
 
-Status: accepted 2026-07-19; amended for the premium wave, trick, and presentation overhaul.
+Status: accepted 2026-07-19; amended 2026-07-19 for the travelling-break, tube, camera, trick, and presentation overhaul.
 
 ## Decision
 
@@ -22,7 +22,7 @@ The stable gameplay core is separated from presentation and browser lifecycle:
 | `js/simulation.js` | Fixed-step signed rider physics, controls, contextual maneuvers, world interactions, launches, landings, and events |
 | `js/sprites.js` | Production Kitty poses, board silhouettes, flex, and wake drawing |
 | `js/wave-visuals.js` | Production face/curl/VFX drawing derived from canonical wave queries |
-| `js/hero-wave-visuals.js` | Twilight's staged hero-barrel volume, real sky aperture, connected face bands, foam crown, and collision-aligned contact presentation |
+| `js/hero-wave-visuals.js` | Twilight's staged travelling break, passed-sky window, coherent curl/pour, tube opening, nonmirroring water motion, and collision-aligned contact presentation |
 | `js/world-visuals.js` | Traffic, wildlife, pickups, carrier, and procedural atlas fallbacks |
 | `js/renderer.js` | Canvas composition, HUD, callouts, particles, and accessibility presentation |
 | `js/asset-manifest.js` / `js/asset-loader.js` | Local atlas/background validation and independent optional-family loading |

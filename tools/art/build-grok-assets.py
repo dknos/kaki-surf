@@ -39,6 +39,7 @@ class Family:
     source_rows: int | None = None
     connected_chroma: bool = False
     edge_blend: bool = False
+    lower_continuation_blend: bool = False
     preserve_layout: bool = False
     source_inset: int = 0
     resample: str = "lanczos"
@@ -83,6 +84,43 @@ FAMILIES = (
         sharpen=False,
         source_size=(1280, 720),
         source_sha256="bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600",
+    ),
+    Family(
+        source="twilight-waterfall-curtain-source.png",
+        output="twilight-waterfall-curtain-atlas.png",
+        columns=4,
+        rows=1,
+        cell=(88, 112),
+        names=("pourA", "pourB", "pourC", "pourD"),
+        # The sheet is anchored at the churn line so every frame can share the
+        # canonical breaking edge while its internal water falls downward.
+        anchor=(0.5, 1.0),
+        colors=24,
+        padding=2,
+        connected_chroma=True,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="5e0d4166e0b46681b9aaf477d37aeb8503989289ad67ea2552df1422291fb2c3",
+    ),
+    Family(
+        source="twilight-breaking-wave-source.jpg",
+        output="twilight-breaking-wave-atlas.png",
+        columns=4,
+        rows=1,
+        cell=(128, 136),
+        names=("curlA", "curlB", "pour", "collapse"),
+        # The lower breaking shoulder stays welded to the canonical contact
+        # while the staged crest pitches and falls around it.
+        anchor=(0.66, 1.0),
+        colors=28,
+        padding=2,
+        connected_chroma=True,
+        lower_continuation_blend=True,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="803b17d83dbf2b9f6c03973dfee5074b188b163d2077cb0efa2f14a2ca2f52e1",
     ),
     Family(
         source="wave-breaker-source-v2.png",
@@ -423,6 +461,41 @@ def blend_open_wave_edges(image: Image.Image) -> Image.Image:
     return rgba
 
 
+def blend_lower_wave_continuation(image: Image.Image) -> Image.Image:
+    """Feather only the lower/right face that must join procedural water.
+
+    The authored hook and foam tip stay crisp. The opaque base and shoulder
+    fade irregularly before their source-cell edges so they cannot read as a
+    pasted rectangle at runtime.
+    """
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    pixels = list(rgba.get_flattened_data())
+    right_start = width * 0.56
+    right_y_start = height * 0.52
+    left_end = width * 0.16
+    left_y_start = height * 0.46
+    bottom_start = height * 0.7
+    blended: list[tuple[int, int, int, int]] = []
+    for index, (red, green, blue, alpha) in enumerate(pixels):
+        x = index % width
+        y = index // width
+        right_mix = 1.0
+        if y > right_y_start and x > right_start:
+            right_mix = max(0.0, (width - 1 - x) / (width - right_start))
+        left_mix = 1.0
+        if y > left_y_start and x < left_end:
+            left_mix = max(0.0, x / left_end)
+        bottom_mix = 1.0 if y <= bottom_start else max(0.0, (height - 1 - y) / (height - bottom_start))
+        # Deterministic tooth breaks avoid one perfectly straight fade front.
+        tooth = ((x * 7 + y * 11) % 13) / 52
+        edge_mix = min(left_mix, right_mix, bottom_mix)
+        mixed = max(0.0, min(1.0, edge_mix - tooth * (1 - edge_mix)))
+        blended.append((red, green, blue, round(alpha * mixed)))
+    rgba.putdata(blended)
+    return rgba
+
+
 def isolate_wave_foam(image: Image.Image) -> Image.Image:
     """Keep organic foam and its nearby ink while dropping rectangular water fill."""
     rgba = image.convert("RGBA")
@@ -466,6 +539,8 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     keyed = remove_connected_chroma(source_cell) if family.connected_chroma else remove_chroma(source_cell)
     if family.edge_blend:
         keyed = blend_open_wave_edges(keyed)
+    if family.lower_continuation_blend:
+        keyed = blend_lower_wave_continuation(keyed)
     if family.foam_only:
         keyed = isolate_wave_foam(keyed)
 
@@ -504,7 +579,9 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
 
     # A crisp alpha edge and a compact palette turn the large source into an
     # authored logical-pixel sprite rather than a filtered thumbnail.
-    subject_alpha = subject.getchannel("A").point(lambda value: 255 if value >= 80 else 0)
+    subject_alpha = subject.getchannel("A") if family.edge_blend or family.lower_continuation_blend else subject.getchannel("A").point(
+        lambda value: 255 if value >= 80 else 0
+    )
     rgb = subject.convert("RGB")
     quantized = rgb.quantize(colors=family.colors, method=Image.Quantize.MEDIANCUT).convert("RGBA")
     quantized.putalpha(subject_alpha)

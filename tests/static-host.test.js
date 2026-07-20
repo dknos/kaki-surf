@@ -132,8 +132,10 @@ test("QA page references only present local files", () => {
 
 test("every generated production atlas is local, dimension-checked, and compact", () => {
   const requiredFamilies = [
-    "twilightHeroBarrel", "twilightHeroWave", "waveBreaker", "waveProgression", "dolphin", "shark",
-    "whale", "birds", "boats", "airTraffic", "powerups", "boards", "carrier", "uiOrnaments",
+    "twilightHeroBarrel", "twilightHeroWave", "twilightHeroCurtain", "twilightHeroBreak",
+    "waveBreaker", "waveProgression",
+    "dolphin", "shark", "whale", "birds", "boats", "airTraffic", "powerups", "boards", "carrier",
+    "uiOrnaments",
   ];
   assert.deepEqual(Object.keys(GENERATED_ASSET_MANIFEST), requiredFamilies);
 
@@ -148,6 +150,7 @@ test("every generated production atlas is local, dimension-checked, and compact"
     const minimumFrames = family === "twilightHeroBarrel"
       ? 1
       : family === "waveProgression" || family === "twilightHeroWave"
+          || family === "twilightHeroCurtain" || family === "twilightHeroBreak"
         ? 4
         : 8;
     assert.ok(Object.keys(descriptor.frames).length >= minimumFrames, `${family} publishes reusable frame metadata`);

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { BOARDS, FIXED_STEP } from "../js/config.js";
-import { KakiRenderer } from "../js/renderer.js";
+import { KakiRenderer, verticalCameraTarget } from "../js/renderer.js";
 import { SurfSimulation } from "../js/simulation.js";
 import { resolveKakiPose } from "../js/sprites.js";
 
@@ -212,4 +212,16 @@ test("stale queued hints expire instead of replacing current action feedback lat
   renderer.time = 1.6;
   renderer.pruneStaleCallouts();
   assert.deepEqual(renderer.calloutQueue, []);
+});
+
+test("large aerials pan the world down to reveal sky and Reduced Motion stays fixed", () => {
+  const highAir = {
+    state: "airborne",
+    airY: 18,
+    maxAirHeight: 94,
+  };
+  assert.ok(verticalCameraTarget(highAir) >= 40, "big air receives meaningful vertical framing");
+  assert.ok(verticalCameraTarget({ ...highAir, airY: -60 }) <= 62, "camera motion remains clamped");
+  assert.equal(verticalCameraTarget(highAir, true), 0);
+  assert.equal(verticalCameraTarget({ state: "riding", airY: 18, maxAirHeight: 94 }), 0);
 });

@@ -9,7 +9,8 @@ scenes=(
   menu results settingsSimple settingsAdvanced simpleKeyboard simpleGamepad neutral leftTravel rightTravel reversal
   downhill curlEarly curlFolding curlImpact curlDanger
   heroGather-twilightGlass heroPitch-twilightGlass heroOpen-twilightGlass
-  heroDeep-twilightGlass heroMax-twilightGlass heroCollapse-twilightGlass maxSpeed
+  heroDeep-twilightGlass heroMax-twilightGlass heroCollapse-twilightGlass
+  heroTube-twilightGlass heroAir-twilightGlass maxSpeed
   pumpCompression pumpRelease powerLine smallAir launch hugeAir clockwiseSpin counterSpin
   frontRail tailGrab varial kakiTwist snap cutback floater tubeTuck combo360 combo540 switchLanding
   perfectLanding wobble wipeout dolphinApproach dolphinRide dolphinDismount
@@ -29,7 +30,7 @@ scenes=(
 
 mkdir -p "$capture_dir"
 for scene in "${scenes[@]}"; do
-  timeout 20s chromium \
+  timeout 30s chromium \
     --headless \
     --no-sandbox \
     --disable-gpu \

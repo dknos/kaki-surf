@@ -28,6 +28,12 @@ export const GENERATED_ASSET_MANIFEST = Object.freeze({
   twilightHeroWave: atlas("twilight-hero-wave-components-atlas.png", 2, 2, 128, 72, [
     "foamCrown", "faceRibbons", "foregroundShoulder", "contactSpray",
   ]),
+  twilightHeroCurtain: atlas("twilight-waterfall-curtain-atlas.png", 4, 1, 88, 112, [
+    "pourA", "pourB", "pourC", "pourD",
+  ], { anchor: [0.5, 1] }),
+  twilightHeroBreak: atlas("twilight-breaking-wave-atlas.png", 4, 1, 128, 136, [
+    "curlA", "curlB", "pour", "collapse",
+  ], { anchor: [0.66, 1] }),
   waveBreaker: atlas("wave-breaker-atlas.png", 4, 2, 72, 64, [
     "crestFeatherA", "crestFeatherB", "risingCurl", "impact",
     "whitewaterChurn", "foamTendrils", "sprayBurst", "seaMist",

@@ -29,6 +29,18 @@ const CALLOUT_QUEUE_LIMIT = 4;
 const CALLOUT_GAP = 0.14;
 const CALLOUT_MIN_READ_TIME = 1.05;
 
+/**
+ * Positive Canvas translation moves the world down and reveals more sky,
+ * which is the camera-up motion a large aerial needs. The previous negative
+ * offset pushed high jumps farther offscreen.
+ */
+export function verticalCameraTarget(player, reducedMotion = false) {
+  if (reducedMotion || player?.state !== "airborne") return 0;
+  const airY = Number.isFinite(Number(player.airY)) ? Number(player.airY) : 74;
+  const height = clamp(Number(player.maxAirHeight ?? 0) / 110, 0, 1);
+  return clamp(Math.max(0, 68 - airY) * 0.72 + height * 10, 0, 62);
+}
+
 export class KakiRenderer {
   constructor(canvas, settings, visualAssets = null) {
     this.canvas = canvas;
@@ -253,11 +265,7 @@ export class KakiRenderer {
       rideSpeedCapFor(simulation),
       this.settings.reducedMotion,
     );
-    let cameraTarget = 0;
-    if (player.state === "airborne") {
-      cameraTarget = clamp((player.airY - 74) * 0.18, -19, 0);
-    }
-    if (this.settings.reducedMotion) cameraTarget = 0;
+    const cameraTarget = verticalCameraTarget(player, this.settings.reducedMotion);
     this.cameraY = damp(this.cameraY, cameraTarget, TUNING.cameraResponse, dt);
 
     for (const particle of this.particles) {
@@ -301,9 +309,15 @@ export class KakiRenderer {
     const heroBarrel = isHeroBarrelWave(simulation.wave);
     ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = palette.sky;
+    ctx.fillStyle = palette.skyTop;
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
+    this.drawSkyExtension(cameraY);
 
+    // The sky and horizon are part of the same camera world as the wave. Moving
+    // only the water created an empty color band during big air; translating
+    // both exposes additional sky above the scene with no horizon seam.
+    ctx.save();
+    ctx.translate(0, cameraY);
     this.drawSky(simulation);
     // Twilight is the authored hero-wave level. Keep its actual sky window
     // pristine: boats, aircraft, and carrier events belong to other levels
@@ -312,6 +326,7 @@ export class KakiRenderer {
       drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings);
     }
+    ctx.restore();
     ctx.save();
     ctx.translate(0, cameraY);
     this.drawBackWater(simulation);
@@ -377,6 +392,25 @@ export class KakiRenderer {
     drawSteppedHill(ctx, 250 - islandShift * 0.04, 73, 152, 12);
     drawPalm(ctx, 42 - islandShift * 0.08, 61, p.deepInk, p.distant);
     drawBirds(ctx, 116 - islandShift * 0.025, 31, p.deepInk, 3);
+  }
+
+  drawSkyExtension(cameraY) {
+    const height = clamp(Math.ceil(Number(cameraY) || 0) + 2, 0, 68);
+    if (height <= 2) return;
+    const ctx = this.ctx;
+    const p = this.palette;
+    ctx.save();
+    ctx.fillStyle = p.skyTop;
+    ctx.fillRect(0, 0, LOGICAL_WIDTH, height);
+    ctx.fillStyle = this.conditionId === "stormbreak" ? p.foamShade : p.white;
+    ctx.globalAlpha = this.settings.highContrast ? 0.75 : 0.34;
+    const count = this.conditionId === "twilightGlass" ? 12 : 7;
+    for (let index = 0; index < count; index += 1) {
+      const x = (17 + index * 53) % LOGICAL_WIDTH;
+      const y = 4 + (index * 17) % Math.max(5, height - 4);
+      ctx.fillRect(x, y, index % 5 === 0 ? 2 : 1, 1);
+    }
+    ctx.restore();
   }
 
   drawBackgroundAsset() {
@@ -500,6 +534,7 @@ export class KakiRenderer {
         this.settings,
         this.visualAssets,
         this.wavePresentationClocks,
+        (window) => this.drawPassedSkyBackdrop(simulation, window),
       );
       return;
     }
@@ -513,13 +548,9 @@ export class KakiRenderer {
       this.visualAssets,
       this.wavePresentationClocks,
       (window) => {
-        // Repaint a sky-only crop through the trailing opening. The foreground
-        // wave is intentionally a tall arcade wall, so revealing sky (rather
-        // than another water slab) makes its left-to-right passage unmistakable.
-        this.ctx.save();
-        this.ctx.translate(0, -Math.round(this.cameraY));
+        // Repaint a sky-only crop through the trailing opening in the same
+        // camera space as the wave so the horizon remains welded together.
         this.drawPassedSkyBackdrop(simulation, window);
-        this.ctx.restore();
       },
     );
   }

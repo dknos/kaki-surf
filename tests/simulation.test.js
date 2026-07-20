@@ -450,6 +450,44 @@ test("Simple context trick buffers before air, holds a directional grab, and cha
   assert.ok(held.aerialSession.manifest.sequence[0].heldDuration >= TUNING.simpleGrabHold);
 });
 
+test("Simple TRICK holds a scored tube tuck inside Twilight's rideable pocket", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, {
+    controlMode: "simple",
+    condition: CONDITIONS.twilightGlass,
+  });
+  const player = simulation.player;
+  simulation.wave.curlX = 100;
+  simulation.wave.pressure = 0.82;
+  simulation.wave.time = TUNING.curlGrace + 0.2;
+  player.x = simulation.wave.contactX() + 13;
+  player.previousX = player.x;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  player.previousFace = player.face;
+  player.speed = 116;
+  const styleBefore = simulation.score.breakdown.style;
+
+  simulation.update(FIXED_STEP, { trick: true, trickPressed: true });
+
+  assert.equal(player.state, "riding");
+  assert.equal(player.maneuver.id, "tubeTuck");
+  assert.ok(player.maneuver.progress > 0);
+  assert.ok(simulation.score.breakdown.style > styleBefore, "tube time scores continuously");
+  assert.equal(player.contextTrick.pending, false, "the pocket consumes the contextual press");
+
+  player.x = simulation.wave.contactX() + 112;
+  player.previousX = player.x;
+  simulation.update(FIXED_STEP, { trick: true });
+  assert.equal(player.maneuver.id, "", "leaving the pocket clears a held tuck pose");
+
+  player.x = simulation.wave.contactX() + 13;
+  player.previousX = player.x;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  simulation.update(FIXED_STEP, { trick: true });
+  assert.equal(player.maneuver.id, "tubeTuck");
+  simulation.update(FIXED_STEP, { trickReleased: true });
+  assert.equal(player.maneuver.id, "");
+});
+
 test("Simple failed advanced tap becomes a readable fallback grab without rejection spam", () => {
   const simulation = prepareLaunch(BOARDS.foamPuff);
   const player = simulation.player;

@@ -89,21 +89,23 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-Fourteen source families were generated with the local Grok Imagine workflow, visually reviewed at source and runtime size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the full Twilight hero barrel and the other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage wave progression, full Twilight barrel, Twilight component overlays, birds, and UI ornaments, while superseded sources remain preserved for auditability.
+Sixteen source families were generated with the local Grok Imagine workflow, visually reviewed at source and runtime size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the Twilight wave studies and other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage classic progression, Twilight components, falling curtain, final coherent travelling break, birds, and UI ornaments, while superseded sources remain preserved for auditability.
 
-`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts each cell, applies either tight-crop or contact-preserving layout rules, uses the declared family filter, thresholds alpha, quantizes and conditionally sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave-breaker family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges. The Twilight component family preserves its 2 x 2 source layout with nearest-neighbor reduction. The one-cell full barrel preserves its composition, then fades only the rightmost and bottommost continuation edges so the generated face joins the code-authored foreground water without a rectangular seam.
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts each cell, applies either tight-crop or contact-preserving layout rules, uses the declared family filter, thresholds alpha unless soft continuation is declared, quantizes and conditionally sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave-breaker family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges. Twilight components preserve their 2 x 2 source layout; the new 4 x 1 curtain and coherent-break sheets use connected-chroma removal and nearest-neighbor reduction. The coherent break keeps crisp curl/foam edges while an irregular alpha treatment feathers only the lower and side continuation into procedural water.
 
-Normal Twilight rendering uses the approved full-barrel frame as its primary silhouette, stage-scales it around the canonical pitching-lip contact, joins it to a continuous code-authored foreground water plane, and adds only the component atlas's `contactSpray` at the board. The generated barrel remains presentation: runtime geometry still owns the playable surface, contact, collision, stage pressure, and monotonic flow direction. High Contrast or a missing full-barrel asset switches to the complete procedural barrel. In that fallback path, the component atlas may add `foamCrown` and `contactSpray`; if it is also missing, both accents remain procedural. `faceRibbons` and `foregroundShoulder` stay packed for provenance but are never rendered because in-motion review found that they read as a pasted fan and detached hump.
+Normal Twilight rendering cross-fades the final coherent-break frames around the canonical pitching-lip contact, joins them to code-authored face volume, tube shadow, falling strands, impact churn, and foreground water, adds the curtain study only as restrained internal falling texture, then adds the component atlas's `contactSpray` at the board. The generated art remains presentation: runtime geometry still owns the playable surface, contact, collision, stage pressure, passed-sky extent, and monotonic left-to-right break direction. A missing coherent-break asset or High Contrast uses the earlier coherent full-barrel study; loss of that secondary asset switches to the complete connected procedural break. The component cells `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for provenance but are not rendered.
 
 ```console
 python3 tools/art/build-grok-assets.py
 ```
 
-Outputs are the 14 PNGs under `assets/generated`:
+Outputs are the 16 PNGs under `assets/generated`:
 
 | Family | Atlas dimensions |
 | --- | ---: |
 | Twilight hero barrel | 256 x 144 |
+| Twilight waterfall curtain | 352 x 112 |
+| Twilight coherent break | 512 x 136 |
 | Wave breaker | 288 x 128 |
 | Wave progression | 320 x 192 |
 | Twilight hero wave | 256 x 144 |

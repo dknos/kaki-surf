@@ -22,7 +22,7 @@ Simple Controls are the default:
 | --- | --- | --- | --- |
 | Travel, carve, and trim | Arrows or WASD | Left stick or D-pad | Direction pad |
 | Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
-| Context trick | F or X | X or B | **Trick** |
+| Context trick / tube hold | F or X | X or B | **Trick** |
 | Optional spin impulses | Q / E | Left / right bumper | Left / right **Spin** |
 | Mounted-animal special | T or Shift | Y | **Special** when ready |
 | Pause | Escape or P | Start | **II** pause button; Settings also pauses |
@@ -42,9 +42,11 @@ Speed and Flow are separate:
 - **Speed** is physical motion, reported as `STALLING`, `GLIDING`, `FAST`, `FLYING`, or `BLASTING` and reinforced by wake, spray, parallax, animation, and audio.
 - **Flow** is the run's combo/style state. Valid full carves, timed pumps, direction changes, varied tricks, clean landings, and wildlife moments build it. A strong line can briefly sustain earned Flow, but passive riding, repetition, stalling, wobble, and wipeouts reduce it.
 
-Simple Controls buffer one Trick request into the aerial context, choose an eligible move, fall back to a readable grab when a large move no longer fits, and begin helping the board toward the nearest valid landing tangent late in descent. Advanced Controls retain direct on-wave maneuvers and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
+Simple Controls make Trick contextual: hold it inside Twilight's critical pocket to tuck into the tube, or use it around a launch to buffer an eligible aerial move. A large move that no longer fits falls back to a readable grab, and late descent begins helping the board toward the nearest valid landing tangent. Advanced Controls retain direct on-wave maneuvers, a dedicated held Tube Tuck/Soul Arch, and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
 
-Fresh profiles open on **Twilight Glass**, the finished hero-barrel session, and receive a six-step in-play **Surf School**: drop, carve, launch, rotate, trick, and land. Each lesson advances only after the physical action succeeds, persists until learned, and can be armed again from Settings. Returning profiles keep their explicit board and condition choices.
+Fresh profiles open on **Twilight Glass**, the finished travelling-break session, and receive a six-step in-play **Surf School**: drop, carve, launch, rotate, trick, and land. Each lesson advances only after the physical action succeeds, persists until learned, and can be armed again from Settings. Returning profiles keep their explicit board and condition choices.
+
+Twilight is staged as a long side-scrolling wave face. Its coherent curl and breaking edge travel left-to-right while the whitewater pours downward under its own pause-safe presentation clock; carving back across the face never mirrors either motion. The passed area opens back to the real twilight sky, the pocket remains briefly rideable before the barrel catches up, and large aerials smoothly pan upward for extra sky and landing room. Reduced Motion freezes the falling-water cycle and vertical camera shift without changing gameplay.
 
 ## A living coast
 
@@ -67,13 +69,13 @@ Spawn streams, quiet periods, capacities, culling, collision sweeps, interaction
 - **Mango Fish** is the technical combo board: fast rails, strong grip, and quick spins.
 - **Moon Log** is the expert glide board: the highest cap and pop, slower correction, and high-value long holds.
 
-Golden Coast and Stormbreak currently use the `classic` wave profile. Twilight Glass uses the dedicated `heroBarrel` profile, with a taller three-quarter barrel, authored ride/air bounds, and one collision-aligned pitching-lip contact. Every profile still goes through the same canonical wave-query, movement, landing, and scoring contracts. Future levels can select their own deliberate wave profiles without teaching the renderer a second version of gameplay geometry.
+Golden Coast and Stormbreak currently use the `classic` wave profile. Twilight Glass uses the dedicated `heroBarrel` profile identifier for its long travelling break, authored ride/air bounds, rideable tube pocket, and one collision-aligned pitching-lip contact. Every profile still goes through the same canonical wave-query, movement, landing, and scoring contracts. Future levels can select their own deliberate wave profiles without teaching the renderer a second version of gameplay geometry.
 
 Audio follows the game lifecycle instead of free-running behind it. Ocean body, board contact/carve, and aerial wind use separate filtered layers; speed, pocket risk, and surface contact drive their mix. Pause, results, visibility loss, and resume fade or rebase the transport so missed beats never burst after a long interruption. Major landings, wipeouts, power moments, and records duck the music through a master limiter, and Settings includes independent music/effects/wave levels plus a persistent master mute.
 
 ## Local art pipeline
 
-The static game includes six condition backgrounds and 14 compact generated atlas families for the full Twilight hero barrel, its contact-spray/component overlays, four-stage classic wave progression, modular breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the wave-breaker polish source is 1024 x 1024, while the full Twilight barrel, staged swell/pitch/curl/collapse source, component source, and other selected sheets are 1280 x 720. `tools/art/build-grok-assets.py` deterministically validates source hashes, removes connected chroma, extracts cells, downsamples, quantizes, edge-blends the authored barrel into runtime water, and rebuilds the transparent atlases under `assets/generated`.
+The static game includes six condition backgrounds and 16 compact generated atlas families. Twilight's active art stack uses a four-frame coherent curl/pour/collapse atlas, restrained internal texture from the four-frame falling-curtain study, and board-contact spray; the earlier full-barrel study remains a coherent secondary fallback for High Contrast or a missing primary atlas. The remaining atlases cover classic wave progression, modular breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Original Grok sheets are preserved under `docs/art-source/grok`. `tools/art/build-grok-assets.py` validates source hashes, removes connected chroma, extracts cells, downsamples, quantizes, feathers only declared continuation edges, and rebuilds the transparent atlases under `assets/generated`.
 
 Every atlas is optional. `js/asset-loader.js` validates each family independently, and the Canvas renderer keeps a local code-authored fallback when one is absent or invalid. The browser never calls Grok, Blender, an image API, a CDN, or a remote asset host. Exact prompts, selections, source hashes, and output dimensions are recorded in [Grok asset provenance](docs/GROK-ASSET-PROVENANCE.md).
 
@@ -85,7 +87,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **158/158 tests**, and the syntax gate checks **30 JavaScript modules**. The canonical real-browser gallery contains **118 deterministic 1280 x 720 captures**, including the six reviewed Twilight hero-barrel stages; the lifecycle/audio/wave pass additionally covers real-browser pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
+The native suite passes **164/164 tests**, and the syntax gate checks **30 JavaScript modules**. The canonical local-browser gallery contains **120 deterministic 1280 x 720 captures**, including six travelling-break stages plus dedicated rideable-tube and big-air-camera scenes; the lifecycle/audio/wave pass additionally covers pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. This checkpoint records local evidence and does not by itself claim that the GitHub Pages deployment has refreshed. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
 
 ## Static deployment and integration
 
@@ -93,4 +95,4 @@ Browsers require the native modules to be served over HTTP rather than opened th
 
 `js/integration-adapter.js` exports `createKakiSurf({ host, input, audio, storage, settings, profile, onExit, onRunComplete, qaScene })`. It returns `start`, `pause`, `resume`, `restart`, `destroy`, and `getSnapshot` lifecycle methods.
 
-Gameplay truth remains renderer-independent: `js/wave.js` owns profile-selected ride geometry, `js/simulation.js` owns rider physics and interactions, `js/world.js` owns the ambient/gameplay world, `js/tricks.js` owns the aerial manifest, and `js/scoring.js` owns Speed/Flow valuation and score banking. `js/hero-wave-visuals.js` presents Twilight's dedicated barrel by consuming those canonical queries rather than inventing a visual-only surface. See [ADR-001](docs/ADR-001-standalone-canvas.md), [Asset manifest](docs/ASSET-MANIFEST.md), and [Hero source map](docs/HERO-SOURCE-MAP.md).
+Gameplay truth remains renderer-independent: `js/wave.js` owns profile-selected ride geometry, `js/simulation.js` owns rider physics and interactions, `js/world.js` owns the ambient/gameplay world, `js/tricks.js` owns the aerial manifest, and `js/scoring.js` owns Speed/Flow valuation and score banking. `js/hero-wave-visuals.js` presents Twilight's travelling break, tube opening, passed-sky window, and downward whitewater by consuming those canonical queries rather than inventing a visual-only surface. See [ADR-001](docs/ADR-001-standalone-canvas.md), [Asset manifest](docs/ASSET-MANIFEST.md), and [Hero source map](docs/HERO-SOURCE-MAP.md).

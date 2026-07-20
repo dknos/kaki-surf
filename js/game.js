@@ -979,6 +979,7 @@ export class KakiSurfGame {
         player.airVY = 2;
         player.maxAirHeight = 96;
         player.provisionalScore = 2840;
+        this.renderer.cameraY = 42;
         break;
       case "clockwiseSpin":
         makeAirborne("apex", "360 AIR SPIN", Math.PI * 2);
@@ -1155,6 +1156,46 @@ export class KakiSurfGame {
           bodyAngle: heroTangent,
           curlTimer: scene === "heroCollapse-twilightGlass" ? 0.35 : 0,
         });
+        break;
+      }
+      case "heroTube-twilightGlass": {
+        this.simulation.wave.pressure = 0.82;
+        this.simulation.wave.curlX = 84;
+        const tubeX = this.simulation.wave.contactX() + 13;
+        const tubeFace = this.simulation.wave.powerFaceAt(tubeX);
+        const tubeTangent = this.simulation.wave.slopeAt(tubeX, tubeFace);
+        Object.assign(player, {
+          state: "riding",
+          stateTime: 0.72,
+          x: tubeX,
+          previousX: tubeX,
+          face: tubeFace,
+          previousFace: tubeFace,
+          boardAngle: tubeTangent,
+          bodyAngle: tubeTangent,
+          speed: 116,
+          curlTimer: 0,
+          maneuver: { id: "tubeTuck", progress: 0.66 },
+          trickPose: "tubeTuck",
+        });
+        break;
+      }
+      case "heroAir-twilightGlass": {
+        this.simulation.wave.pressure = 0.7;
+        this.simulation.wave.curlX = 72;
+        makeAirborne("apex", "TWILIGHT SKYLINE", Math.PI * 2);
+        Object.assign(player, {
+          airX: 246,
+          previousAirX: 246,
+          airY: 18,
+          previousAirY: 18,
+          airVY: 1,
+          maxAirHeight: 102,
+          provisionalScore: 2160,
+        });
+        // QA freezes after its first frame, so use the settled target to prove
+        // the same vertical framing that the live camera eases toward.
+        this.renderer.cameraY = 46;
         break;
       }
       case "dolphinRide":

@@ -12,6 +12,7 @@ const PRESENTATION_CLOCK_KEYS = Object.freeze([
   "faceGlints",
   "powerSeam",
   "crest",
+  "fall",
 ]);
 
 /** Pure bridge used by renderer tests to prove the visual seam is canonical. */
@@ -46,13 +47,16 @@ export function createWavePresentationClocks() {
     faceGlints: 0,
     powerSeam: 0,
     crest: 0,
+    fall: 0,
     surfaceTravel: null,
+    waveTime: null,
   };
 }
 
 export function resetWavePresentationClocks(clocks) {
   for (const key of PRESENTATION_CLOCK_KEYS) clocks[key] = 0;
   clocks.surfaceTravel = null;
+  clocks.waveTime = null;
   return clocks;
 }
 
@@ -65,8 +69,11 @@ export function advanceWavePresentationClocks(
 ) {
   const surfaceTravel = waveSurfaceTravel(wave);
   const previousTravel = clocks.surfaceTravel;
+  const waveTime = Number(wave?.time);
+  const previousWaveTime = clocks.waveTime;
   if (!Number.isFinite(previousTravel)) {
     clocks.surfaceTravel = surfaceTravel;
+    clocks.waveTime = Number.isFinite(waveTime) ? waveTime : null;
     return clocks;
   }
 
@@ -75,12 +82,23 @@ export function advanceWavePresentationClocks(
   if (surfaceTravel + 0.001 < previousTravel) {
     resetWavePresentationClocks(clocks);
     clocks.surfaceTravel = surfaceTravel;
+    clocks.waveTime = Number.isFinite(waveTime) ? waveTime : null;
     return clocks;
   }
 
   const deltaTravel = Math.max(0, surfaceTravel - previousTravel);
+  const deltaWaveTime = Number.isFinite(waveTime) && Number.isFinite(previousWaveTime)
+    ? Math.max(0, waveTime - previousWaveTime)
+    : 0;
   clocks.surfaceTravel = surfaceTravel;
-  if (reducedMotion || deltaTravel <= 0) return clocks;
+  clocks.waveTime = Number.isFinite(waveTime) ? waveTime : null;
+  if (reducedMotion) return clocks;
+
+  // Gravity owns the waterfall cadence. Wave time is fixed-step, pause-safe,
+  // and independent of rider speed/direction, so the pour never slows into a
+  // slideshow when Kaki carves back across the face.
+  clocks.fall += deltaWaveTime * 14;
+  if (deltaTravel <= 0) return clocks;
 
   const safeCap = Math.max(1, Number(speedCap) || 138);
   const speedRatio = clamp(Math.abs(Number(player?.speed ?? 0)) / safeCap, 0, 1);
