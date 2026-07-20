@@ -3,6 +3,166 @@ export const LOGICAL_HEIGHT = 216;
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
+export const DEFAULT_WAVE_STYLE_ID = "classic";
+
+/**
+ * Condition-owned wave profiles. GameplayWave is the canonical consumer of
+ * `surface`, `power`, `threat`, and `pocket`; the renderer may consume the
+ * read-only `barrel` and `projection` values without recreating gameplay math.
+ */
+export const WAVE_STYLES = Object.freeze({
+  classic: Object.freeze({
+    id: "classic",
+    renderer: "layeredSide",
+    bounds: Object.freeze({
+      ridingX: Object.freeze([76, 338]),
+      airX: Object.freeze([58, 350]),
+    }),
+    surface: Object.freeze({
+      crestBase: 75,
+      broadAmplitude: 3.5,
+      broadXFrequency: 0.015,
+      broadTravelFrequency: 0.003,
+      detailAmplitude: 1.25,
+      detailXFrequency: 0.043,
+      detailTimeFrequency: 0.62,
+      faceDepthBase: 102,
+      faceDepthAmplitude: 5,
+      faceDepthXFrequency: 0.021,
+      faceEaseLinear: 0.88,
+      faceEaseQuadratic: 0.12,
+    }),
+    power: Object.freeze({
+      baseFace: 0.405,
+      broadAmplitude: 0.024,
+      broadXFrequency: 0.018,
+      broadTravelFrequency: 0.0007,
+      pulseAmplitude: 0.009,
+      pulseXFrequency: 0.006,
+      pulseTimeFrequency: 0.11,
+      pressureShift: 0.022,
+      minFace: 0.31,
+      maxFace: 0.49,
+    }),
+    threat: Object.freeze({
+      proximityNearGap: 24,
+      proximityFarGap: 156,
+      temporalPressureScale: 0.82,
+    }),
+    pocket: Object.freeze({
+      nearOffset: 14,
+      span: 126,
+      contactOffset: 13,
+    }),
+    barrel: Object.freeze({
+      stageNames: Object.freeze(["swell", "pitch", "curl", "impact"]),
+      stageThresholds: Object.freeze([0.18, 0.54, 0.86]),
+      growStart: 0.18,
+      growEnd: 1,
+      apertureStart: 0.36,
+      apertureFull: 0.68,
+      closeStart: 0.86,
+      closeEnd: 1,
+      closedAperture: 0.18,
+      outerRadiusX: Object.freeze([48, 126]),
+      outerRadiusY: Object.freeze([28, 78]),
+      apertureRadiusX: Object.freeze([16, 45]),
+      apertureRadiusY: Object.freeze([12, 40]),
+      lipDrop: Object.freeze([8, 35]),
+      shoulderReach: Object.freeze([68, 132]),
+    }),
+    projection: Object.freeze({
+      horizonY: 78,
+      depthShear: 0,
+      fanShear: 0,
+      depthDrop: 0,
+      fanDrop: 0,
+    }),
+  }),
+  heroBarrel: Object.freeze({
+    id: "heroBarrel",
+    renderer: "heroBarrel",
+    bounds: Object.freeze({
+      // Keep Twilight's action inside the authored face and landing window.
+      ridingX: Object.freeze([156, 306]),
+      airX: Object.freeze([138, 326]),
+    }),
+    surface: Object.freeze({
+      // The reference horizon is y=78..80, the sustainable ride band is
+      // y=136..150, and the foreground trough terminates around y=194.
+      crestBase: 78,
+      broadAmplitude: 2.2,
+      broadXFrequency: 0.011,
+      broadTravelFrequency: 0.0018,
+      detailAmplitude: 0.55,
+      detailXFrequency: 0.031,
+      detailTimeFrequency: 0.36,
+      faceDepthBase: 116,
+      faceDepthAmplitude: 4,
+      faceDepthXFrequency: 0.015,
+      faceEaseLinear: 0.8,
+      faceEaseQuadratic: 0.2,
+    }),
+    power: Object.freeze({
+      baseFace: 0.59,
+      broadAmplitude: 0.022,
+      broadXFrequency: 0.014,
+      broadTravelFrequency: 0.00045,
+      pulseAmplitude: 0.007,
+      pulseXFrequency: 0.0045,
+      pulseTimeFrequency: 0.075,
+      pressureShift: 0.03,
+      minFace: 0.53,
+      maxFace: 0.66,
+    }),
+    threat: Object.freeze({
+      // Grow the hero barrel while it is still readable, then let the existing
+      // contact delay own the actual catch instead of hiding a larger hitbox.
+      proximityNearGap: 10,
+      proximityFarGap: 100,
+      temporalPressureScale: 0.84,
+      contactOrigin: true,
+    }),
+    pocket: Object.freeze({
+      nearOffset: 0,
+      span: 112,
+      // Curl state is the rear shoulder. The actual pitching lip reaches
+      // forward into the playable composition and owns collision at this
+      // single visible offset.
+      contactOffset: 96,
+      contactOrigin: true,
+    }),
+    barrel: Object.freeze({
+      // Six readable beats are shared by simulation QA and the renderer. The
+      // final collapse pose is further eased by the player's curl contact
+      // timer, so contact does not pop directly to a closed silhouette.
+      stageNames: Object.freeze(["gather", "pitch", "open", "deep", "hero", "collapse"]),
+      stageThresholds: Object.freeze([0.22, 0.44, 0.68, 0.88, 0.98]),
+      growStart: 0.08,
+      growEnd: 0.9,
+      apertureStart: 0.24,
+      apertureFull: 0.58,
+      closeStart: 0.86,
+      closeEnd: 1,
+      // Even the danger frame keeps genuine negative space through the tube.
+      closedAperture: 0.34,
+      outerRadiusX: Object.freeze([54, 156]),
+      outerRadiusY: Object.freeze([32, 112]),
+      apertureRadiusX: Object.freeze([18, 76]),
+      apertureRadiusY: Object.freeze([14, 62]),
+      lipDrop: Object.freeze([8, 38]),
+      shoulderReach: Object.freeze([76, 212]),
+    }),
+    projection: Object.freeze({
+      horizonY: 79,
+      depthShear: 50,
+      fanShear: 14,
+      depthDrop: 10,
+      fanDrop: 8,
+    }),
+  }),
+});
+
 export const TUNING = {
   runDuration: 78,
   entryGrace: 8,
@@ -168,6 +328,7 @@ export const CONDITIONS = {
     shortName: "GOLDEN",
     tagline: "Sunlit seams and warm offshore glass.",
     musicMode: "sunset",
+    waveStyle: "classic",
   },
   twilightGlass: {
     id: "twilightGlass",
@@ -175,6 +336,7 @@ export const CONDITIONS = {
     shortName: "TWILIGHT",
     tagline: "Violet horizon, luminous cold-water lines.",
     musicMode: "night",
+    waveStyle: "heroBarrel",
   },
   stormbreak: {
     id: "stormbreak",
@@ -182,6 +344,7 @@ export const CONDITIONS = {
     shortName: "STORM",
     tagline: "Electric squalls and a hard silver pocket.",
     musicMode: "storm",
+    waveStyle: "classic",
   },
 };
 
@@ -334,19 +497,19 @@ export const PALETTES = {
     white: "#ffffff",
   },
   twilightGlass: {
-    ink: "#17142e",
-    deepInk: "#09091c",
+    ink: "#0b1630",
+    deepInk: "#091326",
     skyTop: "#554c91",
     sky: "#9a8fc0",
     sun: "#ffd19a",
     haze: "#cfbdd4",
     distant: "#41557d",
-    waterDeep: "#102f56",
-    water: "#235b83",
-    waterLight: "#54a3a8",
-    crest: "#9be0cf",
-    foam: "#e9ead8",
-    foamShade: "#73bfc0",
+    waterDeep: "#102a56",
+    water: "#1f6488",
+    waterLight: "#48c4c9",
+    crest: "#62e0d8",
+    foam: "#eef9f4",
+    foamShade: "#a8dfe0",
     danger: "#f07382",
     gold: "#ffd27a",
     violet: "#b49bf1",

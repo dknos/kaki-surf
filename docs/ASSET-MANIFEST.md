@@ -1,6 +1,6 @@
 # Asset manifest and provenance
 
-Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 12 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
+Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 14 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
 
 Gameplay truth remains code-owned. Raster art does not define wave collision, rider motion, wildlife phases, pickup reachability, scoring, or UI state; it renders simulation state and has an independent local fallback.
 
@@ -10,10 +10,11 @@ Gameplay truth remains code-owned. Raster art does not define wave collision, ri
 GameplayWave + SurfSimulation + WorldSimulation + ScoreSystem
                          |
                          v
-sprites.js + wave-visuals.js + world-visuals.js + renderer.js
-       |             |                |
-       |             +----------------+--> optional generated atlases
-       +----------------------------------> code-authored fallback sprites
+sprites.js + wave-visuals.js + hero-wave-visuals.js + world-visuals.js
+       |             |              |                  |
+       +-------------+--------------+------------------+--> optional generated atlases
+                         |
+                         +-------------------------------> renderer.js
 
 condition strips --> asset-loader.js --> optional background layer
                                       --> code-authored sky fallback
@@ -34,12 +35,14 @@ The three full-resolution environment sources were generated offline, curated, t
 
 ## Generated runtime atlases
 
-All 12 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
+All 14 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
+| `twilightHeroBarrel` | `twilight-hero-barrel-atlas.png` | 256 x 144 | Full Twilight barrel silhouette, stage-scaled around the canonical lip and joined to code-authored foreground water | Complete procedural barrel with a real sky aperture and connected face |
 | `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
 | `waveProgression` | `wave-progression-atlas.png` | 320 x 192 | Four tapered threat stages: rounded swell, pitching lip, open curl, airy whitewater impact | Collision-aligned procedural shoulder, folding lip, shadow wedge, and churn |
+| `twilightHeroWave` | `twilight-hero-wave-components-atlas.png` | 256 x 144 | `contactSpray` over the normal authored barrel; `foamCrown` is reserved for the procedural barrel fallback; `faceRibbons` and `foregroundShoulder` stay packed but are not rendered | Procedural crown and board-contact spray |
 | `dolphin` | `dolphin-atlas.png` | 224 x 80 | Approach, offer, mounted ride, breach, dismount | Code-authored animal silhouette |
 | `shark` | `shark-atlas.png` | 224 x 72 | Shadow, fair fin telegraph, crossing, near miss, retreat | Code-authored shadow/fin/splash |
 | `whale` | `whale-atlas.png` | 352 x 108 | Distant cue, blow, breach, ramp/ride, splash, departure | Code-authored whale/event shapes |
@@ -61,6 +64,7 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 | --- | --- |
 | `js/sprites.js` | Kitty poses, board deformation, signed facing, wake, and atlas-aware board drawing |
 | `js/wave-visuals.js` | Ride surface, face bands, fast-line guidance, curl geometry, foam, and wave-atlas accents |
+| `js/hero-wave-visuals.js` | Full-barrel stage scaling, real sky aperture, continuous foreground water, collision-aligned contact, board spray, and the complete procedural fallback |
 | `js/world-visuals.js` | Traffic layers, wildlife phases, powerups, carrier/airshow, and their procedural fallbacks |
 | `js/asset-drawing.js` | Shared atlas-frame drawing with anchor, scale, direction, alpha, and transform controls |
 | `js/renderer.js` | Layer composition, interpolation, HUD, particles, callouts, access presentation, and state-driven VFX |
@@ -70,13 +74,13 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 
 ## Offline source and deterministic conversion
 
-The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The modular wave source is 1024 x 1024; the staged wave progression and other selected sheets are 1280 x 720. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The wave-breaker polish source is 1024 x 1024; the full Twilight hero barrel, staged wave progression, Twilight components, and other selected sheets are 1280 x 720. They are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
 2. identifies and removes the chroma-magenta field while preserving coral accents; the staged JPEG-derived wave uses a boundary-connected chroma flood so interior coral cannot be globally keyed away;
 3. extracts each declared source grid and repacks it into the stable runtime atlas grid;
-4. crops each non-empty silhouette and fits it into a fixed local frame; the four staged wave cells instead retain one shared grid alignment and a right/bottom contact anchor for near-native-aspect upper-lip rendering;
-5. downsamples with Lanczos, thresholds alpha, quantizes the RGB palette, and sharpens;
+4. crops each non-empty silhouette and fits it into a fixed local frame; contact-sensitive families instead retain shared grid alignment, including the staged wave's right/bottom anchor, the Twilight components' stable 2 x 2 layout, and the full barrel's one-cell composition;
+5. downsamples with the family-declared filter, thresholds alpha, quantizes the RGB palette, sharpens only where declared, and fades the full barrel's right/bottom continuation edges into runtime water;
 6. packs transparent RGBA PNG atlases and writes frame metadata.
 
 Run from the repository root:

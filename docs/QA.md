@@ -2,7 +2,7 @@
 
 Date: 2026-07-19.
 
-This document distinguishes automated truth from browser-capture evidence. The files under `docs/images/qa` are the refreshed production set for the bidirectional/world pass. The assembled [contact sheet](./images/qa-contact-sheet.png) contains 112 reviewed browser states.
+This document distinguishes automated truth from browser-capture evidence. The deterministic gallery and capture pipeline contain 118 checked-in browser states, including six locked and reviewed Twilight hero-barrel animation stages. The refreshed [contact sheet](./images/qa-contact-sheet.png) contains the complete normalized set.
 
 ## Automated gate
 
@@ -14,14 +14,14 @@ npm run check
 git diff --check
 ```
 
-Final result: **125/125 tests pass** and **27 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
+Current result: **141/141 tests pass** and **28 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
 
 ## Browser capture matrix
 
 | Group | Required scenes | What must be visible | Status |
 | --- | --- | --- | --- |
 | Entry/UI | Menu, settings Simple, settings Advanced, six-step Surf School, results | Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or seam-required copy; score and Flow distinct | Pass |
-| Core ride | Neutral, right travel, left travel, committed reversal, downhill, four curl states, max speed, pump | Facing, board, wake, nonreversing water clocks, and parallax agree with direction; staged breaker reveals sky behind its trailing edge; reversal reads as committed movement | Pass |
+| Core ride | Neutral, right travel, left travel, committed reversal, downhill, four curl states, six Twilight hero-barrel stages, max speed, pump | Facing, board, wake, nonreversing water clocks, and parallax agree with direction; the Gather/Pitch/Open/Deep/Maximum/Collapse sequence preserves its perspective focus and reveals real sky behind the aperture; reversal reads as committed movement | Pass |
 | Air/landing | Small/medium/huge air, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Big-air scale; board/body separation; nearest valid landing tangent; signed landing direction; queued single-message callouts remain legible | Pass |
 | Wildlife | Dolphin approach/ride/dismount/gates, shark telegraph/near miss/contact, whale distant/breach/ramp/ride/splash, reduced variants | Minimum danger telegraph, friendly mount readability, no harmful animal reward, coherent phase silhouettes | Pass |
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, active HUD, expiration, consumption, protected event, plane drop | Unique silhouettes and labels; active effect reads without obscuring Speed/Flow; consumption and harmless misses are visible | Pass |
@@ -50,7 +50,7 @@ Final result: **125/125 tests pass** and **27 JavaScript modules pass syntax che
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, and contact-sheet source match at 112 identifiers. Every capture exists; an exact-hash scan reports 109 unique renders, with only the three intentional Foam Puff/default-condition identity pairs matching. The assembled sheet plus key native-size states were inspected. Rebuild deterministically with:
+The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 118 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 114 unique bitmaps. The three repeated-render groups are intentional board/condition identity fixtures: `foamPuff-goldenCoast` / `goldenCoast`, `foamPuff-stormbreak` / `stormbreak`, and `foamPuff-twilightGlass` / `twilightGlass` / `twilightTraffic-twilightGlass`. The dedicated cargo ship, fishing boat, and sailboat fixtures are distinct and visibly staged in the safe far-right water band. Rebuild deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py

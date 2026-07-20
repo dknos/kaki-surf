@@ -207,6 +207,24 @@ test("same seed and inputs reproduce schedules and pooled world state exactly", 
   assert.equal(first.droppedInteractionCount, 0);
 });
 
+test("Twilight never schedules traffic-backed events hidden by the hero barrel", () => {
+  const world = new WorldSimulation({ seed: 1262570313, condition: "twilightGlass" });
+  const events = [];
+  const interactions = [];
+  runFor(world, 78, context({ cameraWorldX: 2200, previousCameraWorldX: 2199 }), {
+    events,
+    interactions,
+  });
+
+  assert.equal(Object.values(world.traffic).flat().some((entity) => entity.active), false);
+  assert.equal(world.carrier.hasAppeared, false);
+  assert.equal(world.courier.active, false);
+  assert.equal(world.race.active, false);
+  assert.equal(world.aircraftDrop.active, false);
+  assert.equal(events.some((event) => ["trafficSpawned", "courierPhase", "racePhase", "aircraftDropPhase", "carrierPhase"].includes(event.type)), false);
+  assert.equal(interactions.some((event) => ["speedboatRaceWon", "fleetAirshowCompleted"].includes(event.type)), false);
+});
+
 test("layer streams are isolated from wildlife and powerup scheduling", () => {
   const baseline = new WorldSimulation({ seed: 0x1a2b3c4d });
   const noisyFarLayer = new WorldSimulation({ seed: 0x1a2b3c4d });

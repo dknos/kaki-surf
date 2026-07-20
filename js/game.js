@@ -2,7 +2,7 @@ import { BOARDS, CONDITIONS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_FRAM
 import { SurfAudio } from "./audio.js";
 import { InputManager } from "./input.js";
 import { clamp } from "./math.js";
-import { loadSave, recordRun, sanitizeSettings, writeSave } from "./persistence.js";
+import { loadSave, recordRun, resolveStorage, sanitizeSettings, writeSave } from "./persistence.js";
 import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
 
@@ -38,7 +38,7 @@ export class KakiSurfGame {
     host,
     externalInput = null,
     externalAudio = null,
-    storage = globalThis.localStorage,
+    storage = undefined,
     hostSettings = null,
     profile = null,
     onExit = null,
@@ -47,13 +47,13 @@ export class KakiSurfGame {
     visualAssets = null,
   }) {
     this.host = host;
-    this.storage = storage;
+    this.storage = resolveStorage(storage);
     this.profile = profile;
     this.onExit = onExit;
     this.onRunComplete = onRunComplete;
     this.initialQaScene = qaScene;
     this.qaFreeze = false;
-    this.save = loadSave(storage);
+    this.save = loadSave(this.storage);
     if (hostSettings) {
       this.save.settings = sanitizeSettings(
         { ...this.save.settings, ...hostSettings },
@@ -968,6 +968,39 @@ export class KakiSurfGame {
         player.speed = 112;
         this.renderer.onEvent({ type: "callout", payload: { text: "CURL CLOSE", subtext: "DROP OR REVERSE", tone: "risk" } }, this.simulation);
         break;
+      case "heroGather-twilightGlass":
+      case "heroPitch-twilightGlass":
+      case "heroOpen-twilightGlass":
+      case "heroDeep-twilightGlass":
+      case "heroMax-twilightGlass":
+      case "heroCollapse-twilightGlass": { // Fixed rider pose isolates the hero barrel's authored animation stages.
+        const heroStage = {
+          "heroGather-twilightGlass": { pressure: 0.12, curlX: 42 },
+          "heroPitch-twilightGlass": { pressure: 0.34, curlX: 58 },
+          "heroOpen-twilightGlass": { pressure: 0.58, curlX: 76 },
+          "heroDeep-twilightGlass": { pressure: 0.78, curlX: 96 },
+          "heroMax-twilightGlass": { pressure: 0.94, curlX: 102 },
+          "heroCollapse-twilightGlass": { pressure: 1, curlX: 120 },
+        }[scene];
+        const heroX = 208;
+        this.simulation.wave.pressure = heroStage.pressure;
+        this.simulation.wave.curlX = heroStage.curlX;
+        const heroFace = this.simulation.wave.powerFaceAt(heroX);
+        const heroTangent = this.simulation.wave.slopeAt(heroX, heroFace);
+        Object.assign(player, {
+          state: "riding",
+          stateTime: 0.42,
+          x: heroX,
+          previousX: heroX,
+          face: heroFace,
+          previousFace: heroFace,
+          faceVelocity: 0,
+          boardAngle: heroTangent,
+          bodyAngle: heroTangent,
+          curlTimer: scene === "heroCollapse-twilightGlass" ? 0.35 : 0,
+        });
+        break;
+      }
       case "dolphinRide":
       case "dolphinGates":
         player.animalMount = "dolphin";
@@ -1232,7 +1265,7 @@ function gameMarkup() {
   `;
 }
 
-function qaWorldOverride(scene) {
+export function qaWorldOverride(scene) {
   const wildlife = {
     dolphinApproach: { kind: "dolphin", phase: "approach", screenX: 176, y: 128, direction: 1 },
     dolphinRide: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
@@ -1355,7 +1388,11 @@ function qaWorldOverride(scene) {
         : ["gullFlock", "ternFlock", "cormorantFlock", "pelican"].includes(trafficKind)
           ? 50
           : layer === "far" ? 68 : 82;
-    const trafficX = ["speedboat", "tugboat", "jetSki", "rescueCraft"].includes(trafficKind) ? 308 : 196;
+    const trafficX = ["cargoShip", "sailboat", "fishingBoat"].includes(trafficKind)
+      ? 310
+      : ["speedboat", "tugboat", "jetSki", "rescueCraft"].includes(trafficKind)
+        ? 308
+        : 196;
     return {
       traffic: [{
         kind: trafficKind,

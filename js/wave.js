@@ -1,19 +1,116 @@
 import { clamp, smoothstep } from "./math.js";
-import { TUNING } from "./config.js";
+import {
+  DEFAULT_WAVE_STYLE_ID,
+  LOGICAL_WIDTH,
+  TUNING,
+  WAVE_STYLES,
+} from "./config.js";
+
+export function resolveWaveStyle(profile = DEFAULT_WAVE_STYLE_ID) {
+  const id = typeof profile === "string" ? profile : profile?.id;
+  return WAVE_STYLES[id] ?? WAVE_STYLES[DEFAULT_WAVE_STYLE_ID];
+}
+
+export function contactX(wave) {
+  const curl = Number(wave?.curlX);
+  const profile = resolveWaveStyle(wave?.profile ?? wave?.profileId);
+  const offset = Number(profile.pocket.contactOffset);
+  return (Number.isFinite(curl) ? curl : 0) + (Number.isFinite(offset) ? offset : 13);
+}
+
+/**
+ * Side-effect-free section sample shared by gameplay QA and the renderer.
+ * Callers may provide `out` to avoid allocating during a render loop.
+ */
+export function sampleWaveSection(wave, playerX = contactX(wave), out = {}) {
+  const profile = resolveWaveStyle(wave?.profile ?? wave?.profileId);
+  const barrel = profile.barrel;
+  const pressure = clamp(Number(wave?.pressure) || 0, 0, 1);
+  const x = Number.isFinite(Number(playerX)) ? Number(playerX) : contactX(wave);
+  const curl = Number.isFinite(Number(wave?.curlX)) ? Number(wave.curlX) : 0;
+  const gap = x - (profile.pocket.contactOrigin ? contactX(wave) : curl);
+  const pocket = typeof wave?.pocketRisk === "function"
+    ? clamp(Number(wave.pocketRisk(x)) || 0, 0, 1)
+    : pocketRiskForProfile(profile, gap);
+  const thresholds = barrel.stageThresholds;
+  let stageIndex = 0;
+  while (stageIndex < thresholds.length && pressure >= thresholds[stageIndex]) stageIndex += 1;
+  const stageStart = stageIndex === 0 ? 0 : thresholds[stageIndex - 1];
+  const stageEnd = stageIndex < thresholds.length ? thresholds[stageIndex] : 1;
+  const growth = smoothstep(barrel.growStart, barrel.growEnd, pressure);
+  const closure = smoothstep(barrel.closeStart, barrel.closeEnd, pressure);
+  const apertureGrowth = smoothstep(barrel.apertureStart, barrel.apertureFull, pressure);
+  const aperture = apertureGrowth * (1 - closure * (1 - barrel.closedAperture));
+
+  out.profileId = profile.id;
+  out.renderer = profile.renderer;
+  out.heroBarrel = profile.renderer === "heroBarrel";
+  out.stage = barrel.stageNames[stageIndex];
+  out.stageIndex = stageIndex;
+  out.stageMix = smoothstep(stageStart, stageEnd, pressure);
+  out.pressure = pressure;
+  out.growth = growth;
+  out.closure = closure;
+  out.aperture = aperture;
+  out.curlX = curl;
+  out.contactX = contactX(wave);
+  out.playerX = x;
+  out.gap = gap;
+  out.pocket = pocket;
+  out.outerRadiusX = mixRange(barrel.outerRadiusX, growth);
+  out.outerRadiusY = mixRange(barrel.outerRadiusY, growth);
+  out.apertureRadiusX = mixRange(barrel.apertureRadiusX, aperture);
+  out.apertureRadiusY = mixRange(barrel.apertureRadiusY, aperture);
+  out.lipDrop = mixRange(barrel.lipDrop, growth);
+  out.shoulderReach = mixRange(barrel.shoulderReach, growth);
+  return out;
+}
+
+/**
+ * Three-quarter presentation projection. At `focusFace` it is exactly the
+ * canonical ride surface, so the player, board tangent, contact gap, landing,
+ * and scoring stay aligned while the rest of the face fans into depth.
+ */
+export function projectWavePoint(wave, x, face, focusFace = face, out = {}) {
+  const profile = resolveWaveStyle(wave?.profile ?? wave?.profileId);
+  const projection = profile.projection;
+  const sampleX = Number.isFinite(Number(x)) ? Number(x) : 0;
+  const sampleFace = Number.isFinite(Number(face)) ? Number(face) : 0;
+  const anchorFace = Number.isFinite(Number(focusFace)) ? Number(focusFace) : sampleFace;
+  const depthDelta = easedFace(profile, sampleFace) - easedFace(profile, anchorFace);
+  const contact = contactX(wave);
+  const fan = clamp((sampleX - contact) / Math.max(1, LOGICAL_WIDTH - contact), 0, 1);
+  const canonicalY = typeof wave?.ridingY === "function"
+    ? wave.ridingY(sampleX, sampleFace)
+    : 0;
+
+  out.x = sampleX + depthDelta * (projection.depthShear + projection.fanShear * fan);
+  out.y = canonicalY + depthDelta * (projection.depthDrop + projection.fanDrop * fan);
+  out.depth = easedFace(profile, sampleFace);
+  return out;
+}
 
 export class GameplayWave {
-  constructor(seed = 0x4b414b49) {
-    this.seed = seed;
-    this.phaseA = ((seed >>> 4) & 255) / 255 * Math.PI * 2;
-    this.phaseB = ((seed >>> 12) & 255) / 255 * Math.PI * 2;
-    this.time = 0;
-    this.travel = 0;
-    this.worldTravel = 0;
-    this.curlX = 48;
-    this.pressure = 0;
+  constructor(seed = 0x4b414b49, profile = DEFAULT_WAVE_STYLE_ID) {
+    this.seed = 0;
+    this.phaseA = 0;
+    this.phaseB = 0;
+    this.profile = WAVE_STYLES[DEFAULT_WAVE_STYLE_ID];
+    this.profileId = this.profile.id;
+    this.reset(seed, profile);
   }
 
-  reset() {
+  setProfile(profile = DEFAULT_WAVE_STYLE_ID) {
+    this.profile = resolveWaveStyle(profile);
+    this.profileId = this.profile.id;
+    return this.profile;
+  }
+
+  reset(seed = this.seed, profile = this.profile) {
+    this.setProfile(profile);
+    this.seed = Number.isFinite(seed) ? seed >>> 0 : this.seed >>> 0;
+    this.phaseA = ((this.seed >>> 4) & 255) / 255 * Math.PI * 2;
+    this.phaseB = ((this.seed >>> 12) & 255) / 255 * Math.PI * 2;
     this.time = 0;
     this.travel = 0;
     this.worldTravel = 0;
@@ -27,10 +124,20 @@ export class GameplayWave {
     this.worldTravel += (Number.isFinite(signedSpeed) ? signedSpeed : speed) * dt;
 
     if (threat && Number.isFinite(threat.playerX)) {
+      const threatProfile = this.profile.threat;
       const temporalPressure = smoothstep(0, TUNING.curlRampEnd, this.time);
-      const gap = threat.playerX - this.curlX;
-      const proximityPressure = 1 - smoothstep(24, 156, gap);
-      this.pressure = clamp(Math.max(temporalPressure * 0.82, proximityPressure), 0, 1);
+      const threatOrigin = threatProfile.contactOrigin ? this.contactX() : this.curlX;
+      const gap = threat.playerX - threatOrigin;
+      const proximityPressure = 1 - smoothstep(
+        threatProfile.proximityNearGap,
+        threatProfile.proximityFarGap,
+        gap,
+      );
+      this.pressure = clamp(
+        Math.max(temporalPressure * threatProfile.temporalPressureScale, proximityPressure),
+        0,
+        1,
+      );
 
       if (threat.active !== false && this.time > TUNING.curlGrace) {
         const escalation = smoothstep(TUNING.curlGrace, TUNING.curlRampEnd, this.time);
@@ -65,18 +172,28 @@ export class GameplayWave {
   }
 
   crestY(x) {
-    const broad = Math.sin(x * 0.015 + this.travel * 0.003 + this.phaseA) * 3.5;
-    const detail = Math.sin(x * 0.043 - this.time * 0.62 + this.phaseB) * 1.25;
-    return 75 + broad + detail;
+    const surface = this.profile.surface;
+    const broad = Math.sin(
+      x * surface.broadXFrequency
+        + this.travel * surface.broadTravelFrequency
+        + this.phaseA,
+    ) * surface.broadAmplitude;
+    const detail = Math.sin(
+      x * surface.detailXFrequency
+        - this.time * surface.detailTimeFrequency
+        + this.phaseB,
+    ) * surface.detailAmplitude;
+    return surface.crestBase + broad + detail;
   }
 
   faceDepth(x) {
-    return 102 + Math.sin(x * 0.021 + this.phaseB) * 5;
+    const surface = this.profile.surface;
+    return surface.faceDepthBase
+      + Math.sin(x * surface.faceDepthXFrequency + this.phaseB) * surface.faceDepthAmplitude;
   }
 
   ridingY(x, face) {
-    const easedFace = face * (0.88 + face * 0.12);
-    return this.crestY(x) + easedFace * this.faceDepth(x);
+    return this.crestY(x) + easedFace(this.profile, face) * this.faceDepth(x);
   }
 
   /**
@@ -85,10 +202,19 @@ export class GameplayWave {
    * must never recreate the line with a separate visual-only formula.
    */
   powerFaceAt(x) {
-    const broad = Math.sin(x * 0.018 + this.phaseA + this.travel * 0.0007) * 0.024;
-    const pulse = Math.sin(x * 0.006 - this.time * 0.11 + this.phaseB) * 0.009;
-    const pressureLift = (clamp(this.pressure, 0, 1) - 0.5) * 0.022;
-    return clamp(0.405 + broad + pulse + pressureLift, 0.31, 0.49);
+    const power = this.profile.power;
+    const broad = Math.sin(
+      x * power.broadXFrequency
+        + this.phaseA
+        + this.travel * power.broadTravelFrequency,
+    ) * power.broadAmplitude;
+    const pulse = Math.sin(
+      x * power.pulseXFrequency
+        - this.time * power.pulseTimeFrequency
+        + this.phaseB,
+    ) * power.pulseAmplitude;
+    const pressureLift = (clamp(this.pressure, 0, 1) - 0.5) * power.pressureShift;
+    return clamp(power.baseFace + broad + pulse + pressureLift, power.minFace, power.maxFace);
   }
 
   /**
@@ -228,11 +354,35 @@ export class GameplayWave {
   }
 
   pocketRisk(playerX) {
-    const distance = playerX - this.curlX;
-    return clamp(1 - (distance - 14) / 126, 0, 1);
+    const origin = this.profile.pocket.contactOrigin ? this.contactX() : this.curlX;
+    const distance = playerX - origin;
+    return pocketRiskForProfile(this.profile, distance);
   }
 
   curlContact(playerX) {
-    return playerX <= this.curlX + 13;
+    return playerX <= this.contactX();
   }
+
+  contactX() {
+    return contactX(this);
+  }
+
+  sectionState(playerX, out = {}) {
+    return sampleWaveSection(this, playerX, out);
+  }
+}
+
+function easedFace(profile, face) {
+  const value = Number.isFinite(Number(face)) ? Number(face) : 0;
+  const surface = profile.surface;
+  return value * (surface.faceEaseLinear + value * surface.faceEaseQuadratic);
+}
+
+function pocketRiskForProfile(profile, distance) {
+  const pocket = profile.pocket;
+  return clamp(1 - (distance - pocket.nearOffset) / pocket.span, 0, 1);
+}
+
+function mixRange(range, amount) {
+  return range[0] + (range[1] - range[0]) * clamp(amount, 0, 1);
 }

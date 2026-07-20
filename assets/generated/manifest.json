@@ -2,6 +2,74 @@
   "version": 2,
   "generator": "tools/art/build-grok-assets.py",
   "families": {
+    "twilight-hero-barrel-atlas": {
+      "image": "twilight-hero-barrel-atlas.png",
+      "width": 256,
+      "height": 144,
+      "frames": {
+        "heroBarrel": {
+          "x": 0,
+          "y": 0,
+          "width": 256,
+          "height": 144,
+          "anchor": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/twilight-hero-barrel-source.png",
+      "sourceSha256": "197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf"
+    },
+    "twilight-hero-wave-components-atlas": {
+      "image": "twilight-hero-wave-components-atlas.png",
+      "width": 256,
+      "height": 144,
+      "frames": {
+        "foamCrown": {
+          "x": 0,
+          "y": 0,
+          "width": 128,
+          "height": 72,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "faceRibbons": {
+          "x": 128,
+          "y": 0,
+          "width": 128,
+          "height": 72,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "foregroundShoulder": {
+          "x": 0,
+          "y": 72,
+          "width": 128,
+          "height": 72,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        },
+        "contactSpray": {
+          "x": 128,
+          "y": 72,
+          "width": 128,
+          "height": 72,
+          "anchor": [
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/twilight-hero-wave-components-source.png",
+      "sourceSha256": "bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600"
+    },
     "wave-breaker-atlas": {
       "image": "wave-breaker-atlas.png",
       "width": 288,

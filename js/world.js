@@ -136,10 +136,10 @@ export class WorldSimulation {
     this.updateRace(seconds);
     this.updateAircraftDrop(seconds);
     this.updateFoamGates(seconds);
-    this.updateAmbientScheduler();
+    if (this.profile.ambientTraffic !== false) this.updateAmbientScheduler();
     this.updateInteractiveSchedulers();
-    this.updateSpecialSchedulers();
-    this.updateCarrierScheduler();
+    if (this.profile.specialTraffic !== false) this.updateSpecialSchedulers();
+    if (this.profile.carrierEnabled !== false) this.updateCarrierScheduler();
     this.refreshModifiers();
     return this;
   }

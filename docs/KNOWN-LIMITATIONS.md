@@ -1,6 +1,6 @@
 # Known limitations
 
-The implementation includes Simple and Advanced controls, compositional aerials, bidirectional/switch surfing, three boards and conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a reviewed 112-state browser gallery, and a static-host adapter. The remaining limitations require physical hardware, assistive-technology labs, representative low-powered devices, or rights-holder confirmation rather than missing core systems.
+The implementation includes Simple and Advanced controls, compositional aerials, bidirectional/switch surfing, three boards and conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 118-state browser QA matrix, and a static-host adapter. The remaining limitations require physical hardware, assistive-technology labs, representative low-powered devices, or rights-holder confirmation rather than missing core systems.
 
 ## Current limitations
 

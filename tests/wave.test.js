@@ -1,8 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { BOARDS } from "../js/config.js";
-import { GameplayWave } from "../js/wave.js";
+import { BOARDS, WAVE_STYLES } from "../js/config.js";
+import {
+  contactX,
+  GameplayWave,
+  projectWavePoint,
+  resolveWaveStyle,
+  sampleWaveSection,
+} from "../js/wave.js";
 import {
   advanceWavePresentationClocks,
   breakerSkyWindow,
@@ -14,10 +20,160 @@ import {
   waveSurfaceTravel,
   waveVisualTravel,
 } from "../js/wave-visuals.js";
+import {
+  heroBarrelGeometry,
+  heroBarrelStage,
+  isHeroBarrelWave,
+} from "../js/hero-wave-visuals.js";
 
 function snapshotWave(wave) {
   return JSON.parse(JSON.stringify(wave));
 }
+
+test("classic profile preserves the shipped surface, pocket, and contact equations", () => {
+  const wave = new GameplayWave(0x1234abcd);
+  wave.time = 2.75;
+  wave.travel = 468;
+  wave.pressure = 0.64;
+  const x = 173;
+  const expectedCrest = 75
+    + Math.sin(x * 0.015 + wave.travel * 0.003 + wave.phaseA) * 3.5
+    + Math.sin(x * 0.043 - wave.time * 0.62 + wave.phaseB) * 1.25;
+  const expectedDepth = 102 + Math.sin(x * 0.021 + wave.phaseB) * 5;
+  const face = 0.47;
+
+  assert.equal(wave.profileId, "classic");
+  assert.equal(wave.profile, WAVE_STYLES.classic);
+  assert.equal(wave.crestY(x), expectedCrest);
+  assert.equal(wave.faceDepth(x), expectedDepth);
+  assert.equal(wave.ridingY(x, face), expectedCrest + face * (0.88 + face * 0.12) * expectedDepth);
+  wave.curlX = 100;
+  assert.equal(wave.contactX(), 113);
+  assert.equal(contactX(wave), 113);
+  assert.equal(wave.curlContact(113), true);
+  assert.equal(wave.curlContact(113.001), false);
+  assert.equal(wave.pocketRisk(177), 0.5);
+  assert.equal(resolveWaveStyle("unknown"), WAVE_STYLES.classic);
+});
+
+test("Twilight hero barrel occupies the approved horizon, ride, and trough bands", () => {
+  const wave = new GameplayWave(0x4b414b49, "heroBarrel");
+  wave.update(3.25, 104, 0, 104, { playerX: 226, speed: 104, skillMomentum: 0.4, active: false });
+
+  assert.equal(wave.profileId, "heroBarrel");
+  for (let x = 0; x <= 384; x += 24) {
+    const crest = wave.crestY(x);
+    const depth = wave.faceDepth(x);
+    const powerFace = wave.powerFaceAt(x);
+    const powerY = wave.ridingY(x, powerFace);
+    const troughY = wave.ridingY(x, 1);
+    const gradient = wave.surfaceGradientAt(x, powerFace);
+    assert.ok(crest >= 74.5 && crest <= 81, `crest ${crest} at x=${x}`);
+    assert.ok(depth >= 112 && depth <= 120, `depth ${depth} at x=${x}`);
+    assert.ok(powerFace >= 0.53 && powerFace <= 0.66, `power face ${powerFace} at x=${x}`);
+    assert.ok(powerY >= 132 && powerY <= 154, `ride band ${powerY} at x=${x}`);
+    assert.ok(troughY >= 186.5 && troughY <= 202, `trough ${troughY} at x=${x}`);
+    assert.ok(Number.isFinite(wave.slopeAt(x, powerFace)));
+    assert.ok(Number.isFinite(gradient.x));
+    assert.ok(gradient.face > 100 && gradient.face < 132);
+  }
+});
+
+test("hero barrel has a broad readable pocket but one canonical contact edge", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  wave.curlX = 100;
+
+  assert.equal(wave.contactX(), 196);
+  assert.equal(contactX(wave), 196);
+  assert.equal(contactX({ curlX: 100, profileId: "heroBarrel" }), 196);
+  assert.equal(wave.curlContact(196), true);
+  assert.equal(wave.curlContact(196.001), false);
+  assert.equal(wave.pocketRisk(196), 1);
+  assert.equal(wave.pocketRisk(252), 0.5);
+  assert.equal(wave.pocketRisk(308), 0);
+});
+
+test("hero section state and three-quarter projection are pure and collision aligned", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  wave.curlX = 100;
+  const before = snapshotWave(wave);
+  const stages = [
+    [0.1, "gather"],
+    [0.3, "pitch"],
+    [0.56, "open"],
+    [0.76, "deep"],
+    [0.92, "hero"],
+    [0.99, "collapse"],
+  ];
+  let previousOuterRadius = 0;
+  for (const [pressure, expectedStage] of stages) {
+    wave.pressure = pressure;
+    const section = sampleWaveSection(wave, 170, {});
+    assert.equal(section.profileId, "heroBarrel");
+    assert.equal(section.heroBarrel, true);
+    assert.equal(section.stage, expectedStage);
+    assert.equal(section.contactX, 196);
+    assert.equal(section.gap, -26);
+    assert.equal(section.pocket, wave.pocketRisk(170));
+    assert.ok(section.outerRadiusX >= previousOuterRadius);
+    previousOuterRadius = section.outerRadiusX;
+  }
+
+  wave.pressure = 1;
+  const closed = wave.sectionState(170, {});
+  assert.equal(closed.stage, "collapse");
+  assert.equal(closed.closure, 1);
+  assert.ok(closed.aperture >= 0.339 && closed.aperture <= 0.341, "danger keeps visible tube negative space");
+
+  const focusFace = wave.powerFaceAt(300);
+  const canonical = projectWavePoint(wave, 300, focusFace, focusFace, {});
+  assert.equal(canonical.x, 300);
+  assert.equal(canonical.y, wave.ridingY(300, focusFace));
+  const foreground = projectWavePoint(wave, 300, 0.9, focusFace, {});
+  assert.ok(foreground.x > canonical.x, "deeper water fans toward screen-right");
+  assert.ok(foreground.y > wave.ridingY(300, 0.9), "deeper water drops toward the foreground");
+
+  const after = snapshotWave(wave);
+  before.pressure = 1;
+  assert.deepEqual(after, before, "sampling and projection never mutate gameplay state");
+});
+
+test("hero presentation stages keep an open aperture and the exact collision edge", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  wave.curlX = 76;
+  const player = { x: 208, face: wave.powerFaceAt(208), state: "riding", curlTimer: 0 };
+  assert.equal(isHeroBarrelWave(wave), true);
+
+  const stages = [
+    [0.12, "gather"],
+    [0.34, "pitch"],
+    [0.58, "open"],
+    [0.78, "deep"],
+    [0.94, "hero"],
+    [1, "collapse"],
+  ];
+  for (const [pressure, expected] of stages) {
+    wave.pressure = pressure;
+    assert.equal(heroBarrelStage(wave, player).id, expected);
+    const geometry = heroBarrelGeometry(wave, player);
+    assert.equal(geometry.contactX, wave.contactX());
+    assert.equal(geometry.collisionX, wave.contactX());
+    assert.ok(geometry.aperture.right > geometry.aperture.left + 12);
+    assert.ok(geometry.aperture.bottom > geometry.aperture.top + 28);
+    if (expected === "open" || expected === "deep" || expected === "hero") {
+      assert.ok(geometry.aperture.top < 79, `${expected} exposes real sky above the horizon`);
+      assert.ok(geometry.aperture.bottom > 130, `${expected} exposes backwater below the horizon`);
+    }
+  }
+
+  wave.pressure = 0.5;
+  player.curlTimer = 0.2;
+  const caughtStage = heroBarrelStage(wave, player);
+  assert.equal(caughtStage.id, "collapse", "contact begins the authored collapse beat");
+  assert.ok(caughtStage.collapseMix > 0 && caughtStage.collapseMix < 1, "collapse eases through the contact delay");
+  const caughtGeometry = heroBarrelGeometry(wave, player);
+  assert.ok(caughtGeometry.aperture.bottom > caughtGeometry.aperture.top + 28, "catch animation cannot close the sky window into a wall");
+});
 
 test("speedPotential is deterministic and side-effect free", () => {
   const wave = new GameplayWave(0x1234abcd);

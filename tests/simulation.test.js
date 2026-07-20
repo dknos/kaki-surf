@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BOARDS, CONDITIONS, FIXED_STEP, TUNING } from "../js/config.js";
+import { BOARDS, CONDITIONS, FIXED_STEP, TUNING, WAVE_STYLES } from "../js/config.js";
 import { seededRandom, shortestAngle, TAU } from "../js/math.js";
 import { ScoreSystem } from "../js/scoring.js";
 import { SurfSimulation } from "../js/simulation.js";
@@ -562,6 +562,143 @@ test("reset owns canonical condition, control mode, and signed-travel cleanup", 
   simulation.reset({ condition: { id: "twilightGlass" }, controlMode: "invalid" });
   assert.equal(simulation.condition, CONDITIONS.twilightGlass);
   assert.equal(simulation.controlMode, "simple");
+});
+
+test("condition installs its canonical wave profile before reset-derived geometry", () => {
+  const simulation = new SurfSimulation({ seed: 0x10203040 });
+  assert.equal(simulation.condition, CONDITIONS.goldenCoast);
+  assert.equal(simulation.wave.profileId, "classic");
+  assert.equal(simulation.wave.profile, WAVE_STYLES.classic);
+
+  simulation.wave.time = 11;
+  simulation.wave.travel = 900;
+  simulation.wave.curlX = 166;
+  simulation.reset({ condition: "twilightGlass", seed: 0x54574c47 });
+  assert.equal(simulation.condition, CONDITIONS.twilightGlass);
+  assert.equal(simulation.wave.profileId, "heroBarrel");
+  assert.equal(simulation.wave.profile, WAVE_STYLES.heroBarrel);
+  assert.equal(simulation.wave.seed, 0x54574c47);
+  assert.equal(simulation.wave.time, 0);
+  assert.equal(simulation.wave.travel, 0);
+  assert.equal(simulation.wave.curlX, 48);
+  assert.equal(
+    simulation._worldPreviousPlayerY,
+    simulation.wave.ridingY(simulation.player.x, simulation.player.face),
+    "the first collision/world sample uses the selected profile",
+  );
+  const targetFace = simulation.wave.powerFaceAt(simulation.player.x);
+  const targetY = simulation.wave.ridingY(simulation.player.x, targetFace);
+  assert.ok(targetFace >= 0.53 && targetFace <= 0.66);
+  assert.ok(targetY >= 132 && targetY <= 154);
+  assert.equal(simulation.player.face, targetFace, "Twilight entry starts board-first on the visible power line");
+  assert.equal(simulation.player.previousFace, targetFace);
+
+  simulation.reset({ condition: "stormbreak" });
+  assert.equal(simulation.condition, CONDITIONS.stormbreak);
+  assert.equal(simulation.wave.profileId, "classic");
+  assert.equal(simulation.wave.profile, WAVE_STYLES.classic);
+  simulation.reset({ condition: "goldenCoast" });
+  assert.equal(simulation.wave.profileId, "classic");
+});
+
+test("Twilight entry remains aligned to the hero barrel power line through handoff", () => {
+  const simulation = new SurfSimulation({ seed: 0x54574c47 });
+  simulation.tutorialEnabled = false;
+  simulation.reset({ condition: "twilightGlass" });
+  simulation.begin();
+
+  for (let step = 0; step < 120 && simulation.player.state === "entry"; step += 1) {
+    simulation.update(FIXED_STEP, {});
+    const targetFace = simulation.wave.powerFaceAt(simulation.player.x);
+    assert.ok(
+      Math.abs(simulation.player.face - targetFace) < 1e-12,
+      `entry face ${simulation.player.face} drifted from hero power line ${targetFace}`,
+    );
+  }
+
+  assert.equal(simulation.player.state, "riding");
+  assert.equal(simulation.player.x, 212);
+  assert.equal(simulation.player.face, simulation.wave.powerFaceAt(simulation.player.x));
+});
+
+test("wave profiles preserve classic travel bounds and frame Twilight's authored face", () => {
+  const simulation = new SurfSimulation({ seed: 0x54574c47 });
+  simulation.reset({ condition: "twilightGlass" });
+  simulation.player.x = 999;
+  simulation.constrainRidingX();
+  assert.equal(simulation.player.x, 306);
+  simulation.player.x = -999;
+  simulation.constrainRidingX();
+  assert.equal(simulation.player.x, 156);
+
+  simulation.reset({ condition: "goldenCoast" });
+  simulation.player.x = 999;
+  simulation.constrainRidingX();
+  assert.equal(simulation.player.x, 338);
+  simulation.player.x = -999;
+  simulation.constrainRidingX();
+  assert.equal(simulation.player.x, 76);
+});
+
+test("Twilight aerial collision uses the visible hero lip contact", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, { condition: CONDITIONS.twilightGlass });
+  const player = simulation.player;
+  simulation.wave.curlX = -100;
+  player.state = "lip";
+  player.stateTime = 0.1;
+  player.face = 0.02;
+  player.faceVelocity = -0.85;
+  player.speed = 96;
+  player.charge = 0.8;
+  simulation.update(FIXED_STEP, {});
+  assert.equal(player.state, "airborne");
+
+  player.airX = 400;
+  player.previousAirX = 400;
+  player.airY = 20;
+  player.previousAirY = 20;
+  player.airVY = -20;
+  simulation.update(FIXED_STEP, {});
+  assert.equal(player.airX, 326, "Twilight aerials stay inside the authored landing window");
+
+  simulation.wave.curlX = 100;
+  assert.equal(simulation.wave.contactX(), 196);
+  player.airX = 150;
+  player.previousAirX = 150;
+  player.airY = 20;
+  player.previousAirY = 20;
+  player.airVY = -20;
+  simulation.update(FIXED_STEP, {});
+
+  assert.equal(player.state, "airborne", "the hero lip cannot eat an aerial during opening grace");
+
+  simulation.wave.time = TUNING.curlGrace + 0.1;
+  player.airX = 150;
+  player.previousAirX = 150;
+  player.airY = 20;
+  player.previousAirY = 20;
+  player.airVY = -20;
+  simulation.update(FIXED_STEP, {});
+
+  assert.equal(player.state, "wipeout");
+  assert.equal(player.wipeoutCause, "air");
+});
+
+test("Twilight's forward hero lip still honors the full opening grace", () => {
+  const simulation = new SurfSimulation({ seed: 0x54574c47 });
+  simulation.tutorialEnabled = false;
+  simulation.reset({ condition: "twilightGlass" });
+  simulation.begin();
+  simulation.player.state = "riding";
+  simulation.player.x = simulation.wave.contactX() - 12;
+  simulation.player.previousX = simulation.player.x;
+
+  for (let step = 0; step < Math.floor((TUNING.curlGrace - 0.08) / FIXED_STEP); step += 1) {
+    simulation.update(FIXED_STEP, { x: -1, y: 0 });
+    simulation.consumeEvents(() => {});
+    assert.notEqual(simulation.player.state, "wipeout");
+    assert.equal(simulation.player.curlTimer, 0);
+  }
 });
 
 test("a launched aerial banks only after a perfect landing and returns to riding", () => {

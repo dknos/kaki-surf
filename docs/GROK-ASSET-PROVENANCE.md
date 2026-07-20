@@ -2,7 +2,7 @@
 
 Date: 2026-07-19.
 
-These source sheets were generated through the local Grok Imagine workflow for this repository. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases.
+These 14 source families were generated through the local Grok Imagine workflow for this repository. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases.
 
 ## Rebuild command
 
@@ -12,16 +12,18 @@ From the repository root:
 python3 tools/art/build-grok-assets.py
 ```
 
-The script reads the preserved sources, validates the staged breaker's exact hash and dimensions, removes the chroma-magenta background, extracts each declared source grid, crops silhouettes, downsamples with the family-specific filter, thresholds alpha, quantizes, sharpens where appropriate, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
+The script reads the preserved sources, validates declared exact hashes and dimensions for contact-sensitive wave sheets, removes the chroma-magenta background, extracts each declared source grid, crops or preserves layout according to the family contract, downsamples with the family-specific filter, thresholds alpha, quantizes, sharpens where appropriate, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
 
 ## Selected source and output record
 
-The modular wave source is 1024 x 1024; the staged wave progression and other selected sources are 1280 x 720. SHA-256 values identify the exact files used at this checkpoint.
+The wave-breaker polish source is 1024 x 1024; the full Twilight hero barrel, staged wave progression, Twilight components, and other selected sources are 1280 x 720. SHA-256 values identify the exact files used at this checkpoint.
 
 | Family | Selection | Preserved source | Source SHA-256 | Runtime atlas | Atlas dimensions |
 | --- | --- | --- | --- | --- | ---: |
+| Twilight hero barrel | Candidate 4 selected as the primary normal-palette silhouette; candidates 1–3 rejected | `docs/art-source/grok/twilight-hero-barrel-source.png` | `197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf` | `assets/generated/twilight-hero-barrel-atlas.png` | 256 x 144 |
 | Wave breaker | Square polish pass selected; v2 preserved | `docs/art-source/grok/wave-breaker-source-v2.png` | `07554da55eb79d344d60dea70174384c6497146b33a5923e5c913fe98c6b9ca9` | `assets/generated/wave-breaker-atlas.png` | 288 x 128 |
 | Wave progression | Tapered four-stage polish selected; first pass preserved | `docs/art-source/grok/wave-progression-source-v2.png` | `066da3c2e9466c319458502fdba299fd521371d42bf783a0784fcdb1f66f9070` | `assets/generated/wave-progression-atlas.png` | 320 x 192 |
+| Twilight hero wave | Modular pass A selected; crown/spray approved for runtime, ribbons/shoulder retained but not rendered; whole-wave sheets and labeled pass B rejected | `docs/art-source/grok/twilight-hero-wave-components-source.png` | `bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600` | `assets/generated/twilight-hero-wave-components-atlas.png` | 256 x 144 |
 | Dolphin | First reviewed pass selected | `docs/art-source/grok/dolphin-source.png` | `eac80e5862bb10b89c36fbd04e3f41b3869835d6c34d25edcfe1d0f4ff0f6740` | `assets/generated/dolphin-atlas.png` | 224 x 80 |
 | Shark | First reviewed pass selected | `docs/art-source/grok/shark-source.png` | `044d588bac3ba9d81677228c4b7831859dc94d2bbe6b128c771935bf24f2bd0b` | `assets/generated/shark-atlas.png` | 224 x 72 |
 | Whale | First reviewed pass selected | `docs/art-source/grok/whale-source.png` | `9ff5f93b1fd98a68402c03f8785c5d56e120a0eed2ebb42fd1a3f4770481ca14` | `assets/generated/whale-atlas.png` | 352 x 108 |
@@ -39,10 +41,16 @@ The first staged wave came from local Grok session `019f7c03-7e1e-7570-acac-8cb1
 
 The selected tapered polish came from local Grok session `019f7ced-ca4a-7003-97bb-7ded6e4a97cd`. Variant A was copied without modification to `docs/art-source/grok/wave-progression-source-v2.png`; its source and preserved copy both hash to `066da3c2e9466c319458502fdba299fd521371d42bf783a0784fcdb1f66f9070`. Variant B was rejected because its broad dark mounds and circular highlight shapes did not read as the same flowing breaker at runtime.
 
+The selected full Twilight barrel came from local Grok session `019f7d79-2944-7941-a08e-27439bd9e68c`. Candidate 4 was copied without modification to `docs/art-source/grok/twilight-hero-barrel-source.png`; the 1280 x 720 source and preserved copy hash to `197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf`. It was selected because its single continuous mass, asymmetric open aperture, nested concave face bands, broad trough, and clean chroma perimeter survived native-size compositing. Candidate 1 read as a donut, candidate 2 introduced an extra wave, and candidate 3 introduced a secondary hump. The deterministic build removes only exterior-connected chroma, reduces the full composition to 256 x 144 with nearest-neighbor sampling, and fades its right and bottom continuation edges so they join the runtime foreground water without a rectangular boundary.
+
+The selected Twilight component sheet came from local Grok session `019f7d11-7e31-70b0-bbf0-e8e1f5d85f0a`. Candidate A was copied without modification to `docs/art-source/grok/twilight-hero-wave-components-source.png`; the source and preserved copy are 1280 x 720 and hash to `bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600`. Native-size in-motion review approved `foamCrown` and `contactSpray`. It rejected `faceRibbons`, which read as a pasted triangular fan, and `foregroundShoulder`, which read as a detached lower-right hump; both remain in the deterministic atlas but are not rendered. Candidate B was rejected because visible A/B/C/D labels and heavier panel-like shapes made it unsuitable for compositing. Earlier whole-wave animation-sheet attempts were not promoted because their circular C-shaped mass, flat base, and rectangular framing repeated the perspective problem seen in the previous runtime wave.
+
 ## Review decisions
 
 - Wave v1 was rejected because the model interpreted “crest feather” and “foam fingers” literally. Wave v2 removed those motifs but was superseded after runtime review found its reduced foam clusters muddy. The selected square pass has cleaner isolated silhouettes; only restrained crest and spray accents are used over simulation-owned geometry.
 - The first four-stage progression still produced a tall block when stretched to the Canvas bottom. The selected polish has wider tapered silhouettes and a larger open curl; it renders near native aspect at the simulation-owned contact while code owns the connected lower face, sky cutout, collision, and complete fallback.
+- The selected full Twilight barrel is now the normal-palette hero silhouette. Runtime stage-scales it around the canonical contact and joins it to code-authored foreground water; it never defines collision. High Contrast or a missing full-barrel atlas uses the complete procedural barrel instead.
+- The Twilight component pass supplements rather than replaces the full barrel. Normal rendering uses only `contactSpray`; `foamCrown` is reserved for the procedural fallback. The face ribbons and foreground shoulder remain packed for reproducibility but are not rendered. Real sky stays visible through the aperture, the playable surface stays collision-aligned, and decorative water motion never mirrors with the rider.
 - Birds v1 was rejected because visible grid dividers became part of the sheet. The corrected prompt required one uninterrupted field with no cell borders, seams, panels, or boxes.
 - UI v1 was rejected because ornaments overlapped or cropped and contained pseudo-text. The corrected prompt reduced each ornament to the middle 60% of its implied cell and prohibited every form of writing.
 - The selected airshow cell contains a four-plane formation rather than the requested three-plane formation. It remains a readable, fictional, nonmilitary airshow sprite and is accepted as a presentation variance.
@@ -88,6 +96,22 @@ Selected source: `docs/art-source/grok/wave-progression-source-v2.png`.
 
 ```text
 Production sprite-sheet source for a side-view 384x216 neo-chibi plush arcade surfing game. Exactly four sequential frames of the same LEFT-SIDE ocean breaker arranged in a clean 2 columns by 2 rows grid with identical contact anchor, scale, palette, and lighting. TOP LEFT: a low rounded swell crest entering from the left. TOP RIGHT: the shoulder rises and a thin lip pitches to the right. BOTTOM LEFT: an elegant open curling lip with a large clear hollow and a tapered trailing edge so background sky can visibly show behind the passing wave. BOTTOM RIGHT: a collapsing but airy whitewater crown and spray, not a solid wall. Draw only the upper breaker silhouette, lip, foam and small attached water shoulder; every frame must taper organically into transparency/chroma and must NOT contain a heavy rectangular base. Premium hand-cleaned pixel art with large rounded deliberate clusters, crisp readable silhouette, restrained deep navy shadows, turquoise, pale aqua and seafoam cream, tiny coral accents only in impact foam, coherent late-handheld arcade style. Perfectly uniform flat pure chroma-magenta #ff00ff background in every cell and wide gutters; all art fully inside each cell. No surfer, board, animals, boats, aircraft, scenery, horizon, UI, text, numbers, logos, watermark, borders, cell dividers, rectangular water panels, solid bottom slabs, dark donut barrel, vertical pillar, horizontal speed lines, extra waves, blur, gradients, noisy microtexture, or photorealism.
+```
+
+### 2e. Twilight full hero barrel — selected
+
+Selected source: `docs/art-source/grok/twilight-hero-barrel-source.png`.
+
+```text
+Single isolated production game sprite of one spectacular Twilight Glass barrel wave for a 384x216 premium pixel-art surfing game, composed in the same three-quarter side perspective as a classic arcade surfing screen. The wave is one continuous water mass: a broad deep-navy and turquoise face rises from the lower-left and foreground, arches overhead, then pitches a tapered lip to the right; a large asymmetric D-shaped open barrel aperture cuts through the center and remains fully open to the right; a wide curved trough and foreground shoulder flow from the pocket beneath the future rider position toward the lower-right edge. Show six or seven clearly separated nested concave cyan/teal face bands climbing the wall and sweeping into the trough, not straight lines. Add a shadowed underside, irregular white and pale-aqua foam crown with three to five tapered fingers, sparse directional spray, and deliberate chunky late-handheld pixel clusters with crisp stair-step edges. Upper-right twilight lighting; palette limited to midnight navy, indigo, saturated teal, luminous cyan, pale aqua, and white. The future rider/contact point is empty, approximately 56 percent across and 67 percent down. Pure perfectly flat #ff00ff chroma-magenta background visible everywhere around the wave and through the open barrel. No surfer, board, animals, boats, aircraft, scenery, sky, horizon, UI, text, letters, numbers, logos, watermark, panel borders, extra waves, circular donut, closed tunnel, detached fins, flat wall, rectangular slab, neon platform, thin horizontal water lines, blur, antialias haze, photorealism, or cropped lip.
+```
+
+### 2f. Twilight hero-wave modular components — selected
+
+Selected source: `docs/art-source/grok/twilight-hero-wave-components-source.png`.
+
+```text
+Production modular sprite-sheet source for the Twilight Glass hero-barrel animation in a 384x216 premium pixel-art surfing game. Exactly four isolated reusable wave components arranged in a clean 2 columns by 2 rows grid with identical upper-right twilight lighting, palette, pixel density, pure flat #ff00ff chroma-magenta background, and wide gutters. TOP LEFT: a long airy white seafoam crown that curves from upper left toward lower right, with tapered hanging foam fingers and sparse detached spray. TOP RIGHT: five concave turquoise/cyan inner-face ribbons that fan in perspective from a tight lower-right contact point toward the upper-left barrel wall; ribbons must be curved, tapered, separated, and must not form horizontal lines. BOTTOM LEFT: a foreground water shoulder ribbon seen at water level in three-quarter perspective, sweeping in a broad rising arc from lower left toward mid-right and tapering at both ends, with two thin foam edges. BOTTOM RIGHT: a compact board-contact spray burst with directional droplets fanning up-left and a low tapered wake extending right. Every component floats independently and ends in chroma on all sides; no solid wave body or rectangular base. Hand-cleaned late-handheld pixel art with large deliberate clusters, crisp 1-pixel stair-step curves, deep midnight navy, saturated turquoise, cyan edge light, pale aqua, white seafoam, subtle violet bounce. No surfer, board, animals, scenery, sky, sun, horizon, UI, text, numbers, logos, watermark, borders, cell labels, gradients on the chroma background, flat vertical wall, circular barrel hole, heavy water slab, horizontal speed lines, extra waves, blur, antialias haze, photorealism, or cropped edges.
 ```
 
 ### 3. Dolphin — selected

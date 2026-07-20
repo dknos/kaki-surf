@@ -185,6 +185,9 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
     id: "goldenCoast",
     wind: 0.28,
     density: 1,
+    ambientTraffic: true,
+    specialTraffic: true,
+    carrierEnabled: true,
     traffic: Object.freeze({
       far: Object.freeze(["sailboat", "cargoShip", "fishingBoat", "cormorantFlock", "propPlane"]),
       mid: Object.freeze(["gullFlock", "pelican", "sailboat", "speedboat", "fishingBoat", "bannerPlane", "seaplane"]),
@@ -196,6 +199,12 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
     id: "twilightGlass",
     wind: 0.18,
     density: 0.9,
+    // Twilight's hero barrel owns the full left-side composition. Ordinary
+    // traffic and traffic-backed bonuses would be hidden by that wave and can
+    // therefore never be scheduled during a real run.
+    ambientTraffic: false,
+    specialTraffic: false,
+    carrierEnabled: false,
     traffic: Object.freeze({
       far: Object.freeze(["fishingBoat", "cargoShip", "sailboat", "cormorantFlock", "propPlane"]),
       mid: Object.freeze(["fishingBoat", "ternFlock", "gullFlock", "helicopter", "bannerPlane", "seaplane"]),
@@ -207,6 +216,9 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
     id: "stormbreak",
     wind: 0.82,
     density: 0.78,
+    ambientTraffic: true,
+    specialTraffic: true,
+    carrierEnabled: true,
     traffic: Object.freeze({
       far: Object.freeze(["cargoShip", "fishingBoat", "cormorantFlock", "propPlane"]),
       mid: Object.freeze(["gullFlock", "rescueCraft", "tugboat", "helicopter", "bannerPlane"]),

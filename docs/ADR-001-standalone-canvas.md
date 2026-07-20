@@ -12,7 +12,7 @@ The stable gameplay core is separated from presentation and browser lifecycle:
 | --- | --- |
 | `js/config.js` | Shipping tuning, boards, conditions, palettes, settings, and metadata |
 | `js/input.js` | Keyboard/gamepad/touch normalization and 120 ms action-edge buffers |
-| `js/wave.js` | Seeded wave geometry, surface gradient, curl, fast-line guidance, and signed world travel |
+| `js/wave.js` | Seeded profile-selected wave geometry, surface gradient, curl, fast-line guidance, and signed world travel |
 | `js/world-catalog.js` | Frozen traffic, wildlife, powerup, condition, layer, and capacity data |
 | `js/world.js` / `js/world-collision.js` | Seeded pooled world state, phase machines, swept interaction, modifiers, and bounded signals |
 | `js/trick-catalog.js` | Renderer-free trick definitions and board specialties |
@@ -22,6 +22,7 @@ The stable gameplay core is separated from presentation and browser lifecycle:
 | `js/simulation.js` | Fixed-step signed rider physics, controls, contextual maneuvers, world interactions, launches, landings, and events |
 | `js/sprites.js` | Production Kitty poses, board silhouettes, flex, and wake drawing |
 | `js/wave-visuals.js` | Production face/curl/VFX drawing derived from canonical wave queries |
+| `js/hero-wave-visuals.js` | Twilight's staged hero-barrel volume, real sky aperture, connected face bands, foam crown, and collision-aligned contact presentation |
 | `js/world-visuals.js` | Traffic, wildlife, pickups, carrier, and procedural atlas fallbacks |
 | `js/renderer.js` | Canvas composition, HUD, callouts, particles, and accessibility presentation |
 | `js/asset-manifest.js` / `js/asset-loader.js` | Local atlas/background validation and independent optional-family loading |
@@ -39,7 +40,7 @@ The displayed wave may never approximate gameplay with a visual-only formula.
 - `GameplayWave.speedPotential(x, face, options)` returns the local acceleration contribution, target/error/correction, zone, risk, pocket, pressure, breaking state, line quality, and pump efficiency used by simulation.
 - `waveGuideAt` and `powerSeamFaceAt` in `js/wave-visuals.js` are pure presentation bridges to those exact methods.
 
-Any future renderer, accessibility overlay, ghost, replay, or host view must consume these queries. It must not hard-code another surface, fast line, or zone boundary. Golden Coast, Twilight Glass, and Stormbreak may change palette, atmosphere, traffic mix, and audio, but share rider collision and wave-drive truth.
+Any future renderer, accessibility overlay, ghost, replay, or host view must consume these queries. It must not hard-code another surface, fast line, contact edge, or zone boundary. Golden Coast and Stormbreak currently select the `classic` profile; Twilight Glass selects `heroBarrel`. Those profiles may have different ride/air bounds, surface shapes, and contact placement, but each has one canonical collision and wave-drive truth shared by simulation and presentation. A future level may select another profile only through the same query contract.
 
 ## Determinism boundary
 
@@ -116,6 +117,6 @@ No Kitty Kaki Survivors save-schema change is required. The standalone save key 
 
 ## Consequences
 
-The game ships deterministic rider/world simulation, code-authored production pixel work, and optional curated atlases instead of shared Three.js assets. Conditions remain competitively fair because they share gameplay geometry. Aerial value can be previewed without mutating score, then banked only through landing. Presentation may evolve freely as long as it consumes semantic state/events, preserves independent fallbacks, and obeys the shared-query rule.
+The game ships deterministic rider/world simulation, code-authored production pixel work, and optional curated atlases instead of shared Three.js assets. A selected condition installs its wave profile before reset-derived geometry, and that profile remains deterministic for the run. Aerial value can be previewed without mutating score, then banked only through landing. Presentation may evolve freely as long as it consumes semantic state/events, preserves independent fallbacks, and obeys the shared-query rule; new level-specific waves belong in explicit profiles rather than renderer-only branches.
 
 Cross-mode rewards, town entry, and broader profile use remain host-adapter concerns. Physical-device, assistive-technology, low-powered-hardware, and rights validation remain release follow-up items rather than reasons to merge the two projects.

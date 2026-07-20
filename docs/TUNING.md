@@ -1,6 +1,6 @@
 # Central tuning reference
 
-Shipping values live in `js/config.js` under `TUNING`, `BOARDS`, `CONDITIONS`, `SCORE`, and `DEFAULT_SETTINGS`. Aerial definitions and board-specific trick modifiers live in `js/trick-catalog.js`. Press backtick during play to open Surf Lab; its edits mutate the in-memory `TUNING` object only and a reload restores source defaults.
+Shipping values live in `js/config.js` under `TUNING`, `WAVE_STYLES`, `BOARDS`, `CONDITIONS`, `SCORE`, and `DEFAULT_SETTINGS`. Aerial definitions and board-specific trick modifiers live in `js/trick-catalog.js`. Press backtick during play to open Surf Lab; its edits mutate the in-memory `TUNING` object only and a reload restores source defaults.
 
 ## Runtime envelope
 
@@ -117,7 +117,7 @@ Simple mode begins board-specific auto-level after downward velocity exceeds 18.
 
 `js/world-catalog.js` keeps world tuning separate from rider tuning. Far, mid, and near traffic pools have capacities 8, 8, and 3 with parallax 0.08, 0.32, and 0.88. Wildlife and powerup pools each have capacity 3; at most two bonuses can be active. Interactions and presentation events use fixed 16- and 32-record arrays. A 7-second initial grace and 3.5-second minimum interactive quiet period prevent immediate or stacked hazards.
 
-Condition profiles change wind, density, traffic lists, and dolphin/shark/whale weights while rider collision geometry remains shared. Spawn streams are separately seeded so adding cosmetic traffic does not perturb interactive wildlife or powerup timing.
+Condition profiles change wind, density, traffic lists, dolphin/shark/whale weights, and the selected wave style. Golden Coast and Stormbreak use `classic`; Twilight Glass uses `heroBarrel`. Each style owns deterministic ride/air bounds and collision geometry through the shared wave-query API. Spawn streams are separately seeded so adding cosmetic traffic does not perturb interactive wildlife or powerup timing.
 
 ## Aerial trick gates
 
@@ -156,13 +156,13 @@ The four numbers multiply base entry duration, points, risk, and board-motion ti
 
 ## Conditions
 
-| ID | Name | Presentation identity |
-| --- | --- | --- |
-| `goldenCoast` | Golden Coast | Sunlit coast, warm seafoam palette, sunset music pattern |
-| `twilightGlass` | Twilight Glass | Violet horizon, star points, cool glass palette, night arrangement |
-| `stormbreak` | Stormbreak | Squalls, rain, pier silhouette, silver-green face, storm arrangement |
+| ID | Name | Wave style | Presentation identity |
+| --- | --- | --- | --- |
+| `goldenCoast` | Golden Coast | `classic` | Sunlit coast, warm seafoam palette, sunset music pattern |
+| `twilightGlass` | Twilight Glass | `heroBarrel` | Violet horizon, star points, cool glass palette, staged three-quarter hero barrel, night arrangement |
+| `stormbreak` | Stormbreak | `classic` | Squalls, rain, pier silhouette, silver-green face, storm arrangement |
 
-Conditions share the same collision and speed-potential model, so selection changes atmosphere rather than competitive physics. Board and condition selections persist locally.
+All styles expose the same collision, slope, speed-potential, contact, and projection queries, while their authored geometry may differ. Twilight's `heroBarrel` therefore changes the physical line as well as its presentation; Golden Coast and Stormbreak preserve the existing `classic` line. Future levels can select their own reviewed profiles without duplicating wave math in the renderer. Board and condition selections persist locally.
 
 ## Score values
 

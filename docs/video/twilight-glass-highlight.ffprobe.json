@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-07-20T03:50:02.756Z",
+  "source": {
+    "duration": 27.3,
+    "mimeType": "video/webm;codecs=vp9,opus",
+    "size": 6780645,
+    "capturedAudio": true,
+    "audioContextState": "running",
+    "width": 384,
+    "height": 216,
+    "shotCount": 22
+  },
+  "final": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "index": 0,
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1080,
+        "height": 1920,
+        "pix_fmt": "yuv420p",
+        "r_frame_rate": "60/1"
+      },
+      {
+        "index": 1,
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "27.311167",
+      "size": "6592902",
+      "bit_rate": "1931195"
+    }
+  }
+}

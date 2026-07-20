@@ -5,6 +5,7 @@ const cdpHost = process.env.KAKI_SURF_CDP_URL ?? "http://127.0.0.1:9224";
 const baseUrl = process.env.KAKI_SURF_QA_URL ?? "http://127.0.0.1:9876/index.html";
 const outputDir = process.env.KAKI_SURF_RESPONSIVE_DIR
   ?? path.resolve("docs/images/qa-responsive");
+const activeSceneOverride = process.env.KAKI_SURF_ACTIVE_QA_SCENE ?? "";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const profiles = [
@@ -91,7 +92,7 @@ for (const profile of profiles) {
   });
 
   for (const [state, fixedScene] of states) {
-    const scene = fixedScene ?? profile.active;
+    const scene = fixedScene ?? (activeSceneOverride || profile.active);
     const url = `${baseUrl}?qa=${encodeURIComponent(scene)}&capture=responsive-cdp`;
     await call("Page.navigate", { url });
     await waitForReady();

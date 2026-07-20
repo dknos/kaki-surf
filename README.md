@@ -65,13 +65,13 @@ Spawn streams, quiet periods, capacities, culling, collision sweeps, interaction
 - **Mango Fish** is the technical combo board: fast rails, strong grip, and quick spins.
 - **Moon Log** is the expert glide board: the highest cap and pop, slower correction, and high-value long holds.
 
-Golden Coast, Twilight Glass, and Stormbreak share fair gameplay geometry while changing palette, horizon treatment, traffic mix, atmosphere, and reactive music.
+Golden Coast and Stormbreak currently use the `classic` wave profile. Twilight Glass uses the dedicated `heroBarrel` profile, with a taller three-quarter barrel, authored ride/air bounds, and one collision-aligned pitching-lip contact. Every profile still goes through the same canonical wave-query, movement, landing, and scoring contracts. Future levels can select their own deliberate wave profiles without teaching the renderer a second version of gameplay geometry.
 
 Audio follows the game lifecycle instead of free-running behind it. Ocean body, board contact/carve, and aerial wind use separate filtered layers; speed, pocket risk, and surface contact drive their mix. Pause, results, visibility loss, and resume fade or rebase the transport so missed beats never burst after a long interruption. Major landings, wipeouts, power moments, and records duck the music through a master limiter, and Settings includes independent music/effects/wave levels plus a persistent master mute.
 
 ## Local art pipeline
 
-The static game includes six condition backgrounds and 12 compact generated atlas families for four-stage wave progression, modular breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the modular wave source is 1024 x 1024, the staged swell/pitch/curl/collapse source is 1280 x 720, and the other selected sheets are 1280 x 720. `tools/art/build-grok-assets.py` deterministically validates source hashes, removes connected chroma, extracts cells, downsamples, quantizes, and rebuilds the transparent atlases under `assets/generated`.
+The static game includes six condition backgrounds and 14 compact generated atlas families for the full Twilight hero barrel, its contact-spray/component overlays, four-stage classic wave progression, modular breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the wave-breaker polish source is 1024 x 1024, while the full Twilight barrel, staged swell/pitch/curl/collapse source, component source, and other selected sheets are 1280 x 720. `tools/art/build-grok-assets.py` deterministically validates source hashes, removes connected chroma, extracts cells, downsamples, quantizes, edge-blends the authored barrel into runtime water, and rebuilds the transparent atlases under `assets/generated`.
 
 Every atlas is optional. `js/asset-loader.js` validates each family independently, and the Canvas renderer keeps a local code-authored fallback when one is absent or invalid. The browser never calls Grok, Blender, an image API, a CDN, or a remote asset host. Exact prompts, selections, source hashes, and output dimensions are recorded in [Grok asset provenance](docs/GROK-ASSET-PROVENANCE.md).
 
@@ -83,7 +83,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **125/125 tests**, and the syntax gate checks **27 JavaScript modules**. The canonical real-browser gallery contains **112 deterministic 1280 x 720 captures**; the current lifecycle/audio/wave pass additionally has real-browser pause/resume, corrupt-save recovery, 100-restart, console/network, native Settings input, touch-scroll, boat-depth, and 25-state responsive checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), and [Responsive QA](docs/RESPONSIVE-QA.md).
+The native suite passes **141/141 tests**, and the syntax gate checks **28 JavaScript modules**. The canonical real-browser gallery contains **118 deterministic 1280 x 720 captures**, including the six reviewed Twilight hero-barrel stages; the lifecycle/audio/wave pass additionally covers real-browser pause/resume, corrupt-save recovery, 100-restart, console/network, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
 
 ## Static deployment and integration
 
@@ -91,4 +91,4 @@ Browsers require the native modules to be served over HTTP rather than opened th
 
 `js/integration-adapter.js` exports `createKakiSurf({ host, input, audio, storage, settings, profile, onExit, onRunComplete, qaScene })`. It returns `start`, `pause`, `resume`, `restart`, `destroy`, and `getSnapshot` lifecycle methods.
 
-Gameplay truth remains renderer-independent: `js/wave.js` owns ride geometry, `js/simulation.js` owns rider physics and interactions, `js/world.js` owns the ambient/gameplay world, `js/tricks.js` owns the aerial manifest, and `js/scoring.js` owns Speed/Flow valuation and score banking. See [ADR-001](docs/ADR-001-standalone-canvas.md), [Asset manifest](docs/ASSET-MANIFEST.md), and [Hero source map](docs/HERO-SOURCE-MAP.md).
+Gameplay truth remains renderer-independent: `js/wave.js` owns profile-selected ride geometry, `js/simulation.js` owns rider physics and interactions, `js/world.js` owns the ambient/gameplay world, `js/tricks.js` owns the aerial manifest, and `js/scoring.js` owns Speed/Flow valuation and score banking. `js/hero-wave-visuals.js` presents Twilight's dedicated barrel by consuming those canonical queries rather than inventing a visual-only surface. See [ADR-001](docs/ADR-001-standalone-canvas.md), [Asset manifest](docs/ASSET-MANIFEST.md), and [Hero source map](docs/HERO-SOURCE-MAP.md).

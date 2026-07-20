@@ -89,20 +89,24 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-Twelve modular source families were generated with the local Grok Imagine workflow, visually reviewed at source and atlas size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage wave progression, birds, and UI ornaments, while superseded sources remain preserved for auditability.
+Fourteen source families were generated with the local Grok Imagine workflow, visually reviewed at source and runtime size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the full Twilight hero barrel and the other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage wave progression, full Twilight barrel, Twilight component overlays, birds, and UI ornaments, while superseded sources remain preserved for auditability.
 
-`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The new 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts and tightly crops each cell, reduces with Lanczos, thresholds alpha, quantizes and sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges.
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts each cell, applies either tight-crop or contact-preserving layout rules, uses the declared family filter, thresholds alpha, quantizes and conditionally sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave-breaker family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges. The Twilight component family preserves its 2 x 2 source layout with nearest-neighbor reduction. The one-cell full barrel preserves its composition, then fades only the rightmost and bottommost continuation edges so the generated face joins the code-authored foreground water without a rectangular seam.
+
+Normal Twilight rendering uses the approved full-barrel frame as its primary silhouette, stage-scales it around the canonical pitching-lip contact, joins it to a continuous code-authored foreground water plane, and adds only the component atlas's `contactSpray` at the board. The generated barrel remains presentation: runtime geometry still owns the playable surface, contact, collision, stage pressure, and monotonic flow direction. High Contrast or a missing full-barrel asset switches to the complete procedural barrel. In that fallback path, the component atlas may add `foamCrown` and `contactSpray`; if it is also missing, both accents remain procedural. `faceRibbons` and `foregroundShoulder` stay packed for provenance but are never rendered because in-motion review found that they read as a pasted fan and detached hump.
 
 ```console
 python3 tools/art/build-grok-assets.py
 ```
 
-Outputs are the 12 PNGs under `assets/generated`:
+Outputs are the 14 PNGs under `assets/generated`:
 
 | Family | Atlas dimensions |
 | --- | ---: |
+| Twilight hero barrel | 256 x 144 |
 | Wave breaker | 288 x 128 |
 | Wave progression | 320 x 192 |
+| Twilight hero wave | 256 x 144 |
 | Dolphin | 224 x 80 |
 | Shark | 224 x 72 |
 | Whale | 352 x 108 |

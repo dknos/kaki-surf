@@ -10,6 +10,12 @@ import {
   waveSurfaceTravel,
 } from "./wave-visuals.js";
 import {
+  drawHeroBackWater,
+  drawHeroBarrelBack,
+  drawHeroBarrelFront,
+  isHeroBarrelWave,
+} from "./hero-wave-visuals.js";
+import {
   drawActivePowerupHud,
   drawCarrierEvent,
   drawWorldFoamGates,
@@ -292,20 +298,28 @@ export class KakiRenderer {
     const shakeX = Math.round(Math.sin(this.time * 71) * this.shake * motionScale);
     const shakeY = Math.round(Math.cos(this.time * 53) * this.shake * motionScale * 0.55);
     const cameraY = Math.round(this.cameraY);
+    const heroBarrel = isHeroBarrelWave(simulation.wave);
     ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
     ctx.globalAlpha = 1;
     ctx.fillStyle = palette.sky;
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
 
     this.drawSky(simulation);
-    drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
-    drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings);
+    // Twilight is the authored hero-wave level. Keep its actual sky window
+    // pristine: boats, aircraft, and carrier events belong to other levels
+    // instead of drifting through or being pasted onto the barrel face.
+    if (!heroBarrel) {
+      drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings);
+    }
     ctx.save();
     ctx.translate(0, cameraY);
     this.drawBackWater(simulation);
-    drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
+    if (!heroBarrel) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
     this.drawWave(simulation);
-    drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "foreground");
+    // Twilight's playable face is the hero composition. Mid/near traffic stays
+    // in the genuine background window instead of being pasted on the barrel.
+    if (!heroBarrel) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "foreground");
     this.drawMaxSpeedFeedback(simulation);
     this.drawImpactCavity(simulation);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, false);
@@ -313,8 +327,9 @@ export class KakiRenderer {
     drawWorldFoamGates(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
     this.drawParticles(false);
     this.drawSurfer(simulation, alpha);
+    if (heroBarrel) this.drawWaveFront(simulation);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true);
-    drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings);
+    if (!heroBarrel) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings);
     this.drawParticles(true);
     ctx.restore();
     this.drawHud(simulation);
@@ -427,6 +442,16 @@ export class KakiRenderer {
     const speedCap = rideSpeedCapFor(simulation);
     const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
     const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
+    if (isHeroBarrelWave(simulation.wave)) {
+      drawHeroBackWater(
+        ctx,
+        simulation,
+        p,
+        this.settings,
+        this.wavePresentationClocks.backWater,
+      );
+      return;
+    }
     ctx.fillStyle = p.waterDeep;
     ctx.fillRect(0, 78, LOGICAL_WIDTH, LOGICAL_HEIGHT - 78);
 
@@ -467,6 +492,17 @@ export class KakiRenderer {
   }
 
   drawWave(simulation) {
+    if (isHeroBarrelWave(simulation.wave)) {
+      drawHeroBarrelBack(
+        this.ctx,
+        simulation,
+        this.palette,
+        this.settings,
+        this.visualAssets,
+        this.wavePresentationClocks,
+      );
+      return;
+    }
     drawLayeredWave(
       this.ctx,
       simulation,
@@ -485,6 +521,17 @@ export class KakiRenderer {
         this.drawPassedSkyBackdrop(simulation, window);
         this.ctx.restore();
       },
+    );
+  }
+
+  drawWaveFront(simulation) {
+    drawHeroBarrelFront(
+      this.ctx,
+      simulation,
+      this.palette,
+      this.settings,
+      this.visualAssets,
+      this.wavePresentationClocks,
     );
   }
 
@@ -509,6 +556,9 @@ export class KakiRenderer {
   }
 
   drawMaxSpeedFeedback(simulation) {
+    // The hero face already carries converging perspective ribbons and board
+    // spray. Full-screen streaks would flatten it back into horizontal bands.
+    if (isHeroBarrelWave(simulation.wave)) return;
     const player = simulation.player;
     const speedCap = rideSpeedCapFor(simulation);
     const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);

@@ -117,7 +117,11 @@ export class SurfSimulation {
       steering: Boolean(assists.steering),
       landing: Boolean(assists.landing),
     };
-    this.wave.reset();
+    // The condition selects canonical surface and contact geometry. Install it
+    // before reset so the first entry frame, world context, and every derived
+    // slope/landing query agree with the renderer.
+    this.wave.setProfile(this.condition.waveStyle);
+    this.wave.reset(this.seed);
     this.world.reset({ seed: this.seed, condition: this.condition.id, qa: worldQa });
     this.score.reset();
     this.tutorialEnabled = Boolean(tutorialEnabled);
@@ -136,6 +140,13 @@ export class SurfSimulation {
     this.lastGiantTrickAt = -Infinity;
     resetRunHighlights(this.highlights);
     resetPlayer(this.player, true, this.tuning.speed);
+    if (this.wave.profileId === "heroBarrel") {
+      const entryFace = this.wave.powerFaceAt(this.player.x);
+      this.player.face = entryFace;
+      this.player.previousFace = entryFace;
+      this.player.boardAngle = this.wave.slopeAt(this.player.x, entryFace);
+      this.player.bodyAngle = this.player.boardAngle;
+    }
     this._worldPreviousPlayerY = this.wave.ridingY(this.player.x, this.player.face);
     this.emit("state", { state: "entry" });
   }
@@ -464,7 +475,9 @@ export class SurfSimulation {
     const player = this.player;
     const t = smoothstep(0, 0.72, player.stateTime);
     player.x = 324 - t * 112;
-    player.face = 0.44 + Math.sin(t * Math.PI) * 0.05;
+    player.face = this.wave.profileId === "heroBarrel"
+      ? this.wave.powerFaceAt(player.x)
+      : 0.44 + Math.sin(t * Math.PI) * 0.05;
     player.boardAngle = this.wave.slopeAt(player.x, player.face);
     player.bodyAngle = player.boardAngle;
     player.speed = damp(player.speed, this.tuning.speed, 3, dt);
@@ -1047,7 +1060,8 @@ export class SurfSimulation {
     player.airVX *= 1 - dt * 0.09;
     player.airX += player.airVX * dt;
     player.airY += player.airVY * dt;
-    player.airX = clamp(player.airX, 58, 350);
+    const [airMinX, airMaxX] = this.wave.profile.bounds.airX;
+    player.airX = clamp(player.airX, airMinX, airMaxX);
     player.landingFace = clamp(
       player.landingFace + dt * (0.032 + Math.abs(player.airVX) * 0.002),
       0.1,
@@ -1088,7 +1102,9 @@ export class SurfSimulation {
       return;
     }
 
-    if (player.airY > 224 || player.airX <= this.wave.curlX + 4) {
+    const curlReachedAir = this.wave.time >= this.tuning.curlGrace
+      && this.wave.curlContact(player.airX);
+    if (player.airY > 224 || curlReachedAir) {
       this.triggerWipeout("FOAM SNACK!", "air");
     }
   }
@@ -1349,10 +1365,11 @@ export class SurfSimulation {
 
   constrainRidingX() {
     const player = this.player;
-    const nextX = clamp(player.x, 76, 338);
+    const [ridingMinX, ridingMaxX] = this.wave.profile.bounds.ridingX;
+    const nextX = clamp(player.x, ridingMinX, ridingMaxX);
     if (nextX !== player.x) {
-      const pushingOut = (nextX === 76 && player.lateralVelocity < 0)
-        || (nextX === 338 && player.lateralVelocity > 0);
+      const pushingOut = (nextX === ridingMinX && player.lateralVelocity < 0)
+        || (nextX === ridingMaxX && player.lateralVelocity > 0);
       if (pushingOut) player.lateralVelocity = 0;
       if (pushingOut) player.travelVelocity = 0;
       player.x = nextX;
@@ -1652,6 +1669,13 @@ export class SurfSimulation {
   updateCurlDanger(dt, risk) {
     const player = this.player;
     if (player.animalMount) {
+      player.curlTimer = 0;
+      return;
+    }
+    // `curlGrace` protects the opening read/teaching beat, not only the
+    // breaker's advance rate. Twilight's visible lip starts farther forward,
+    // so collision must honor the same contract explicitly.
+    if (this.wave.time < this.tuning.curlGrace) {
       player.curlTimer = 0;
       return;
     }

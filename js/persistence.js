@@ -26,11 +26,27 @@ export function createDefaultSave() {
   };
 }
 
-export function loadSave(storage = globalThis.localStorage) {
-  const fallback = createDefaultSave();
-  if (!storage) return fallback;
+/**
+ * Resolve the browser storage boundary without assuming the property is safe to
+ * read. Privacy policies and sandboxed/opaque origins can throw from the
+ * `localStorage` getter itself, before a getItem/setItem try/catch can run.
+ * Explicit null is preserved so hosts can intentionally disable persistence.
+ */
+export function resolveStorage(storage = undefined) {
+  if (storage !== undefined) return storage;
   try {
-    const raw = storage.getItem(SAVE_KEY);
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function loadSave(storage = undefined) {
+  const fallback = createDefaultSave();
+  const resolvedStorage = resolveStorage(storage);
+  if (!resolvedStorage) return fallback;
+  try {
+    const raw = resolvedStorage.getItem(SAVE_KEY);
     if (!raw) return fallback;
     const saved = JSON.parse(raw);
     if (!saved || saved.version !== 1) return fallback;
@@ -75,10 +91,11 @@ export function sanitizeSettings(candidate = {}, { legacyControlMode = DEFAULT_S
   return settings;
 }
 
-export function writeSave(save, storage = globalThis.localStorage) {
-  if (!storage) return false;
+export function writeSave(save, storage = undefined) {
+  const resolvedStorage = resolveStorage(storage);
+  if (!resolvedStorage) return false;
   try {
-    storage.setItem(SAVE_KEY, JSON.stringify(save));
+    resolvedStorage.setItem(SAVE_KEY, JSON.stringify(save));
     return true;
   } catch (error) {
     console.warn("Kaki Surf save could not be written.", error);

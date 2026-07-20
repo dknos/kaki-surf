@@ -1,4 +1,5 @@
 import { preloadVisualAssets } from "./asset-loader.js";
+import { resolveStorage } from "./persistence.js";
 
 /**
  * Narrow host boundary for a future Kitty Kaki Survivors integration.
@@ -8,7 +9,7 @@ export async function createKakiSurf({
   host,
   input = null,
   audio = null,
-  storage = globalThis.localStorage,
+  storage = undefined,
   settings = null,
   profile = null,
   onExit = null,
@@ -18,6 +19,9 @@ export async function createKakiSurf({
   if (!(host instanceof HTMLElement)) {
     throw new TypeError("Kaki Surf requires a host HTMLElement.");
   }
+  // Resolve once at the public boundary so every persistence call in the game
+  // receives the same concrete storage object or an intentional null.
+  const resolvedStorage = resolveStorage(storage);
   const [visualAssets, { KakiSurfGame }] = await Promise.all([
     preloadVisualAssets(),
     import("./game.js"),
@@ -26,7 +30,7 @@ export async function createKakiSurf({
     host,
     externalInput: input,
     externalAudio: audio,
-    storage,
+    storage: resolvedStorage,
     hostSettings: settings,
     profile,
     onExit,

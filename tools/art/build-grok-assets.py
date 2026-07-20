@@ -38,6 +38,7 @@ class Family:
     source_columns: int | None = None
     source_rows: int | None = None
     connected_chroma: bool = False
+    edge_blend: bool = False
     preserve_layout: bool = False
     source_inset: int = 0
     resample: str = "lanczos"
@@ -47,6 +48,42 @@ class Family:
 
 
 FAMILIES = (
+    Family(
+        source="twilight-hero-barrel-source.png",
+        output="twilight-hero-barrel-atlas.png",
+        columns=1,
+        rows=1,
+        cell=(256, 144),
+        names=("heroBarrel",),
+        anchor=(0.0, 0.0),
+        colors=32,
+        padding=0,
+        connected_chroma=True,
+        edge_blend=True,
+        preserve_layout=True,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf",
+    ),
+    Family(
+        source="twilight-hero-wave-components-source.png",
+        output="twilight-hero-wave-components-atlas.png",
+        columns=2,
+        rows=2,
+        cell=(128, 72),
+        names=("foamCrown", "faceRibbons", "foregroundShoulder", "contactSpray"),
+        anchor=(0.5, 0.5),
+        colors=24,
+        padding=0,
+        connected_chroma=True,
+        preserve_layout=True,
+        source_inset=12,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="bc6190965387909e41264f23c22e3aef1880271c33a5e9fb96f28c10cc996600",
+    ),
     Family(
         source="wave-breaker-source-v2.png",
         output="wave-breaker-atlas.png",
@@ -368,6 +405,24 @@ def remove_connected_chroma(image: Image.Image) -> Image.Image:
     return rgba
 
 
+def blend_open_wave_edges(image: Image.Image) -> Image.Image:
+    """Fade only the full-frame wave's right/bottom continuation into runtime water."""
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    pixels = list(rgba.get_flattened_data())
+    blended: list[tuple[int, int, int, int]] = []
+    right_start = width * 0.78
+    bottom_start = height * 0.78
+    for index, (red, green, blue, alpha) in enumerate(pixels):
+        x = index % width
+        y = index // width
+        right_mix = 1.0 if x <= right_start else max(0.0, (width - 1 - x) / (width - right_start))
+        bottom_mix = 1.0 if y <= bottom_start else max(0.0, (height - 1 - y) / (height - bottom_start))
+        blended.append((red, green, blue, round(alpha * min(right_mix, bottom_mix))))
+    rgba.putdata(blended)
+    return rgba
+
+
 def isolate_wave_foam(image: Image.Image) -> Image.Image:
     """Keep organic foam and its nearby ink while dropping rectangular water fill."""
     rgba = image.convert("RGBA")
@@ -409,6 +464,8 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     bottom = round(source.height * (row + 1) / source_rows)
     source_cell = source.crop((left, top, right, bottom))
     keyed = remove_connected_chroma(source_cell) if family.connected_chroma else remove_chroma(source_cell)
+    if family.edge_blend:
+        keyed = blend_open_wave_edges(keyed)
     if family.foam_only:
         keyed = isolate_wave_foam(keyed)
 
@@ -419,7 +476,9 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
         subject = keyed.crop((inset, inset, keyed.width - inset, keyed.height - inset))
         resampling = Image.Resampling.NEAREST if family.resample == "nearest" else Image.Resampling.LANCZOS
         subject = subject.resize(family.cell, resampling)
-        subject_alpha = subject.getchannel("A").point(lambda value: 255 if value >= 80 else 0)
+        subject_alpha = subject.getchannel("A") if family.edge_blend else subject.getchannel("A").point(
+            lambda value: 255 if value >= 80 else 0
+        )
         quantized = subject.convert("RGB").quantize(
             colors=family.colors,
             method=Image.Quantize.MEDIANCUT,

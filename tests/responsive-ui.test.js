@@ -4,7 +4,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { shouldShowTouchControls } from "../js/game.js";
+import { KakiSurfGame, qaWorldOverride, shouldShowTouchControls } from "../js/game.js";
+import { watercraftClearsBreaker } from "../js/world-visuals.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GAME_SOURCE = readFileSync(path.join(ROOT, "js", "game.js"), "utf8");
@@ -17,6 +18,46 @@ test("touch controls are interactive only during an enabled running lifecycle", 
 
   for (const state of ["menu", "paused", "results", "qa", "destroyed"]) {
     assert.equal(shouldShowTouchControls(state, true, false), false, `${state} must suppress touch input`);
+  }
+});
+
+test("dedicated far-boat QA fixtures clear both the breaker and rider exclusion bands", () => {
+  const simulation = { wave: { curlX: 72 }, player: { x: 232 } };
+  for (const scene of ["cargoShip", "fishingBoat", "sailboat"]) {
+    const [boat] = qaWorldOverride(scene).traffic;
+    assert.equal(boat.layer, "far", `${scene} remains distant background traffic`);
+    assert.equal(
+      watercraftClearsBreaker(boat, boat.screenX, simulation),
+      true,
+      `${scene} must remain visible in its deterministic QA frame`,
+    );
+  }
+});
+
+test("direct game construction degrades safely when the global storage getter is denied", () => {
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const reachedDomBoundary = new Error("reached DOM initialization");
+  let storageReads = 0;
+  const host = {};
+  Object.defineProperty(host, "innerHTML", {
+    set() {
+      throw reachedDomBoundary;
+    },
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() {
+      storageReads += 1;
+      throw new DOMException("Storage access denied", "SecurityError");
+    },
+  });
+
+  try {
+    assert.throws(() => new KakiSurfGame({ host }), (error) => error === reachedDomBoundary);
+    assert.equal(storageReads, 1, "the guarded boundary resolves global storage once");
+  } finally {
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else delete globalThis.localStorage;
   }
 });
 

@@ -22,6 +22,12 @@ function atlas(filename, columns, rows, cellWidth, cellHeight, names, {
 }
 
 export const GENERATED_ASSET_MANIFEST = Object.freeze({
+  twilightHeroBarrel: atlas("twilight-hero-barrel-atlas.png", 1, 1, 256, 144, [
+    "heroBarrel",
+  ], { anchor: [0, 0] }),
+  twilightHeroWave: atlas("twilight-hero-wave-components-atlas.png", 2, 2, 128, 72, [
+    "foamCrown", "faceRibbons", "foregroundShoulder", "contactSpray",
+  ]),
   waveBreaker: atlas("wave-breaker-atlas.png", 4, 2, 72, 64, [
     "crestFeatherA", "crestFeatherB", "risingCurl", "impact",
     "whitewaterChurn", "foamTendrils", "sprayBurst", "seaMist",

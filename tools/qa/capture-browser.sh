@@ -7,7 +7,9 @@ capture_dir="$project_root/docs/images/qa"
 
 scenes=(
   menu results settingsSimple settingsAdvanced simpleKeyboard simpleGamepad neutral leftTravel rightTravel reversal
-  downhill curlEarly curlFolding curlImpact curlDanger maxSpeed
+  downhill curlEarly curlFolding curlImpact curlDanger
+  heroGather-twilightGlass heroPitch-twilightGlass heroOpen-twilightGlass
+  heroDeep-twilightGlass heroMax-twilightGlass heroCollapse-twilightGlass maxSpeed
   pumpCompression pumpRelease powerLine smallAir launch hugeAir clockwiseSpin counterSpin
   frontRail tailGrab varial kakiTwist snap cutback floater tubeTuck combo360 combo540 switchLanding
   perfectLanding wobble wipeout dolphinApproach dolphinRide dolphinDismount

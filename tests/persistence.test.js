@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { BOARDS, DEFAULT_SETTINGS, SAVE_KEY } from "../js/config.js";
-import { createDefaultSave, loadSave, recordRun, writeSave } from "../js/persistence.js";
+import { createDefaultSave, loadSave, recordRun, resolveStorage, writeSave } from "../js/persistence.js";
 
 test("fresh profiles keep the backward-compatible v1 shape and current defaults", () => {
   const save = createDefaultSave();
@@ -196,6 +196,65 @@ test("writeSave writes once and only under kaki-surf-meta-v1", () => {
   assert.deepEqual(JSON.parse(storage.writes[0].value), save);
   assert.deepEqual([...storage.values.keys()], ["kaki-surf-meta-v1"]);
 });
+
+test("explicit null disables persistence without reading the global storage getter", () => {
+  withGlobalStorageGetter(() => {
+    throw new Error("the global getter must not be read");
+  }, (reads) => {
+    assert.equal(resolveStorage(null), null);
+    assert.deepEqual(loadSave(null), createDefaultSave());
+    assert.equal(writeSave(createDefaultSave(), null), false);
+    assert.equal(reads(), 0);
+  });
+});
+
+test("a denied global storage getter degrades direct load and write to memory-only play", () => {
+  withGlobalStorageGetter(() => {
+    throw new DOMException("Storage access denied", "SecurityError");
+  }, (reads) => {
+    assert.equal(resolveStorage(), null);
+    assert.deepEqual(loadSave(), createDefaultSave());
+    assert.equal(writeSave(createDefaultSave()), false);
+    assert.equal(reads(), 3);
+  });
+});
+
+test("storage method failures remain nonfatal after safe resolution", () => {
+  const deniedStorage = {
+    getItem() {
+      throw new DOMException("Read denied", "SecurityError");
+    },
+    setItem() {
+      throw new DOMException("Write denied", "SecurityError");
+    },
+  };
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.deepEqual(loadSave(deniedStorage), createDefaultSave());
+    assert.equal(writeSave(createDefaultSave(), deniedStorage), false);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+function withGlobalStorageGetter(getter, assertion) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  let reads = 0;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() {
+      reads += 1;
+      return getter();
+    },
+  });
+  try {
+    assertion(() => reads);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else delete globalThis.localStorage;
+  }
+}
 
 class MemoryStorage {
   constructor(initialValues = {}) {
