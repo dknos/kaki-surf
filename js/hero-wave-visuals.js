@@ -58,7 +58,7 @@ export function heroBarrelGeometry(wave, player = null) {
   const opening = section.aperture * (1 - collapse * 0.18);
   const contactX = clamp(canonicalContactX(wave), 30, LOGICAL_WIDTH + 26);
   const sampledX = clamp(contactX, 0, LOGICAL_WIDTH);
-  const powerFace = clamp(Number(wave?.powerFaceAt?.(sampledX) ?? 0.58), 0.46, 0.7);
+  const powerFace = clamp(Number(wave?.powerFaceAt?.(sampledX) ?? 0.58), 0.3, 0.7);
   const powerY = clamp(Number(wave?.ridingY?.(sampledX, powerFace) ?? 144), 124, 166);
   const crestY = clamp(Number(wave?.crestY?.(sampledX) ?? HORIZON_Y), 73, 84);
 
@@ -78,7 +78,7 @@ export function heroBarrelGeometry(wave, player = null) {
 
   const riderX = clamp(Number(player?.x ?? 208), 0, LOGICAL_WIDTH);
   const focusX = clamp(riderX, Math.max(36, contactX + 8), LOGICAL_WIDTH - 18);
-  const focusFace = clamp(Number(wave?.powerFaceAt?.(focusX) ?? powerFace), 0.46, 0.7);
+  const focusFace = clamp(Number(wave?.powerFaceAt?.(focusX) ?? powerFace), 0.3, 0.7);
   const focusY = clamp(Number(wave?.ridingY?.(focusX, focusFace) ?? powerY), 126, 172);
   const apertureTop = curtainTopY + 2;
   const apertureBottom = Math.max(apertureTop + 32, tubeFloorY);
@@ -202,14 +202,13 @@ export function drawHeroBarrelBack(
   const geometry = heroBarrelGeometry(wave, simulation.player);
   const clock = settings?.reducedMotion ? 0 : Number(presentationClocks?.fall ?? presentationClocks?.crest ?? 0);
 
-  drawAheadFaceVolume(ctx, wave, geometry, palette, settings);
   drawPassedSky(ctx, geometry, repaintTrailingSky);
+  // One registered, full-height silhouette now owns the crest, tube, falling
+  // curtain, and long face. Keeping those parts in one mask prevents the old
+  // floating shelf and mismatched waterfall seams.
+  drawAheadFaceVolume(ctx, wave, geometry, palette, settings);
+  drawContinuousSideBreak(ctx, geometry, palette, settings, assets);
   drawTrailingWhitewater(ctx, geometry, palette, settings, clock);
-  // The horizon-to-trough mass is live geometry, so it always stays welded to
-  // the collision edge. Generated art contributes animated foam detail only.
-  drawPitchingLip(ctx, geometry, palette, settings);
-  drawTravellingHeroBreak(ctx, geometry, settings, assets);
-  drawTubePocket(ctx, geometry, palette, settings);
   drawFallingCurtainBack(ctx, geometry, palette, settings, clock);
   // Keep the collision edge legible without painting it over Kaki. The whole
   // falling sheet belongs to the wave layer; catch particles and churn still
@@ -218,6 +217,63 @@ export function drawHeroBarrelBack(
   drawCurtainLeadingEdge(ctx, geometry, palette, settings, clock, edgeWash);
   drawPowerTrack(ctx, wave, geometry, palette, settings);
   drawHeroReadAssist(ctx, simulation, geometry, palette, settings);
+}
+
+function drawContinuousSideBreak(ctx, g, p, settings, assets) {
+  const drawn = drawAtlasFrame(
+    ctx,
+    assets,
+    "continuousSideBreak",
+    "sideBreak",
+    g.contactX,
+    LOGICAL_HEIGHT * 0.5,
+    {
+      scaleX: 0.88 + g.growth * 0.12 + g.collapse * 0.02,
+      scaleY: 0.84 + g.growth * 0.16 + g.collapse * 0.02,
+      alpha: settings?.highContrast ? 0.76 : 0.9,
+    },
+  );
+  if (drawn) return true;
+
+  // Complete code-native fallback. Its upper boundary forms the outer crest,
+  // hollow lip, and rideable trough in a single path; no rectangular shelf or
+  // separately positioned curl can appear when optional art is unavailable.
+  const c = g.curtain;
+  const rearX = Math.max(-96, c.edgeX - 176);
+  const peakX = c.edgeX - 72 - g.growth * 16;
+  const peakY = c.topY - 2;
+  const lipX = c.edgeX + 24 + g.growth * 16;
+  const lipY = c.topY + 12;
+  const troughX = Math.max(c.edgeX + 92, g.focusX + 24);
+  const troughY = Math.max(g.focusY + 30, 166);
+  const fill = ctx.createLinearGradient(peakX, peakY, troughX, troughY);
+  fill.addColorStop(0, p.waterLight);
+  fill.addColorStop(0.36, p.water);
+  fill.addColorStop(1, p.waterDeep);
+
+  ctx.save();
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(rearX, LOGICAL_HEIGHT + 4);
+  ctx.bezierCurveTo(rearX + 12, 156, peakX - 30, peakY + 8, peakX, peakY);
+  ctx.bezierCurveTo(peakX + 42, peakY - 9, lipX - 12, lipY - 8, lipX, lipY);
+  ctx.bezierCurveTo(lipX - 10, lipY + 26, c.edgeX + 25, g.powerY + 18, troughX, troughY);
+  ctx.bezierCurveTo(troughX + 82, troughY + 6, LOGICAL_WIDTH - 42, troughY - 8, LOGICAL_WIDTH + 8, troughY + 4);
+  ctx.lineTo(LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = p.foamShade;
+  ctx.lineWidth = settings?.highContrast ? 8 : 5;
+  ctx.beginPath();
+  ctx.moveTo(rearX + 4, 166);
+  ctx.bezierCurveTo(peakX - 32, peakY + 5, lipX - 16, lipY - 11, lipX, lipY);
+  ctx.stroke();
+  ctx.strokeStyle = p.foam;
+  ctx.lineWidth = settings?.highContrast ? 3 : 2;
+  ctx.stroke();
+  ctx.restore();
+  return false;
 }
 
 export function drawHeroBarrelFront(

@@ -282,6 +282,30 @@ test("travel direction commits only after a stable reversal and signed world tra
   assert.equal(directionEvents.length, 1);
 });
 
+test("held steering traverses the long face in both directions like a side scroller", () => {
+  const simulation = beginRiding(BOARDS.mangoFish);
+  const player = simulation.player;
+  simulation.wave.curlX = -500;
+  player.x = 212;
+  player.previousX = 212;
+  let rightmost = player.x;
+  let leftmost = player.x;
+
+  for (let step = 0; step < 360; step += 1) {
+    simulation.update(FIXED_STEP, { x: 1 });
+    rightmost = Math.max(rightmost, player.x);
+  }
+  for (let step = 0; step < 720; step += 1) {
+    simulation.update(FIXED_STEP, { x: -1 });
+    leftmost = Math.min(leftmost, player.x);
+  }
+
+  assert.ok(rightmost >= 320, `right traverse reached only ${rightmost}`);
+  assert.ok(leftmost <= 90, `left traverse reached only ${leftmost}`);
+  assert.ok(rightmost - leftmost >= 220, "the rider can use most of the visible wave face");
+  assert.equal(player.travelDirection, -1);
+});
+
 test("high-speed reversals draw a heavier arc and scrub more speed than low-speed pivots", () => {
   const reverse = (speed) => {
     const simulation = beginRiding(BOARDS.mangoFish);
@@ -793,7 +817,8 @@ test("condition installs its canonical wave profile before reset-derived geometr
   assert.equal(simulation.wave.seed, 0x54574c47);
   assert.equal(simulation.wave.time, 0);
   assert.equal(simulation.wave.travel, 0);
-  assert.equal(simulation.wave.curlX, 48);
+  assert.equal(simulation.wave.curlX, -66);
+  assert.equal(simulation.wave.contactX(), 30, "the visible travelling edge starts at the left screen margin");
   assert.equal(
     simulation._worldPreviousPlayerY,
     simulation.wave.ridingY(simulation.player.x, simulation.player.face),
@@ -839,10 +864,10 @@ test("wave profiles preserve classic travel bounds and frame Twilight's authored
   simulation.reset({ condition: "twilightGlass" });
   simulation.player.x = 999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 306);
+  assert.equal(simulation.player.x, 338);
   simulation.player.x = -999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 156);
+  assert.equal(simulation.player.x, 72);
 
   simulation.reset({ condition: "goldenCoast" });
   simulation.player.x = 999;
@@ -872,7 +897,7 @@ test("Twilight aerial collision uses the visible hero lip contact", () => {
   player.previousAirY = 20;
   player.airVY = -20;
   simulation.update(FIXED_STEP, {});
-  assert.equal(player.airX, 326, "Twilight aerials stay inside the authored landing window");
+  assert.equal(player.airX, 352, "Twilight aerials stay inside the expanded side-scroller landing window");
 
   simulation.wave.curlX = 100;
   assert.equal(simulation.wave.contactX(), 196);
@@ -1233,7 +1258,7 @@ test("long seeded randomized play remains finite, bounded, and restartable", () 
     assert.ok(simulation.player.airX >= 50 && simulation.player.airX <= 360);
     assert.ok(simulation.player.charge >= 0 && simulation.player.charge <= 1);
     assert.ok(simulation.player.waveMomentum >= 0 && simulation.player.waveMomentum <= 1);
-    assert.ok(Math.abs(simulation.player.lateralVelocity) <= 48);
+    assert.ok(Math.abs(simulation.player.lateralVelocity) <= TUNING.sideScrollMaxSpeed);
     assert.ok(simulation.player.speed >= 0);
     assert.ok(simulation.player.speed <= TUNING.maxSpeed * simulation.board.maxSpeed + 2);
     assert.ok(simulation.timeRemaining >= 0 && simulation.timeRemaining <= TUNING.runDuration);

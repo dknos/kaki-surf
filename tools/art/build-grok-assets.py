@@ -38,6 +38,7 @@ class Family:
     source_columns: int | None = None
     source_rows: int | None = None
     connected_chroma: bool = False
+    black_key: bool = False
     edge_blend: bool = False
     passing_left_blend: bool = False
     lower_continuation_blend: bool = False
@@ -51,6 +52,28 @@ class Family:
 
 
 FAMILIES = (
+    Family(
+        source="continuous-side-break-source.jpg",
+        output="continuous-side-break-atlas.png",
+        columns=1,
+        rows=1,
+        cell=(384, 216),
+        names=("sideBreak",),
+        # The foremost falling-water collision edge sits at 53% width. Runtime
+        # pins that point to GameplayWave.contactX() and lets the rest of the
+        # connected face travel with it.
+        anchor=(0.53, 0.5),
+        colors=28,
+        padding=0,
+        black_key=True,
+        edge_blend=True,
+        passing_left_blend=True,
+        preserve_layout=True,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="b70ef5baf639d9af207881e3a7f80b2a68fdf2a5915e581417465b447ba85436",
+    ),
     Family(
         source="twilight-travelling-break-v2-source.png",
         output="twilight-travelling-break-v2-atlas.png",
@@ -359,6 +382,51 @@ def remove_chroma(image: Image.Image) -> Image.Image:
     return rgba
 
 
+def remove_black_field(image: Image.Image) -> Image.Image:
+    """Key the deliberately black Grok isolation field and tube opening.
+
+    The threshold is intentionally narrow: it clears JPEG-black background
+    pixels while preserving the saturated navy water that gives the face its
+    depth. The cleared tube then reveals the live sky/backwater beneath it.
+    """
+    rgba = image.convert("RGBA")
+    cleaned: list[tuple[int, int, int, int]] = []
+    for red, green, blue, _alpha in rgba.get_flattened_data():
+        alpha = 0 if max(red, green, blue) <= 26 else 255
+        cleaned.append((red, green, blue, alpha))
+    rgba.putdata(cleaned)
+    return rgba
+
+
+def remove_low_horizontal_rail(image: Image.Image) -> Image.Image:
+    """Dissolve the generated lower-right foam rail into live backwater.
+
+    The source's barrel and falling curtain are useful, but its long straight
+    baseline reads as a moving HUD rule at gameplay scale. The live renderer
+    already supplies the trough, so the keyed source fades out before that
+    rail while preserving the irregular impact foam around the curtain.
+    """
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    pixels = list(rgba.get_flattened_data())
+    fade_x = width * 0.47
+    fade_y = height * 0.75
+    end_y = height * 0.85
+    cleaned: list[tuple[int, int, int, int]] = []
+    for index, (red, green, blue, alpha) in enumerate(pixels):
+        x = index % width
+        y = index // width
+        if x <= fade_x or y <= fade_y:
+            cleaned.append((red, green, blue, alpha))
+            continue
+        vertical = max(0.0, min(1.0, (end_y - y) / (end_y - fade_y)))
+        horizontal = max(0.0, min(1.0, (x - fade_x) / (width * 0.1)))
+        mix = 1 - horizontal * (1 - vertical)
+        cleaned.append((red, green, blue, round(alpha * mix)))
+    rgba.putdata(cleaned)
+    return rgba
+
+
 def remove_connected_chroma(image: Image.Image) -> Image.Image:
     """Flood-key only exterior magenta, including JPEG fringe variation.
 
@@ -418,12 +486,13 @@ def blend_open_wave_edges(image: Image.Image) -> Image.Image:
     pixels = list(rgba.get_flattened_data())
     blended: list[tuple[int, int, int, int]] = []
     right_start = width * 0.78
-    bottom_start = height * 0.78
+    bottom_start = height * 0.72
+    bottom_end = height * 0.82
     for index, (red, green, blue, alpha) in enumerate(pixels):
         x = index % width
         y = index // width
         right_mix = 1.0 if x <= right_start else max(0.0, (width - 1 - x) / (width - right_start))
-        bottom_mix = 1.0 if y <= bottom_start else max(0.0, (height - 1 - y) / (height - bottom_start))
+        bottom_mix = 1.0 if y <= bottom_start else max(0.0, (bottom_end - y) / (bottom_end - bottom_start))
         blended.append((red, green, blue, round(alpha * min(right_mix, bottom_mix))))
     rgba.putdata(blended)
     return rgba
@@ -534,7 +603,11 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     right = round(source.width * (column + 1) / source_columns)
     bottom = round(source.height * (row + 1) / source_rows)
     source_cell = source.crop((left, top, right, bottom))
-    keyed = remove_connected_chroma(source_cell) if family.connected_chroma else remove_chroma(source_cell)
+    if family.black_key:
+        keyed = remove_black_field(source_cell)
+        keyed = remove_low_horizontal_rail(keyed)
+    else:
+        keyed = remove_connected_chroma(source_cell) if family.connected_chroma else remove_chroma(source_cell)
     if family.edge_blend:
         keyed = blend_open_wave_edges(keyed)
     if family.passing_left_blend:

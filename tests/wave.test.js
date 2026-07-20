@@ -46,6 +46,8 @@ test("classic profile preserves the shipped surface, pocket, and contact equatio
 
   assert.equal(wave.profileId, "classic");
   assert.equal(wave.profile, WAVE_STYLES.classic);
+  assert.equal(wave.profile.renderer, "heroBarrel", "every shipped condition uses the continuous break compositor");
+  assert.equal(wave.contactX(), 30, "the classic break starts fully behind the long ride lane");
   assert.equal(wave.crestY(x), expectedCrest);
   assert.equal(wave.faceDepth(x), expectedDepth);
   assert.equal(wave.ridingY(x, face), expectedCrest + face * (0.88 + face * 0.12) * expectedDepth);
@@ -60,6 +62,7 @@ test("classic profile preserves the shipped surface, pocket, and contact equatio
 
 test("Twilight hero barrel occupies the approved horizon, ride, and trough bands", () => {
   const wave = new GameplayWave(0x4b414b49, "heroBarrel");
+  assert.equal(wave.contactX(), 30, "Twilight shares the same visible opening contact");
   wave.update(3.25, 104, 0, 104, { playerX: 226, speed: 104, skillMomentum: 0.4, active: false });
 
   assert.equal(wave.profileId, "heroBarrel");

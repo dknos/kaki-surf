@@ -1354,8 +1354,12 @@ export class SurfSimulation {
       0,
       1,
     );
-    const glideMagnitude = 7 + player.speed * 0.07;
-    const steeringMagnitude = Math.abs(inputX) * (13 + player.speed * 0.075);
+    const glideMagnitude = finiteTuning(this.tuning.sideScrollGlideBase, TUNING.sideScrollGlideBase)
+      + player.speed * finiteTuning(this.tuning.sideScrollGlideSpeed, TUNING.sideScrollGlideSpeed);
+    const steeringMagnitude = Math.abs(inputX) * (
+      finiteTuning(this.tuning.sideScrollSteerBase, TUNING.sideScrollSteerBase)
+        + player.speed * finiteTuning(this.tuning.sideScrollSteerSpeed, TUNING.sideScrollSteerSpeed)
+    );
     const target = intent * (glideMagnitude + steeringMagnitude) + player.redirectVelocity;
     const opposing = directionInput !== 0 && directionInput !== player.travelDirection;
     const baseResponse = Math.abs(inputX) > 0.02 || Math.abs(player.redirectVelocity) > 0.5
@@ -1365,7 +1369,15 @@ export class SurfSimulation {
     const previousVelocity = Number.isFinite(player.travelVelocity)
       ? player.travelVelocity
       : Number(player.lateralVelocity) || player.travelDirection * glideMagnitude;
-    player.travelVelocity = clamp(damp(previousVelocity, target, response, dt), -48, 48);
+    const maxSideScrollSpeed = finiteTuning(
+      this.tuning.sideScrollMaxSpeed,
+      TUNING.sideScrollMaxSpeed,
+    );
+    player.travelVelocity = clamp(
+      damp(previousVelocity, target, response, dt),
+      -maxSideScrollSpeed,
+      maxSideScrollSpeed,
+    );
     player.turnForce = clamp(
       Math.abs(player.travelVelocity - previousVelocity) / Math.max(0.01, dt * 72),
       0,

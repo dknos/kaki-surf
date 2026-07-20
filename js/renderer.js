@@ -322,6 +322,7 @@ export class KakiRenderer {
     const shakeY = Math.round(Math.cos(this.time * 53) * this.shake * motionScale * 0.55);
     const cameraY = Math.round(this.cameraY);
     const heroBarrel = isHeroBarrelWave(simulation.wave);
+    const allowsBackgroundTraffic = this.conditionId !== "twilightGlass";
     ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
     ctx.globalAlpha = 1;
     ctx.fillStyle = palette.skyTop;
@@ -334,22 +335,23 @@ export class KakiRenderer {
     ctx.save();
     ctx.translate(0, cameraY);
     this.drawSky(simulation);
-    // Twilight is the authored hero-wave level. Keep its actual sky window
-    // pristine: boats, aircraft, and carrier events belong to other levels
-    // instead of drifting through or being pasted onto the barrel face.
-    if (!heroBarrel) {
+    // Twilight keeps a pristine hero-wave sky. Other conditions retain only
+    // correctly depth-sorted traffic behind the break: no craft is allowed to
+    // paste across the barrel, rider, or falling-water curtain.
+    if (allowsBackgroundTraffic) {
       drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "background");
     }
     ctx.restore();
     ctx.save();
     ctx.translate(0, cameraY);
     this.drawBackWater(simulation);
-    if (!heroBarrel) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
+    if (allowsBackgroundTraffic) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
     this.drawWave(simulation);
-    // Twilight's playable face is the hero composition. Mid/near traffic stays
-    // in the genuine background window instead of being pasted on the barrel.
-    if (!heroBarrel) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "foreground");
+    // The continuous break owns the entire playable foreground. Near and
+    // playfield-front traffic is deliberately omitted so boats cannot float on
+    // the wave face or appear inside the tube.
     this.drawMaxSpeedFeedback(simulation);
     this.drawImpactCavity(simulation);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, false);
@@ -359,7 +361,6 @@ export class KakiRenderer {
     this.drawSurfer(simulation, alpha);
     if (heroBarrel) this.drawWaveFront(simulation);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true);
-    if (!heroBarrel) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings);
     this.drawParticles(true);
     ctx.restore();
     this.drawHud(simulation);

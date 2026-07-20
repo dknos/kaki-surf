@@ -132,6 +132,7 @@ test("QA page references only present local files", () => {
 
 test("every generated production atlas is local, dimension-checked, and compact", () => {
   const requiredFamilies = [
+    "continuousSideBreak",
     "twilightTravellingBreak", "twilightHeroWave",
     "waveBreaker", "waveProgression",
     "dolphin", "shark", "whale", "birds", "boats", "airTraffic", "powerups", "boards", "carrier",
@@ -147,7 +148,9 @@ test("every generated production atlas is local, dimension-checked, and compact"
     assert.equal(bytes.readUInt32BE(16), descriptor.width, `${family} manifest width`);
     assert.equal(bytes.readUInt32BE(20), descriptor.height, `${family} manifest height`);
     assert.ok(bytes.byteLength < 512 * 1024, `${family} stays within the compact runtime budget`);
-    const minimumFrames = family === "waveProgression" || family === "twilightHeroWave"
+    const minimumFrames = family === "continuousSideBreak"
+      ? 1
+      : family === "waveProgression" || family === "twilightHeroWave"
       ? 4
       : family === "twilightTravellingBreak"
         ? 6

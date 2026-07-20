@@ -38,7 +38,10 @@ export const RUN_MODES = Object.freeze({
 export const WAVE_STYLES = Object.freeze({
   classic: Object.freeze({
     id: "classic",
-    renderer: "layeredSide",
+    // Golden Coast and Stormbreak share the production long-break compositor
+    // until their level-specific silhouettes are authored. Keeping one
+    // renderer prevents the retired mini-curl/white-shelf path from returning.
+    renderer: "heroBarrel",
     bounds: Object.freeze({
       ridingX: Object.freeze([76, 338]),
       airX: Object.freeze([58, 350]),
@@ -70,6 +73,9 @@ export const WAVE_STYLES = Object.freeze({
       maxFace: 0.49,
     }),
     threat: Object.freeze({
+      // Start the visible breaking edge at x=30 (17 + 13 contact offset),
+      // leaving almost the full face available before the barrel catches up.
+      initialCurlX: 17,
       proximityNearGap: 24,
       proximityFarGap: 156,
       temporalPressureScale: 0.82,
@@ -108,9 +114,10 @@ export const WAVE_STYLES = Object.freeze({
     id: "heroBarrel",
     renderer: "heroBarrel",
     bounds: Object.freeze({
-      // Keep Twilight's action inside the authored face and landing window.
-      ridingX: Object.freeze([156, 306]),
-      airX: Object.freeze([138, 326]),
+      // The long level is a real side scroller: Kaki may use nearly the full
+      // face instead of being trapped in a narrow central presentation slot.
+      ridingX: Object.freeze([72, 338]),
+      airX: Object.freeze([50, 352]),
     }),
     surface: Object.freeze({
       // The reference horizon is y=78..80, the sustainable ride band is
@@ -141,6 +148,8 @@ export const WAVE_STYLES = Object.freeze({
       maxFace: 0.66,
     }),
     threat: Object.freeze({
+      // -66 + the 96 px pitched-lip offset places first contact at x=30.
+      initialCurlX: -66,
       // Grow the hero barrel while it is still readable, then let the existing
       // contact delay own the actual catch instead of hiding a larger hitbox.
       proximityNearGap: 10,
@@ -262,6 +271,11 @@ export const TUNING = {
   offLineSpeedHeadroom: 26,
   lateralResponse: 12,
   lateralCoast: 3,
+  sideScrollGlideBase: 9,
+  sideScrollGlideSpeed: 0.09,
+  sideScrollSteerBase: 18,
+  sideScrollSteerSpeed: 0.1,
+  sideScrollMaxSpeed: 52,
   launchForce: 112,
   gravity: 176,
   rotationAcceleration: 13.6,

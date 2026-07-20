@@ -89,20 +89,21 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-The active build publishes 14 generated families from sources reviewed at source and runtime size. The latest Twilight travelling-break source is a 384 x 216 six-cell sheet; superseded 1280 x 720 full-wave, curtain, and long-back studies remain under `docs/art-source/grok` for auditability but are no longer converted or shipped as runtime atlases.
+The active build publishes 15 generated families from sources reviewed at source and runtime size. The production wave uses a selected 1280 x 720 continuous side-break source plus the 384 x 216 six-cell travelling-break sheet; superseded full-wave, curtain, and long-back studies remain under `docs/art-source/grok` for auditability.
 
-`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source directory, source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta, extracts each cell, applies tight-crop or contact-preserving layout rules, quantizes the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The modular breaker and Twilight travelling-break families receive a foam-isolation pass so generated art can add organic detail without reintroducing rectangular water slabs.
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source directory, source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta or the continuous wave's narrow black isolation field, extracts each cell, applies contact-preserving layout rules, removes the source's straight lower rail, blends continuation edges, quantizes the local sprite, packs transparent RGBA atlases, and writes `assets/generated/manifest.json`.
 
-Normal Twilight rendering draws one live horizon-to-trough wall and unstriped face, adds selected `fall`/`pocket` detail from the travelling-break atlas, then draws Kaki, the segmented forward curtain, low foreground foam, and component `contactSpray`. Runtime geometry owns the playable surface, crest, collision, stage pressure, passed-sky extent, tube pocket, collapse, and monotonic left-to-right break direction. Missing generated art and High Contrast use the same complete live break rather than a retired full-wave fallback.
+Normal rendering in every condition pins the continuous wave's foremost falling edge to canonical collision, scales the registered mass with pressure, blends its tapered face into live water, then draws Kaki, moving waterfall packets, churn, and contact spray. Runtime geometry owns the playable surface, collision, stage pressure, passed-sky extent, tube rules, collapse, and monotonic left-to-right break direction. Missing generated art uses the same one-path continuous fallback.
 
 ```console
 python3 tools/art/build-grok-assets.py
 ```
 
-Outputs are the 14 PNGs under `assets/generated`:
+Outputs are the 15 PNGs under `assets/generated`:
 
 | Family | Atlas dimensions |
 | --- | ---: |
+| Continuous side break | 384 x 216 |
 | Twilight travelling break | 336 x 208 |
 | Wave breaker | 288 x 128 |
 | Wave progression | 320 x 192 |

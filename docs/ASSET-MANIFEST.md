@@ -1,6 +1,6 @@
 # Asset manifest and provenance
 
-Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 14 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
+Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 15 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
 
 Gameplay truth remains code-owned. Raster art does not define wave collision, rider motion, wildlife phases, pickup reachability, scoring, or UI state; it renders simulation state and has an independent local fallback.
 
@@ -35,10 +35,11 @@ The three full-resolution environment sources were generated offline, curated, t
 
 ## Generated runtime atlases
 
-All 14 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
+All 15 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
+| `continuousSideBreak` | `continuous-side-break-atlas.png` | 384 x 216 | One connected barrel/waterfall/long-face silhouette; its 53%-width front edge registers directly to gameplay contact and its lower/right edges dissolve into live water | One-path procedural curl, trough, foam crest, live falling curtain, and churn |
 | `twilightTravellingBreak` | `twilight-travelling-break-v2-atlas.png` | 336 x 208 | Six registered spill/steepen/fall/pocket/curtain/collapse cells; selected falling-water detail is layered over the live travelling wall | Collision-aligned procedural wall, crest, curtain, tube shadow, and churn |
 | `twilightHeroWave` | `twilight-hero-wave-components-atlas.png` | 256 x 144 | `contactSpray` at the board; `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for reproducibility but are not currently rendered | Procedural board-contact spray |
 | `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
@@ -74,12 +75,12 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 
 ## Offline source and deterministic conversion
 
-The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The active travelling-break sheet is 384 x 216, the wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, retired complete-wave studies, and other selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. All are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The active continuous side-break source is 1280 x 720, the travelling-break sheet is 384 x 216, the wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, retired studies, and other selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. All are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
-2. identifies and removes the chroma-magenta field while preserving coral accents; the staged JPEG-derived wave uses a boundary-connected chroma flood so interior coral cannot be globally keyed away;
+2. identifies and removes the chroma-magenta field while preserving coral accents; the continuous wave uses a narrow black key so its isolation field and tube opening reveal the live world without erasing saturated navy water;
 3. extracts each declared source grid and repacks it into the stable runtime atlas grid;
-4. crops each non-empty silhouette and fits it into a fixed local frame; contact-sensitive families instead retain shared grid alignment, including the staged wave's right/bottom anchor, the Twilight components' stable 2 x 2 layout, and the one-cell barrel compositions;
+4. crops each non-empty silhouette and fits it into a fixed local frame; contact-sensitive families instead retain shared grid alignment, including the continuous wave's 53%-width contact anchor, the staged wave's right/bottom anchor, and the Twilight components' stable 2 x 2 layout;
 5. downsamples with the family-declared filter, thresholds alpha unless a soft continuation is declared, quantizes the RGB palette, sharpens only where declared, and feathers or steps only declared continuation edges into runtime water/sky;
 6. packs transparent RGBA PNG atlases and writes frame metadata.
 

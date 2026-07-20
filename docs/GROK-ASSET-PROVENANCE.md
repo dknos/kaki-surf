@@ -2,7 +2,7 @@
 
 Date: 2026-07-20.
 
-The active build publishes 14 source families generated through the local Grok Imagine workflow for this repository. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases. Superseded wave studies remain preserved here but are not rebuilt or loaded.
+The active build publishes 15 source families generated through the local Grok Imagine workflow for this repository. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases. Superseded wave studies remain preserved here but are not selected by the renderer.
 
 ## Rebuild command
 
@@ -12,7 +12,7 @@ From the repository root:
 python3 tools/art/build-grok-assets.py
 ```
 
-The script reads the preserved sources, validates declared exact hashes and dimensions for contact-sensitive wave sheets, removes the chroma-magenta background, extracts each declared source grid, crops or preserves layout according to the family contract, downsamples with the family-specific filter, thresholds alpha, quantizes, sharpens where appropriate, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
+The script reads the preserved sources, validates declared exact hashes and dimensions for contact-sensitive wave sheets, removes chroma-magenta or the continuous wave's narrow black isolation field, extracts each declared source grid, crops or preserves layout according to the family contract, removes declared source rails and blends continuation edges, downsamples with the family-specific filter, thresholds alpha, quantizes, sharpens where appropriate, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
 
 ## Selected source and output record
 
@@ -20,6 +20,7 @@ The active Twilight travelling-break source is 384 x 216, the modular wave-break
 
 | Family | Selection | Preserved source | Source SHA-256 | Runtime atlas | Atlas dimensions |
 | --- | --- | --- | --- | --- | ---: |
+| Continuous side break | Variant 4 selected from the four-image long-face pass; foremost curtain registered to collision and generated lower rail removed in conversion | `docs/art-source/grok/continuous-side-break-source.jpg` | `b70ef5baf639d9af207881e3a7f80b2a68fdf2a5915e581417465b447ba85436` | `assets/generated/continuous-side-break-atlas.png` | 384 x 216 |
 | Twilight travelling break | Variant 4 selected from the narrow-edge pass; later broad cells demoted to the clean pocket texture in runtime | `docs/art-source/grok/twilight-travelling-break-v2-source.png` | `8cad52668112bb477e4bb8923693333848b631662fe2ab3f3f2307b40b88fd1f` | `assets/generated/twilight-travelling-break-v2-atlas.png` | 336 x 208 |
 | Twilight long barrel back | Retired complete-wave study; source preserved, runtime atlas removed | `docs/art-source/grok/twilight-long-barrel-back-edit-v1.png` | `269800eda215821d40c9bbf24eaf7fa77f47e3a2159e36b9221720892975e05b` | — | — |
 | Twilight hero barrel | Retired complete-wave study; source preserved, runtime atlas removed | `docs/art-source/grok/twilight-hero-barrel-source.png` | `197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf` | — | — |
@@ -59,12 +60,14 @@ Three local Qwen Image Edit experiments are preserved under `docs/art-source/qwe
 
 The active travelling-break sheet came from local Grok session `019f8160-e97c-7850-815b-f82bfb1a46ff`. Variant 4 of 4 was copied without modification to `docs/art-source/grok/twilight-travelling-break-v2-source.png`; its 384 x 216 source hashes to `8cad52668112bb477e4bb8923693333848b631662fe2ab3f3f2307b40b88fd1f`. The deterministic build removes connected chroma, isolates bright foam plus nearby ink, reduces six 3 x 2 cells to 112 x 104, and packs the 336 x 208 RGBA `assets/generated/twilight-travelling-break-v2-atlas.png`, which hashes to `5daf4349f3a260c49e8e6a8facc2a5db780140ee9dae6ba02f865e7d3c0b667c`. Runtime uses the clean `fall` and `pocket` detail; later pressure beats reuse the pocket texture while live geometry adds curtain density and collapse churn. This prevents the generated `curtain` and `collapse` cells from becoming opaque blocks.
 
+The active continuous side break came from local Grok session `019f81ab-4b2c-7533-8632-771ac0bf6349`. Variant 4 of 4 was copied unchanged to `docs/art-source/grok/continuous-side-break-source.jpg`; the 1280 x 720 JPEG hashes to `b70ef5baf639d9af207881e3a7f80b2a68fdf2a5915e581417465b447ba85436`. It was selected for its connected outer wall, hollow aperture, long right-hand face, and unmistakable downward foam channels. The deterministic build narrowly keys JPEG-black outside pixels and the tube opening, removes the long lower-right foam rail, feathers the left/lower/right continuation, reduces to 28 colors, and preserves a 53%-width contact anchor in `assets/generated/continuous-side-break-atlas.png`. Runtime pins that anchor to `GameplayWave.contactX()`, scales the mass with pressure, and keeps live geometry in charge of collision, face continuation, falling packets, collapse, and missing-art fallback.
+
 ## Review decisions
 
 - Wave v1 was rejected because the model interpreted “crest feather” and “foam fingers” literally. Wave v2 removed those motifs but was superseded after runtime review found its reduced foam clusters muddy. The selected square pass has cleaner isolated silhouettes; only restrained crest and spray accents are used over simulation-owned geometry.
 - The first four-stage progression still produced a tall block when stretched to the Canvas bottom. The selected polish has wider tapered silhouettes and a larger open curl; it renders near native aspect at the simulation-owned contact while code owns the connected lower face, sky cutout, collision, and complete fallback.
-- Complete generated wave bodies, long backs, and isolated curtains are retired from the browser. Live geometry is the sole silhouette/collision fallback and cannot return to the rejected giant C.
-- The active travelling-break atlas contributes only registered falling-water detail. The long face is a single depth field with no horizontal rails; the wall and its ragged crest span horizon to trough and advance left-to-right while internal packets fall downward.
+- The rejected compact C-waves, detached long backs, and isolated curtain are retired. The selected continuous body is accepted because its long face is keyed into live water, its front edge owns the exact collision anchor, and the whole mass actually translates with the threat rather than sitting as a backdrop.
+- The active continuous and travelling-break atlases work together: one supplies the coherent silhouette and vertical foam language, while registered live packets supply downward motion. The source's long horizontal base rail is removed during the deterministic build.
 - Three Qwen experiments were useful diagnostics, but none improved the selected composition. They remain authoring evidence only.
 - The Twilight component pass now contributes only `contactSpray`. `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for reproducibility but are not rendered. Real sky reappears behind the passing edge, the playable surface stays collision-aligned, and the break and falling-water clocks never mirror with the rider.
 - Birds v1 was rejected because visible grid dividers became part of the sheet. The corrected prompt required one uninterrupted field with no cell borders, seams, panels, or boxes.
@@ -189,6 +192,16 @@ Session: `019f8160-e97c-7850-815b-f82bfb1a46ff`. Variant 4 of 4 selected. Preser
 ```text
 Production animation sprite sheet for Kaki Surf, premium 16-bit pixel art at 384x216. Exactly six equal cells in a clean 3-column by 2-row grid on one perfectly flat #D10072 chroma-magenta field with wide gutters. Six consecutive frames of the SAME narrow travelling breaking edge advancing left-to-right across one long side-scrolling wave: 1 low feathering spill, 2 steepening shoulder, 3 rounded lip beginning to pitch and water falling straight downward, 4 short overhang with an open rideable pocket immediately to its right, 5 dense torn waterfall curtain connected to the lip and compact impact churn, 6 broad airy foamy collapse. Identical base/contact anchor, scale, lighting and palette in every frame. Only the moving breaker: connected crest, lip, falling whitewater, sparse forward spray, and a compact base impact footprint. Tall narrow asymmetrical silhouette, not a complete C-wave. Chunky deliberate pixel clusters, crisp stair-step edges, midnight navy, indigo, saturated teal, cyan, pale mint, white, subtle violet and coral highlights, upper-right moonlight. No surfer, board, animals, boats, aircraft, scenery, sky, horizon, UI, text, logo, cell borders, circular donut, giant C wave, full wave wall, long trough, foreground slab, horizontal speed lines, straight bars, extra waves, detached waterfall, rectangular pillar, umbrella cap, blur, antialias haze, photorealism, gradients on the magenta background, cropped art.
 ```
+
+### 2m. Continuous side break — selected
+
+Session: `019f81ab-4b2c-7533-8632-771ac0bf6349`. Variant 4 of 4 selected. Preserved source: `docs/art-source/grok/continuous-side-break-source.jpg`.
+
+```text
+Production source art for a 2D side-scrolling arcade surfing game wave, isolated single enormous continuous breaking wave viewed perfectly side-on, California Games and premium 16-bit pixel-art clarity, wave rises from bottom-left into a powerful hollow barrel then flows into a long smooth rideable face and trough reaching the right edge, coherent connected water mass with no detached shelf or seams, crest pitches left-to-right, cascading waterfall foam with clear downward flow, navy deep water, turquoise body, pale mint and warm-white foam, stepped pixel clusters, readable at 420x240 gameplay resolution. Empty transparent-looking solid black background for easy alpha extraction. No surfer, no board, no boats, no birds, no sky, no text, no UI, no border, no horizon lines, no repeated horizontal streaks, no circular standalone icon, no cropped foam at top or bottom.
+```
+
+Variants 1 and 2 were rejected for closed circular mouths and hard right-edge color blocks. Variant 3 had strong waterfall action but introduced a secondary foreground wave and a brighter straight foam shelf. Variant 4 kept one readable barrel, the longest coherent right-hand face, and the clearest top-to-bottom fall; its remaining low rail is removed by the deterministic converter rather than hidden at runtime.
 
 ### 3. Dolphin — selected
 

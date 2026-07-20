@@ -114,7 +114,8 @@ export class GameplayWave {
     this.time = 0;
     this.travel = 0;
     this.worldTravel = 0;
-    this.curlX = 48;
+    const initialCurlX = Number(this.profile.threat?.initialCurlX);
+    this.curlX = Number.isFinite(initialCurlX) ? initialCurlX : 48;
     this.pressure = 0;
   }
 

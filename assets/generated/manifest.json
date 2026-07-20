@@ -2,6 +2,25 @@
   "version": 2,
   "generator": "tools/art/build-grok-assets.py",
   "families": {
+    "continuous-side-break-atlas": {
+      "image": "continuous-side-break-atlas.png",
+      "width": 384,
+      "height": 216,
+      "frames": {
+        "sideBreak": {
+          "x": 0,
+          "y": 0,
+          "width": 384,
+          "height": 216,
+          "anchor": [
+            0.53,
+            0.5
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/continuous-side-break-source.jpg",
+      "sourceSha256": "b70ef5baf639d9af207881e3a7f80b2a68fdf2a5915e581417465b447ba85436"
+    },
     "twilight-travelling-break-v2-atlas": {
       "image": "twilight-travelling-break-v2-atlas.png",
       "width": 336,

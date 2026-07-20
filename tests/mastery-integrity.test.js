@@ -196,6 +196,7 @@ test("full arcs and timed pumps preserve substantially more threat gap", () => {
 test("curl advance stays monotonic through signed travel reversals", () => {
   const wave = new GameplayWave(0x4b414b49);
   const context = { playerX: 260, speed: 110, skillMomentum: 0.4, active: true };
+  const initialCurlX = wave.curlX;
   let previousCurlX = wave.curlX;
   for (let step = 0; step < 3_600; step += 1) {
     const direction = step < 1_800 ? 1 : -1;
@@ -206,5 +207,5 @@ test("curl advance stays monotonic through signed travel reversals", () => {
 
   assert.ok(Math.abs(wave.worldTravel) < 1e-8);
   assert.ok(wave.travel > 3_000);
-  assert.ok(wave.curlX > 48);
+  assert.ok(wave.curlX > initialCurlX);
 });
