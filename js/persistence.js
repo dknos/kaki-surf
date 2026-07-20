@@ -1,4 +1,15 @@
-import { DEFAULT_SETTINGS, SAVE_KEY } from "./config.js";
+import { BOARDS, CONDITIONS, DEFAULT_SETTINGS, SAVE_KEY } from "./config.js";
+
+const VOLUME_SETTINGS = Object.freeze(["music", "effects", "waveAudio", "screenShake"]);
+const BOOLEAN_SETTINGS = Object.freeze([
+  "muted",
+  "reducedMotion",
+  "reducedFlash",
+  "highContrast",
+  "steeringAssist",
+  "landingAssist",
+  "touchControls",
+]);
 
 export function createDefaultSave() {
   return {
@@ -23,22 +34,45 @@ export function loadSave(storage = globalThis.localStorage) {
     if (!raw) return fallback;
     const saved = JSON.parse(raw);
     if (!saved || saved.version !== 1) return fallback;
-    const savedSettings = saved.settings && typeof saved.settings === "object"
-      ? saved.settings
-      : {};
-    const controlMode = savedSettings.controlMode === "simple" || savedSettings.controlMode === "advanced"
-      ? savedSettings.controlMode
-      : "advanced";
+    const savedSettings = saved.settings && typeof saved.settings === "object" ? saved.settings : {};
+    const settings = sanitizeSettings(savedSettings, { legacyControlMode: "advanced" });
+    const unlockedBoards = Array.isArray(saved.unlockedBoards)
+      ? [...new Set(saved.unlockedBoards.filter((id) => Object.hasOwn(BOARDS, id)))]
+      : fallback.unlockedBoards;
     return {
       ...fallback,
-      ...saved,
-      unlockedBoards: Array.isArray(saved.unlockedBoards) ? saved.unlockedBoards : fallback.unlockedBoards,
-      settings: { ...DEFAULT_SETTINGS, ...savedSettings, controlMode },
+      bestScore: finiteNonNegative(saved.bestScore, fallback.bestScore),
+      bestFlow: finiteRange(saved.bestFlow, fallback.bestFlow, 0, 100),
+      totalRuns: Math.floor(finiteNonNegative(saved.totalRuns, fallback.totalRuns)),
+      selectedBoard: Object.hasOwn(BOARDS, saved.selectedBoard) ? saved.selectedBoard : fallback.selectedBoard,
+      selectedCondition: Object.hasOwn(CONDITIONS, saved.selectedCondition) ? saved.selectedCondition : fallback.selectedCondition,
+      unlockedBoards: unlockedBoards.length ? unlockedBoards : fallback.unlockedBoards,
+      tutorialSeen: saved.tutorialSeen === true,
+      settings,
+      lastRun: sanitizeLastRun(saved.lastRun),
     };
   } catch (error) {
     console.warn("Kaki Surf save could not be read; using a fresh local profile.", error);
     return fallback;
   }
+}
+
+export function sanitizeSettings(candidate = {}, { legacyControlMode = DEFAULT_SETTINGS.controlMode } = {}) {
+  const source = candidate && typeof candidate === "object" ? candidate : {};
+  const settings = { ...DEFAULT_SETTINGS };
+  for (const key of VOLUME_SETTINGS) {
+    settings[key] = finiteRange(source[key], DEFAULT_SETTINGS[key], 0, 1);
+  }
+  for (const key of BOOLEAN_SETTINGS) {
+    settings[key] = typeof source[key] === "boolean" ? source[key] : DEFAULT_SETTINGS[key];
+  }
+  settings.controlMode = source.controlMode === "simple" || source.controlMode === "advanced"
+    ? source.controlMode
+    : legacyControlMode;
+  settings.waveReadAssist = ["full", "subtle", "off"].includes(source.waveReadAssist)
+    ? source.waveReadAssist
+    : DEFAULT_SETTINGS.waveReadAssist;
+  return settings;
 }
 
 export function writeSave(save, storage = globalThis.localStorage) {
@@ -68,4 +102,30 @@ export function recordRun(save, result) {
     at: new Date().toISOString(),
   };
   return score > previousBest;
+}
+
+function sanitizeLastRun(lastRun) {
+  if (!lastRun || typeof lastRun !== "object") return null;
+  const rank = typeof lastRun.rank === "string" && /^[SABCD]$/.test(lastRun.rank) ? lastRun.rank : "D";
+  const board = Object.hasOwn(BOARDS, lastRun.board) ? lastRun.board : "foamPuff";
+  const condition = Object.hasOwn(CONDITIONS, lastRun.condition) ? lastRun.condition : "goldenCoast";
+  const at = Number.isFinite(Date.parse(lastRun.at)) ? lastRun.at : null;
+  return {
+    score: Math.round(finiteNonNegative(lastRun.score, 0)),
+    flow: Math.round(finiteRange(lastRun.flow, 0, 0, 100)),
+    rank,
+    board,
+    condition,
+    at,
+  };
+}
+
+function finiteNonNegative(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function finiteRange(value, fallback, min, max) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
 }

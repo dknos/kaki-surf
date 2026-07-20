@@ -42,7 +42,19 @@ body {
     linear-gradient(var(--deep-ink), #081429);
   color: var(--foam);
   overscroll-behavior: none;
+  touch-action: pan-y;
+}
+
+canvas,
+.touch-controls,
+.touch-controls button {
   touch-action: none;
+}
+
+.title-layer,
+.settings-dialog,
+.settings-card {
+  touch-action: pan-y;
 }
 
 button,

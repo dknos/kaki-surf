@@ -12,11 +12,12 @@ npm run check
 git diff --check
 ```
 
-The final native Node run passed **116 tests with 0 failures**. `npm run check` parsed **27 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
+The final native Node run passed **125 tests with 0 failures**. `npm run check` parsed **27 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
 
 The current suite covers:
 
-- Simple and Advanced control-mode selection, new-save default, migration of older saves to Advanced, mode-switch clearing, keyboard aliases, 120 ms action edges, gamepad mapping, dead zone, and independent touch pointers.
+- Simple and Advanced control-mode selection, new-save default, migration of older saves to Advanced, mode-switch clearing, keyboard aliases, 120 ms action edges, active-second-gamepad selection, dead zone, and independent touch pointers.
+- Native slider/select/checkbox/button keyboard behavior while Settings is open, modal gameplay-input suppression, safe Escape cleanup, and scrollable touch surfaces outside the Canvas control zone.
 - Simple context-Trick buffering, tap/hold interpretation, gated fallback, spin impulses, board-specific auto-level, and nearest regular/opposite landing alignment.
 - Advanced Q/E/F/T on-wave context, direct aerial actions, ordered multi-trick manifests, rotation naming, trick gates, provisional scoring, exact-repeat decay, landing bank, and wipeout loss.
 - Committed bidirectional reversals, signed `travelDirection` and `worldTravel`, velocity scrubbing, switch takeoff/landing data, score/Flow response, and sprite/wake direction contracts.
@@ -30,9 +31,10 @@ The current suite covers:
 - Seeded `WorldSimulation` traffic pools, layer capacity and culling, stable stream isolation, quiet periods, wildlife phase machines, swept collision/reachability, powerup collection/consumption, carrier/airshow state, and bounded signal queues.
 - Bird reactions and harmless final-moment dodge, one-shot Feather Thread, courier and aircraft drops, no-penalty speedboat/jet-ski races, Dolphin/Fleet foam gates, and deterministic style-score integration.
 - Dolphin/whale mount and dismount interactions, shark telegraph/contact/near-miss behavior, Mango Rush, Moon Pop, Star Foam, and semantic event/audio wiring.
-- Asset-manifest paths, generated-atlas dimensions and independent fallback behavior, deterministic staged-wave source hashing, local-only static imports, 384 x 216 backing Canvas, and no runtime remote generation dependency.
+- Lifecycle-owned audio transport with bounded scheduling after long pauses, finite saved gain values, separate board-contact and airborne-wind layers, priority ducking, a dynamics limiter, suspended-context resume, and persistent master mute.
+- Asset-manifest paths, generated-atlas dimensions, four-second optional-image timeout/fallback behavior, deterministic staged-wave source hashing, local-only static imports, 384 x 216 backing Canvas, and no runtime remote generation dependency.
 - Touch lifecycle gating plus a measured 24 px control gutter at a true 390 x 844 viewport.
-- Fixed-step equivalence, finite-state assertions, event capacity, clean reset/restart, defensive persistence, monotonic records, and seeded random-input soak behavior.
+- Fixed-step equivalence, finite-state assertions, event capacity, presentation/audio cleanup on retry, semantically corrupt-save normalization, monotonic records, and seeded random-input soak behavior.
 
 ## Browser QA status
 
@@ -42,10 +44,11 @@ The canonical broad browser pass and current targeted polish pass are complete:
 - The gallery, capture script, and contact-sheet source contain the same 112 scene identifiers.
 - `docs/images/qa-contact-sheet.png` was rebuilt at 1200 x 10146 and inspected alongside native-size key captures.
 - An exact-image hash scan found 109 unique renders; the only matching pairs are the three intentional Foam Puff/default-condition identity scenes.
-- The current CDP play probe exercised menu, a physical input sequence, pause, resume, restart, settings, blur auto-pause, and true device emulation at 390 x 844, 844 x 390, and 768 x 1024 with **0 console messages, 0 uncaught exceptions, and 0 failed runtime loads**. The only non-runtime response was the browser's optional `favicon.ico` request.
+- The current CDP play probe exercised menu, native Settings slider input, modal Space suppression, native dialog close, start, pause, resume, corrupt-save reload, and a 100-restart stress loop with a stable 436-node DOM. It completed with **0 console errors, 0 uncaught exceptions, and 0 failed runtime loads**; the checked-in SVG favicon also removes the previous optional 404.
+- The responsive rerun captured menu, active play, pause, results, and options at 1280 x 720, 1366 x 768, 1024 x 768, 390 x 844, and 844 x 390. A real emulated touch drag scrolled the 844 x 390 Settings dialog from 0 to its 383 px maximum while the dialog reported `touch-action: pan-y`.
 - A browser fault injection temporarily removed the dolphin atlas. Launch remained successful and the deterministic dolphin fallback stayed visibly readable; the production atlas was then restored and size-checked.
 - Live banner text remains simulation-positioned on flexible cloth. Breaker-aware occlusion hides ordinary mid-watercraft before they enter the curl/player zone while retaining deliberate wake-race craft ahead of it, and gameplay callouts queue instead of stacking.
-- Selected Grok sources, all 12 runtime atlases, menu/results, all four curl states, wildlife, controls, banners, races, carrier, and access modes were inspected at actual output size.
+- Selected Grok sources, all 12 runtime atlases, menu/results, all four rebuilt curl states in three conditions plus High Contrast, distant race craft, wildlife, controls, banners, carrier, and access modes were inspected at actual output size.
 - The current rendering-polish rerun confirmed distinct swell/pitch/curl/collapse silhouettes, an expanding sky opening behind the passing breaker, collision-aligned contact, sparse nonreversing water motion, grounded behind-wave boats, and readable Golden Coast, Twilight Glass, Stormbreak, High Contrast, and Reduced Motion output.
 
 The [QA matrix](./QA.md) records the reviewed coverage, and [Visual audit](./VISUAL-AUDIT.md) records the adjustments made from that review.

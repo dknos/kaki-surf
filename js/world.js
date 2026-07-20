@@ -752,18 +752,26 @@ export class WorldSimulation {
     if (this.race.active) return null;
     if (!force && (this.hasActiveInteractive() || this.elapsed < this.interactiveQuietUntil)) return null;
     const direction = signOr(options.direction, this.context.direction);
+    const safeRaceX = clamp(
+      Math.max(
+        finite(this.context.curlScreenX, 40) + 148,
+        finite(this.context.player?.x, WORLD_LIMITS.centerX) + 98,
+      ),
+      294,
+      WORLD_LIMITS.logicalWidth - 46,
+    );
     const boat = this.spawnTraffic(kind, {
       layer: "mid",
       direction,
-      screenX: finite(options.screenX, this.context.player.x - direction * 58),
+      screenX: finite(options.screenX, safeRaceX),
       y: clamp(
-        finite(options.y, 86),
+        finite(options.y, WORLD_LAYER_CONFIG.mid.waterYRange[0]),
         WORLD_LAYER_CONFIG.mid.waterYRange[0],
         WORLD_LAYER_CONFIG.mid.waterYRange[1],
       ),
       speed: finite(options.screenSpeed, kind === "jetSki" ? 18 : 15),
       duration: finite(options.duration, 12),
-      scale: finite(options.scale, kind === "jetSki" ? 0.9 : 1.05),
+      scale: finite(options.scale, kind === "jetSki" ? 0.62 : 0.68),
       animationOffset: finite(options.animationOffset),
       eventSeed: finite(options.eventSeed, this.streams.race() * 0xffffffff),
       activity: "race",

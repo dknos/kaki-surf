@@ -141,6 +141,33 @@ test("landing and result poses resolve from state the simulation actually publis
   assert.equal(resolveKakiPose(strongRun.player), "victory");
 });
 
+test("rapid retry clears stale particles, callouts, freeze, shake, and wave clocks", () => {
+  const renderer = new KakiRenderer({
+    getContext: () => ({ imageSmoothingEnabled: false }),
+  }, {
+    highContrast: false,
+    reducedMotion: false,
+    reducedFlash: false,
+    screenShake: 1,
+  });
+  renderer.particles[0].life = 4;
+  renderer.pushCallout("OLD RUN", "SHOULD CLEAR", "risk");
+  renderer.freeze = 1;
+  renderer.shake = 3;
+  renderer.flash = 1;
+  renderer.wavePresentationClocks.surface = 42;
+
+  renderer.resetRunPresentation();
+
+  assert.equal(renderer.particles.some((particle) => particle.life > 0), false);
+  assert.equal(renderer.activeCallout.life, 0);
+  assert.equal(renderer.calloutQueue.length, 0);
+  assert.equal(renderer.freeze, 0);
+  assert.equal(renderer.shake, 0);
+  assert.equal(renderer.flash, 0);
+  assert.notEqual(renderer.wavePresentationClocks.surface, 42);
+});
+
 test("gameplay callouts queue one at a time, preserve a readable beat, and prioritize danger", () => {
   const canvas = {
     getContext() {

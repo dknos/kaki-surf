@@ -60,6 +60,29 @@ test("step contract is complete and navigator is optional", () => {
   input.destroy();
 });
 
+test("gameplay keys leave native settings controls alone", () => {
+  const target = new FakeTarget();
+  const input = new InputManager({ target, getGamepads: () => [] });
+  for (const tagName of ["INPUT", "SELECT", "BUTTON", "TEXTAREA"]) {
+    const event = target.dispatch("keydown", { code: "Space", target: { tagName } });
+    assert.equal(event.defaultPrevented, false, `${tagName} keeps its native Space behavior`);
+    input.update(0);
+    assert.equal(input.consumeStep().edgePressed, false);
+  }
+
+  const pauseEvent = target.dispatch("keydown", { code: "KeyP", target: { tagName: "BUTTON" } });
+  assert.equal(pauseEvent.defaultPrevented, true, "pause remains global when a gameplay button owns focus");
+  input.update(0);
+  assert.equal(input.consumeMeta().pause, true);
+  target.dispatch("keyup", { code: "KeyP", target: { tagName: "BUTTON" } });
+
+  const retryEvent = target.dispatch("keydown", { code: "KeyR", target: { tagName: "BUTTON" } });
+  assert.equal(retryEvent.defaultPrevented, true, "the documented R retry remains global on the results button");
+  input.update(0);
+  assert.equal(input.consumeMeta().restart, true);
+  input.destroy();
+});
+
 test("Simple mode is the default and exposes buffered action, context trick, special, and spin semantics", () => {
   const target = new FakeTarget();
   const input = new InputManager({ target, getGamepads: () => [] });
@@ -376,6 +399,20 @@ test("gamepad mappings expose all actions and keep B retry separate from live re
 
   target.dispatch("keydown", { code: "KeyR" });
   assert.equal(input.consumeMeta().restart, true, "keyboard R remains the restart edge");
+  input.destroy();
+});
+
+test("an active second controller wins over an idle first controller", () => {
+  const idle = createPad();
+  const active = createPad();
+  active.axes[0] = -0.8;
+  pressButtons(active, 0);
+  const input = new InputManager({ target: new FakeTarget(), getGamepads: () => [idle, active] });
+
+  input.update(0);
+  const step = input.consumeStep();
+  assert.ok(step.x < -0.7);
+  assert.equal(step.edgePressed, true);
   input.destroy();
 });
 

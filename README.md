@@ -67,6 +67,8 @@ Spawn streams, quiet periods, capacities, culling, collision sweeps, interaction
 
 Golden Coast, Twilight Glass, and Stormbreak share fair gameplay geometry while changing palette, horizon treatment, traffic mix, atmosphere, and reactive music.
 
+Audio follows the game lifecycle instead of free-running behind it. Ocean body, board contact/carve, and aerial wind use separate filtered layers; speed, pocket risk, and surface contact drive their mix. Pause, results, visibility loss, and resume fade or rebase the transport so missed beats never burst after a long interruption. Major landings, wipeouts, power moments, and records duck the music through a master limiter, and Settings includes independent music/effects/wave levels plus a persistent master mute.
+
 ## Local art pipeline
 
 The static game includes six condition backgrounds and 12 compact generated atlas families for four-stage wave progression, modular breaker pieces, dolphin, shark, whale, birds, boats, air traffic, powerups, boards, the festival carrier, and UI ornaments. Their original Grok source sheets are preserved under `docs/art-source/grok`; the modular wave source is 1024 x 1024, the staged swell/pitch/curl/collapse source is 1280 x 720, and the other selected sheets are 1280 x 720. `tools/art/build-grok-assets.py` deterministically validates source hashes, removes connected chroma, extracts cells, downsamples, quantizes, and rebuilds the transparent atlases under `assets/generated`.
@@ -81,7 +83,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **116/116 tests**, and the syntax gate checks **27 JavaScript modules**. The canonical real-browser gallery contains **112 deterministic 1280 x 720 captures**; the current wave/mastery pass additionally has real-browser motion, console, lifecycle, and true 390 x 844 device-emulation checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), and [Responsive QA](docs/RESPONSIVE-QA.md).
+The native suite passes **125/125 tests**, and the syntax gate checks **27 JavaScript modules**. The canonical real-browser gallery contains **112 deterministic 1280 x 720 captures**; the current lifecycle/audio/wave pass additionally has real-browser pause/resume, corrupt-save recovery, 100-restart, console/network, native Settings input, touch-scroll, boat-depth, and 25-state responsive checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), and [Responsive QA](docs/RESPONSIVE-QA.md).
 
 ## Static deployment and integration
 

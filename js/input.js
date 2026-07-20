@@ -124,6 +124,7 @@ export class InputManager {
     const options = { signal: this.abort.signal };
     this.target.addEventListener("keydown", (event) => {
       if (!isBoundCode(event.code)) return;
+      if (isTextOrFormControl(event.target) && !isMetaBindingCode(event.code)) return;
       event.preventDefault();
       if (!this.enabled) return;
       if (event.repeat) return;
@@ -137,6 +138,11 @@ export class InputManager {
     }, options);
     this.target.addEventListener("keyup", (event) => {
       if (!isBoundCode(event.code)) return;
+      if (isTextOrFormControl(event.target) && !isMetaBindingCode(event.code)) {
+        this.keys.delete(event.code);
+        this.refreshEdges();
+        return;
+      }
       event.preventDefault();
       this.keys.delete(event.code);
       this.refreshEdges();
@@ -366,6 +372,19 @@ export function isBoundCode(code) {
   return Object.values(KEY_BINDINGS).some((codes) => codes.includes(code));
 }
 
+export function isTextOrFormControl(target) {
+  const tagName = String(target?.tagName ?? "").toUpperCase();
+  return Boolean(target?.isContentEditable || ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tagName));
+}
+
+function isMetaBindingCode(code) {
+  return [
+    ...KEY_BINDINGS.restart,
+    ...KEY_BINDINGS.pause,
+    ...KEY_BINDINGS.debug,
+  ].includes(code);
+}
+
 export function applyDeadZone(value) {
   if (!Number.isFinite(value)) return 0;
   const magnitude = Math.abs(value);
@@ -382,9 +401,11 @@ export function pollGamepad(getGamepads = defaultGetGamepads) {
   } catch {
     return DISCONNECTED_GAMEPAD;
   }
-  const pad = Array.from(pads ?? []).find(Boolean);
-  if (!pad) return DISCONNECTED_GAMEPAD;
+  const snapshots = Array.from(pads ?? []).filter(Boolean).map(snapshotGamepad);
+  return snapshots.find(isGamepadActive) ?? snapshots[0] ?? DISCONNECTED_GAMEPAD;
+}
 
+function snapshotGamepad(pad) {
   const dpadX = Number(buttonPressed(pad, 15)) - Number(buttonPressed(pad, 14));
   const dpadY = Number(buttonPressed(pad, 13)) - Number(buttonPressed(pad, 12));
   return {

@@ -39,7 +39,7 @@ All 12 families are optional. Missing or invalid art falls back independently; o
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
 | `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
-| `waveProgression` | `wave-progression-atlas.png` | 320 x 192 | Four aligned threat stages: broad swell, pitching lip, open curl, whitewater impact | Collision-aligned procedural shoulder, folding lip, shadow wedge, and churn |
+| `waveProgression` | `wave-progression-atlas.png` | 320 x 192 | Four tapered threat stages: rounded swell, pitching lip, open curl, airy whitewater impact | Collision-aligned procedural shoulder, folding lip, shadow wedge, and churn |
 | `dolphin` | `dolphin-atlas.png` | 224 x 80 | Approach, offer, mounted ride, breach, dismount | Code-authored animal silhouette |
 | `shark` | `shark-atlas.png` | 224 x 72 | Shadow, fair fin telegraph, crossing, near miss, retreat | Code-authored shadow/fin/splash |
 | `whale` | `whale-atlas.png` | 352 x 108 | Distant cue, blow, breach, ramp/ride, splash, departure | Code-authored whale/event shapes |
@@ -65,7 +65,7 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 | `js/asset-drawing.js` | Shared atlas-frame drawing with anchor, scale, direction, alpha, and transform controls |
 | `js/renderer.js` | Layer composition, interpolation, HUD, particles, callouts, access presentation, and state-driven VFX |
 | `js/pixel-font.js` | Compact Canvas glyph data and text drawing |
-| `js/audio.js` | Procedural music, wave noise, speed state, wildlife/powerup/event cues; no samples |
+| `js/audio.js` | Lifecycle-safe procedural music, ocean/board/wind layers, limiter/ducking, speed state, wildlife/powerup/event cues; no samples |
 | `js/game.js` and `styles.css` | Menu, touch controls, settings, results, responsive shell, and nearest-neighbor stage |
 
 ## Offline source and deterministic conversion
@@ -75,7 +75,7 @@ The selected Grok sheets are preserved at their original dimensions under `docs/
 1. reads each selected source without overwriting it;
 2. identifies and removes the chroma-magenta field while preserving coral accents; the staged JPEG-derived wave uses a boundary-connected chroma flood so interior coral cannot be globally keyed away;
 3. extracts each declared source grid and repacks it into the stable runtime atlas grid;
-4. crops each non-empty silhouette and fits it into a fixed local frame; the four staged wave cells instead retain one shared grid alignment and a right/bottom contact anchor;
+4. crops each non-empty silhouette and fits it into a fixed local frame; the four staged wave cells instead retain one shared grid alignment and a right/bottom contact anchor for near-native-aspect upper-lip rendering;
 5. downsamples with Lanczos, thresholds alpha, quantizes the RGB palette, and sharpens;
 6. packs transparent RGBA PNG atlases and writes frame metadata.
 

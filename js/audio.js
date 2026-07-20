@@ -21,6 +21,16 @@ const MANEUVER_CUES = Object.freeze({
 });
 
 const EMPTY_EVENT_PAYLOAD = Object.freeze({});
+const MUSIC_LOOKAHEAD = 0.16;
+const MUSIC_RESYNC_GAP = 0.22;
+const MAX_BEATS_PER_UPDATE = 4;
+
+const LIFECYCLE_MIX = Object.freeze({
+  menu: Object.freeze({ master: 0.52, music: 0.42, wave: 0.08, effects: 0.72 }),
+  running: Object.freeze({ master: 0.82, music: 1, wave: 1, effects: 1 }),
+  paused: Object.freeze({ master: 0.42, music: 0.22, wave: 0.1, effects: 0.65 }),
+  results: Object.freeze({ master: 0.68, music: 0.34, wave: 0.12, effects: 1 }),
+});
 
 const POWERUP_TONES = Object.freeze({
   mangoRush: Object.freeze({ start: 196, end: 784, type: "sawtooth", accent: 988 }),
@@ -38,6 +48,14 @@ export class SurfAudio {
     this.waveGain = null;
     this.waveFilter = null;
     this.waveSource = null;
+    this.boardGain = null;
+    this.boardFilter = null;
+    this.boardSource = null;
+    this.windGain = null;
+    this.windFilter = null;
+    this.windSource = null;
+    this.limiter = null;
+    this.continuousNoiseBuffer = null;
     this.effectNoiseBuffer = null;
     this.noiseCursor = 0;
     this.nextBeat = 0;
@@ -45,6 +63,9 @@ export class SurfAudio {
     this.started = false;
     this.destroyed = false;
     this.mutedByVisibility = false;
+    this.lifecycle = "menu";
+    this.duckUntil = 0;
+    this.duckAmount = 1;
     this.conditionId = "goldenCoast";
     this.lastSpeedTier = -1;
     this.lastFinalSecond = -1;
@@ -64,7 +85,8 @@ export class SurfAudio {
     if (!this.context) return;
     if (this.context.state === "suspended") await this.context.resume();
     this.started = true;
-    this.nextBeat = this.context.currentTime + 0.06;
+    this.resyncMusicClock();
+    this.applyLifecycleMix();
   }
 
   createGraph() {
@@ -75,20 +97,44 @@ export class SurfAudio {
     this.musicGain = this.context.createGain();
     this.effectsGain = this.context.createGain();
     this.waveGain = this.context.createGain();
+    this.boardGain = this.context.createGain();
+    this.windGain = this.context.createGain();
+    for (const bus of [this.master, this.musicGain, this.effectsGain, this.waveGain, this.boardGain, this.windGain]) {
+      setParamValue(bus.gain, 0);
+    }
     this.waveFilter = this.context.createBiquadFilter();
+    this.boardFilter = this.context.createBiquadFilter();
+    this.windFilter = this.context.createBiquadFilter();
     this.waveFilter.type = "lowpass";
     this.waveFilter.frequency.value = 1050;
+    this.boardFilter.type = "bandpass";
+    this.boardFilter.Q.value = 0.8;
+    this.boardFilter.frequency.value = 1450;
+    this.windFilter.type = "highpass";
+    this.windFilter.Q.value = 0.45;
+    this.windFilter.frequency.value = 920;
+    this.limiter = this.context.createDynamicsCompressor?.() ?? null;
+    if (this.limiter) {
+      setParamValue(this.limiter.threshold, -12);
+      setParamValue(this.limiter.knee, 8);
+      setParamValue(this.limiter.ratio, 8);
+      setParamValue(this.limiter.attack, 0.004);
+      setParamValue(this.limiter.release, 0.18);
+    }
     this.musicGain.connect(this.master);
     this.effectsGain.connect(this.master);
     this.waveGain.connect(this.waveFilter).connect(this.master);
-    this.master.connect(this.context.destination);
+    this.boardGain.connect(this.boardFilter).connect(this.master);
+    this.windGain.connect(this.windFilter).connect(this.master);
+    if (this.limiter) this.master.connect(this.limiter).connect(this.context.destination);
+    else this.master.connect(this.context.destination);
     this.applySettings();
-    this.createWaveNoise();
+    this.createContinuousNoise();
     this.createEffectNoiseBuffer();
   }
 
-  createWaveNoise() {
-    if (!this.context || !this.waveGain) return;
+  createContinuousNoise() {
+    if (!this.context || !this.waveGain || this.continuousNoiseBuffer) return;
     const sampleRate = this.context.sampleRate;
     const length = sampleRate * 2;
     const buffer = this.context.createBuffer(1, length, sampleRate);
@@ -99,12 +145,20 @@ export class SurfAudio {
       last = last * 0.88 + white * 0.12;
       channel[index] = last * 0.7 + white * 0.16;
     }
+    this.continuousNoiseBuffer = buffer;
+    this.waveSource = this.startNoiseLoop(buffer, this.waveGain);
+    this.boardSource = this.startNoiseLoop(buffer, this.boardGain, 0.37);
+    this.windSource = this.startNoiseLoop(buffer, this.windGain, 0.83);
+  }
+
+  startNoiseLoop(buffer, destination, offset = 0) {
+    if (!this.context || !buffer || !destination) return null;
     const source = this.context.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
-    source.connect(this.waveGain);
-    source.start();
-    this.waveSource = source;
+    source.connect(destination);
+    source.start(0, Math.min(offset, Math.max(0, buffer.duration - 0.01)));
+    return source;
   }
 
   createEffectNoiseBuffer() {
@@ -125,15 +179,12 @@ export class SurfAudio {
   applySettings(settings = this.settings) {
     this.settings = { ...this.settings, ...settings };
     if (!this.context || this.destroyed) return;
-    const now = this.context.currentTime;
-    this.master.gain.setTargetAtTime(this.mutedByVisibility ? 0 : 0.82, now, 0.02);
-    this.musicGain.gain.setTargetAtTime(clamp(Number(this.settings.music ?? 0.58), 0, 1) * 0.22, now, 0.04);
-    this.effectsGain.gain.setTargetAtTime(clamp(Number(this.settings.effects ?? 0.78), 0, 1) * 0.42, now, 0.03);
-    this.waveGain.gain.setTargetAtTime(clamp(Number(this.settings.waveAudio ?? 0.52), 0, 1) * 0.13, now, 0.08);
+    this.applyLifecycleMix();
   }
 
   update(simulation) {
-    if (!this.started || !this.context || this.context.state !== "running" || this.destroyed) return;
+    if (!this.started || !this.context || this.context.state !== "running" || this.destroyed
+      || this.lifecycle !== "running" || this.mutedByVisibility) return;
     const player = simulation.player;
     const risk = player.speedPotential?.risk ?? simulation.wave.pocketRisk(player.x);
     const potential = player.speedPotential?.potential ?? 0.5;
@@ -145,10 +196,29 @@ export class SurfAudio {
     this.conditionId = conditionIdFor(simulation, this.settings);
 
     const conditionFilter = this.conditionId === "stormbreak" ? 360 : this.conditionId === "twilightGlass" ? 180 : 0;
-    this.waveFilter.frequency.setTargetAtTime(560 + speed * 4.5 + risk * 1180 + potential * 310 + conditionFilter, now, 0.08);
+    setParamTarget(this.waveFilter?.frequency, 560 + speed * 4.5 + risk * 1180 + potential * 310 + conditionFilter, now, 0.08);
     const pocketGain = 0.05 + risk * 0.15 + potential * 0.045 + (airborne ? -0.025 : 0);
-    this.waveGain.gain.setTargetAtTime(clamp(Number(this.settings.waveAudio ?? 0.52), 0, 1) * pocketGain, now, 0.07);
-    this.musicGain.gain.setTargetAtTime(clamp(Number(this.settings.music ?? 0.58), 0, 1) * (airborne ? 0.17 : 0.22 + Math.min(0.055, combo * 0.012)), now, 0.05);
+    setParamTarget(this.waveGain?.gain, safeLevel(this.settings.waveAudio, 0.52) * pocketGain, now, 0.07);
+
+    const contact = ["riding", "lip", "landing", "wobble"].includes(player.state);
+    const speedMix = clamp((speed - 28) / 118, 0, 1);
+    const carveMix = clamp(Math.abs(Number(player.faceVelocity) || 0) / 1.4, 0, 1);
+    const effectsLevel = safeLevel(this.settings.effects, 0.78);
+    const boardLevel = contact ? effectsLevel * (0.012 + speedMix * 0.045 + carveMix * 0.055) : 0;
+    const windLevel = airborne ? effectsLevel * (0.018 + speedMix * 0.095) : effectsLevel * speedMix * 0.008;
+    setParamTarget(this.boardGain?.gain, boardLevel, now, 0.045);
+    setParamTarget(this.boardFilter?.frequency, 780 + speedMix * 1750 + carveMix * 920, now, 0.055);
+    setParamTarget(this.windGain?.gain, windLevel, now, airborne ? 0.05 : 0.12);
+    setParamTarget(this.windFilter?.frequency, 720 + speedMix * 1900, now, 0.08);
+
+    const duck = now < this.duckUntil ? this.duckAmount : 1;
+    if (duck === 1) this.duckAmount = 1;
+    setParamTarget(
+      this.musicGain?.gain,
+      safeLevel(this.settings.music, 0.58) * (airborne ? 0.17 : 0.22 + Math.min(0.055, combo * 0.012)) * duck,
+      now,
+      duck < 1 ? 0.025 : 0.08,
+    );
 
     const speedTier = clamp(Math.floor((speed - 34) / 24), 0, 4);
     if (speedTier > this.lastSpeedTier && speedTier >= 3) this.tone(now, 520 + speedTier * 80, 0.05, "triangle", 0.035, this.effectsGain, 720 + speedTier * 90);
@@ -165,10 +235,14 @@ export class SurfAudio {
     reactive.airborne = airborne;
     reactive.combo = combo;
     reactive.finalSeconds = seconds <= 10;
-    while (this.nextBeat < now + 0.16) {
+    if (!Number.isFinite(this.nextBeat) || this.nextBeat < now - MUSIC_RESYNC_GAP) this.resyncMusicClock(now);
+    let scheduled = 0;
+    while (this.nextBeat < now + MUSIC_LOOKAHEAD && scheduled < MAX_BEATS_PER_UPDATE) {
       this.scheduleBeat(this.nextBeat, reactive);
       this.nextBeat += clamp(0.146 - speedTier * 0.006 - (combo > 2.5 ? 0.008 : 0) - (seconds <= 10 ? 0.009 : 0), 0.1, 0.15);
+      scheduled += 1;
     }
+    if (this.nextBeat < now - MUSIC_RESYNC_GAP) this.resyncMusicClock(now);
   }
 
   scheduleBeat(time, reactive) {
@@ -220,6 +294,11 @@ export class SurfAudio {
         this.inPowerLine = true;
         this.chirp(now, 294, 660, 0.15, 0.12);
         this.tone(now + 0.06, 990, 0.08, "sine", 0.055, this.effectsGain, 1320);
+        break;
+      case "fullPower":
+        this.duck(0.68, 0.24);
+        this.chirp(now, 247, 988, 0.22, 0.13);
+        this.noiseBurst(now, 0.16, 0.055, "highpass", 820, 3400);
         break;
       case "powerLineLeave":
         this.inPowerLine = false;
@@ -340,8 +419,24 @@ export class SurfAudio {
         this.playFleetAirshow(now, payload);
         break;
       case "wipeout":
+        this.duck(0.34, 0.48);
         this.noiseBurst(now, 0.34, 0.26, "lowpass", 980, 260);
         this.tone(now, 160, 0.33, "square", 0.11, this.effectsGain, 52);
+        break;
+      case "respawn":
+        this.chirp(now, 196, 523, 0.18, 0.075);
+        break;
+      case "tutorialComplete":
+        this.duck(0.5, 0.5);
+        this.chirp(now, 392, 1568, 0.34, 0.14);
+        this.tone(now + 0.18, 2093, 0.15, "sine", 0.07, this.effectsGain, 2637);
+        break;
+      case "uiConfirm":
+        this.tone(now, 392, 0.065, "square", 0.055, this.effectsGain, 587);
+        break;
+      case "uiBack":
+      case "uiPause":
+        this.tone(now, 330, 0.075, "triangle", 0.045, this.effectsGain, 220);
         break;
       case "combo":
       case "comboIncrease": {
@@ -350,10 +445,12 @@ export class SurfAudio {
         break;
       }
       case "personalBest":
+        this.duck(0.28, 0.72);
         this.chirp(now, 330, 1320, 0.34, 0.16);
         this.tone(now + 0.16, 1568, 0.16, "sine", 0.08, this.effectsGain, 2093);
         break;
       case "complete":
+        this.duck(0.48, 0.52);
         this.chirp(now, 260, 780, 0.42, 0.14);
         break;
       default:
@@ -622,32 +719,140 @@ export class SurfAudio {
     source.stop(time + duration + 0.01);
   }
 
+  duck(amount = 0.5, duration = 0.3) {
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    this.duckAmount = clamp(Number(amount) || 0.5, 0.15, 1);
+    this.duckUntil = Math.max(this.duckUntil, now + Math.max(0.05, Number(duration) || 0.3));
+    const lifecycle = LIFECYCLE_MIX[this.lifecycle] ?? LIFECYCLE_MIX.menu;
+    setParamTarget(
+      this.musicGain?.gain,
+      safeLevel(this.settings.music, 0.58) * 0.22 * lifecycle.music * this.duckAmount,
+      now,
+      0.018,
+    );
+  }
+
+  setLifecycle(nextLifecycle) {
+    const next = Object.hasOwn(LIFECYCLE_MIX, nextLifecycle) ? nextLifecycle : "menu";
+    const wasRunning = this.lifecycle === "running" && !this.mutedByVisibility;
+    this.lifecycle = next;
+    const isRunning = next === "running" && !this.mutedByVisibility;
+    if (isRunning && !wasRunning) {
+      this.resyncMusicClock();
+      if (this.context?.state === "suspended") {
+        try { this.context.resume()?.catch?.(() => {}); } catch {}
+      }
+    }
+    this.applyLifecycleMix();
+  }
+
+  resetRun() {
+    this.lastSpeedTier = -1;
+    this.lastFinalSecond = -1;
+    this.inPowerLine = false;
+    this.duckUntil = 0;
+    this.duckAmount = 1;
+    this.beatIndex = 0;
+    this.resyncMusicClock();
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    setParamTarget(this.boardGain?.gain, 0, now, 0.015);
+    setParamTarget(this.windGain?.gain, 0, now, 0.015);
+  }
+
+  resyncMusicClock(now = this.context?.currentTime ?? 0) {
+    this.nextBeat = Math.max(0, Number(now) || 0) + 0.06;
+  }
+
+  applyLifecycleMix() {
+    if (!this.context || this.destroyed) return;
+    const now = this.context.currentTime;
+    const lifecycle = LIFECYCLE_MIX[this.lifecycle] ?? LIFECYCLE_MIX.menu;
+    const muted = this.mutedByVisibility || Boolean(this.settings.muted);
+    const music = safeLevel(this.settings.music, 0.58);
+    const effects = safeLevel(this.settings.effects, 0.78);
+    const wave = safeLevel(this.settings.waveAudio, 0.52);
+    setParamTarget(this.master?.gain, muted ? 0 : lifecycle.master, now, muted ? 0.018 : 0.055);
+    setParamTarget(this.musicGain?.gain, music * 0.22 * lifecycle.music, now, 0.06);
+    setParamTarget(this.effectsGain?.gain, effects * 0.42 * lifecycle.effects, now, 0.045);
+    setParamTarget(this.waveGain?.gain, wave * 0.13 * lifecycle.wave, now, 0.09);
+    if (this.lifecycle !== "running") {
+      setParamTarget(this.boardGain?.gain, 0, now, 0.045);
+      setParamTarget(this.windGain?.gain, 0, now, 0.08);
+    }
+  }
+
   setVisibility(hidden) {
+    const wasAudible = this.lifecycle === "running" && !this.mutedByVisibility;
     this.mutedByVisibility = Boolean(hidden);
-    this.applySettings();
+    if (!this.mutedByVisibility && !wasAudible && this.lifecycle === "running") this.resyncMusicClock();
+    this.applyLifecycleMix();
   }
 
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
     this.started = false;
-    try { this.waveSource?.stop(); } catch {}
-    for (const node of [this.waveSource, this.waveFilter, this.waveGain, this.effectsGain, this.musicGain, this.master]) {
+    for (const source of [this.waveSource, this.boardSource, this.windSource]) {
+      try { source?.stop(); } catch {}
+    }
+    for (const node of [
+      this.waveSource,
+      this.boardSource,
+      this.windSource,
+      this.waveFilter,
+      this.boardFilter,
+      this.windFilter,
+      this.waveGain,
+      this.boardGain,
+      this.windGain,
+      this.effectsGain,
+      this.musicGain,
+      this.master,
+      this.limiter,
+    ]) {
       try { node?.disconnect(); } catch {}
     }
     const context = this.context;
     this.waveSource = null;
+    this.boardSource = null;
+    this.windSource = null;
     this.waveFilter = null;
+    this.boardFilter = null;
+    this.windFilter = null;
     this.waveGain = null;
+    this.boardGain = null;
+    this.windGain = null;
     this.effectsGain = null;
     this.musicGain = null;
     this.master = null;
+    this.limiter = null;
+    this.continuousNoiseBuffer = null;
     this.effectNoiseBuffer = null;
     this.context = null;
     if (context && context.state !== "closed") {
       try { context.close()?.catch?.(() => {}); } catch {}
     }
   }
+}
+
+export function safeLevel(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? clamp(number, 0, 1) : clamp(Number(fallback) || 0, 0, 1);
+}
+
+function setParamTarget(param, value, time, constant) {
+  if (!param) return;
+  const finiteValue = Number.isFinite(value) ? value : 0;
+  if (typeof param.setTargetAtTime === "function") param.setTargetAtTime(finiteValue, time, constant);
+  else param.value = finiteValue;
+}
+
+function setParamValue(param, value) {
+  if (!param) return;
+  if (typeof param.setValueAtTime === "function") param.setValueAtTime(value, 0);
+  else param.value = value;
 }
 
 function conditionIdFor(simulation, settings) {

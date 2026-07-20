@@ -137,8 +137,8 @@
           ]
         }
       },
-      "source": "docs/art-source/grok/wave-progression-source.png",
-      "sourceSha256": "4f94dc3224049cf3f2e6cce60be8316a97875b2ba87d725e1452891a4d669173"
+      "source": "docs/art-source/grok/wave-progression-source-v2.png",
+      "sourceSha256": "066da3c2e9466c319458502fdba299fd521371d42bf783a0784fcdb1f66f9070"
     },
     "dolphin-atlas": {
       "image": "dolphin-atlas.png",

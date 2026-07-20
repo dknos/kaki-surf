@@ -209,6 +209,7 @@ export const SCORE = {
 };
 
 export const DEFAULT_SETTINGS = {
+  muted: false,
   music: 0.58,
   effects: 0.78,
   waveAudio: 0.52,

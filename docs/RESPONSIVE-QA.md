@@ -24,6 +24,7 @@ Use `KAKI_SURF_QA_URL` to point the capture pass at another local static server 
 
 - Touch controls are visible and interactive only while the lifecycle is `running`, the Touch Controls setting is enabled, and the settings dialog is closed.
 - Pause, settings, results, menu, visibility loss, and blur clear active touch pointers before hiding and making the cluster inert.
+- Page/dialog surfaces use `touch-action: pan-y` while the Canvas and gameplay clusters retain `touch-action: none`; an emulated touch drag at 844 x 390 traversed the full 383 px Settings overflow range.
 - Resuming restores the cluster only when Touch Controls remains enabled.
 - At 390 × 844, the D-pad ends at x = 152 and the action cluster starts at x = 176, leaving a 24 px gutter. Optional spin controls move to the upper row of the action cluster rather than overlapping the right direction button.
 

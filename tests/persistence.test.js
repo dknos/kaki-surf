@@ -92,6 +92,55 @@ test("malformed, old, and future-version saves each fall back to a fresh profile
   }
 });
 
+test("semantically corrupt v1 fields are normalized without discarding valid progress", () => {
+  const storage = new MemoryStorage({
+    [SAVE_KEY]: JSON.stringify({
+      version: 1,
+      bestScore: null,
+      bestFlow: 900,
+      totalRuns: -8,
+      selectedBoard: "not-a-board",
+      selectedCondition: "lava",
+      unlockedBoards: ["foamPuff", "foamPuff", "bogus"],
+      tutorialSeen: "yes",
+      settings: {
+        muted: true,
+        music: "broken",
+        effects: 4,
+        waveAudio: -2,
+        screenShake: Number.NaN,
+        controlMode: "turbo",
+        waveReadAssist: "maximum",
+      },
+      lastRun: { score: null, flow: Infinity, rank: "Z", board: "bad", condition: "bad", at: "never" },
+    }),
+  });
+
+  const save = loadSave(storage);
+  assert.equal(save.bestScore, 0);
+  assert.equal(save.bestFlow, 100);
+  assert.equal(save.totalRuns, 0);
+  assert.equal(save.selectedBoard, "foamPuff");
+  assert.equal(save.selectedCondition, "goldenCoast");
+  assert.deepEqual(save.unlockedBoards, ["foamPuff"]);
+  assert.equal(save.tutorialSeen, false);
+  assert.equal(save.settings.muted, true);
+  assert.equal(save.settings.music, DEFAULT_SETTINGS.music);
+  assert.equal(save.settings.effects, 1);
+  assert.equal(save.settings.waveAudio, 0);
+  assert.equal(save.settings.controlMode, "advanced");
+  assert.equal(save.settings.waveReadAssist, DEFAULT_SETTINGS.waveReadAssist);
+  assert.deepEqual(save.lastRun, {
+    score: 0,
+    flow: 0,
+    rank: "D",
+    board: "foamPuff",
+    condition: "goldenCoast",
+    at: null,
+  });
+  assert.doesNotThrow(() => save.bestScore.toLocaleString());
+});
+
 test("recordRun only raises bests and records board and condition metadata", () => {
   const save = createDefaultSave();
   save.bestScore = 500;

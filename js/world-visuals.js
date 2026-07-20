@@ -1,7 +1,7 @@
 import { clamp, lerp } from "./math.js";
 import { drawPixelText } from "./pixel-font.js";
 import { drawAtlasFrame } from "./asset-drawing.js";
-import { WORLD_LAYER_CONFIG } from "./world-catalog.js";
+import { isBoatKind, WORLD_LAYER_CONFIG } from "./world-catalog.js";
 import { projectWorldX } from "./world-collision.js";
 
 export { drawAtlasFrame } from "./asset-drawing.js";
@@ -30,9 +30,6 @@ const POWERUP_HALO = Object.freeze({
   starFoam: "starHalo",
 });
 
-const MID_WATERCRAFT = new Set([
-  "speedboat", "jetSki", "rescueCraft", "tugboat", "fishingBoat", "sailboat",
-]);
 const ACTIVE_POWERUP_KINDS = Object.freeze(["mangoRush", "moonPop", "starFoam"]);
 const CARRIER_ACTIVITY_PHASES = new Set(["deckActivity", "launch", "airshow"]);
 const BIRD_SCATTER_PHASES = new Set(["scatter", "dodge"]);
@@ -76,9 +73,10 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
   if (!config) return;
   const camera = interpolatedCamera(world, alpha);
   world.forEachTraffic(layer, (entity) => {
-    const watercraft = MID_WATERCRAFT.has(entity.kind) || entity.activity === "race";
-    if (pass === "background" && watercraft) return;
-    if (pass === "watercraft" && !watercraft) return;
+    const renderBand = entity.renderBand || (isBoatKind(entity.kind) ? "waterBack" : "skyTraffic");
+    const watercraft = isBoatKind(entity.kind) || entity.activity === "race";
+    if (pass === "background" && renderBand === "playfieldFront") return;
+    if (pass === "foreground" && renderBand !== "playfieldFront") return;
     const x = projectWorldX(
       lerp(entity.previousWorldX, entity.worldX, alpha),
       camera,
@@ -120,10 +118,11 @@ export function watercraftClearsBreaker(entity, x, simulation) {
   const curlX = Number(simulation?.wave?.curlX);
   if (!Number.isFinite(curlX)) return true;
   const race = entity?.activity === "race" || String(entity?.phase ?? "").startsWith("race");
-  const curlMargin = race ? 88 : 112;
+  const curlMargin = race ? 132 : 112;
   if (x <= curlX + curlMargin) return false;
   const playerX = Number(simulation?.player?.x);
-  return race || !Number.isFinite(playerX) || Math.abs(x - playerX) >= 64;
+  const playerMargin = race ? 90 : 64;
+  return !Number.isFinite(playerX) || Math.abs(x - playerX) >= playerMargin;
 }
 
 export function drawWorldFoamGates(ctx, simulation, assets, palette, alpha = 1, settings = {}) {
