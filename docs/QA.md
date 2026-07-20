@@ -14,13 +14,13 @@ npm run check
 git diff --check
 ```
 
-Current result: **141/141 tests pass** and **28 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
+Current result: **158/158 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
 
 ## Browser capture matrix
 
 | Group | Required scenes | What must be visible | Status |
 | --- | --- | --- | --- |
-| Entry/UI | Menu, settings Simple, settings Advanced, six-step Surf School, results | Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or seam-required copy; score and Flow distinct | Pass |
+| Entry/UI | Menu, settings Simple, settings Advanced, six-step Surf School, results | Twilight hero barrel and Simple selected for a fresh save; action-gated teaching and replay; controller-only spatial navigation; no stale POWER meter or seam-required copy; score and Flow distinct | Pass |
 | Core ride | Neutral, right travel, left travel, committed reversal, downhill, four curl states, six Twilight hero-barrel stages, max speed, pump | Facing, board, wake, nonreversing water clocks, and parallax agree with direction; the Gather/Pitch/Open/Deep/Maximum/Collapse sequence preserves its perspective focus and reveals real sky behind the aperture; reversal reads as committed movement | Pass |
 | Air/landing | Small/medium/huge air, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Big-air scale; board/body separation; nearest valid landing tangent; signed landing direction; queued single-message callouts remain legible | Pass |
 | Wildlife | Dolphin approach/ride/dismount/gates, shark telegraph/near miss/contact, whale distant/breach/ramp/ride/splash, reduced variants | Minimum danger telegraph, friendly mount readability, no harmful animal reward, coherent phase silhouettes | Pass |
@@ -28,7 +28,7 @@ Current result: **141/141 tests pass** and **28 JavaScript modules pass syntax c
 | Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation without traffic ping-pong, stable facing, breaker-aware occlusion, readable reactive text, and watercraft grounded in waterline bands | Pass |
 | Set piece | Carrier haze, arrival, deck activity, launch, Fleet Airshow and foam gates | Whimsical/nonmilitary identity, horizon scale, airshow hierarchy, no gameplay collision | Pass |
 | Conditions | Every board in Golden Coast, Twilight Glass, and Stormbreak; condition-specific traffic | Correct local strip, palette and readable player/world contrast | Pass |
-| Access | Touch Simple, touch Advanced, true 390 x 844 portrait, pause/settings lifecycle, native Settings keys, 844 x 390 touch scrolling, High Contrast, Reduced Motion, Reduced Flash | No clipped or overlapping primary controls, no modal input leak, scrollable short-screen Settings, hidden/inert controls outside play, readable danger and reduced effects | Pass |
+| Access | Touch Simple, touch Advanced, true 390 x 844 portrait, pause/settings lifecycle, native Settings keys, controller Settings/results flow, held-touch rotation, 844 x 390 touch scrolling, High Contrast, Reduced Motion, Reduced Flash | No clipped or overlapping primary controls, no modal input leak, scrollable short-screen Settings, hidden/inert controls outside play, readable danger and reduced effects | Pass |
 | Audio lifecycle | Running, pause, visibility, resume, results, record, rapid retry, mute | No missed-beat catch-up, stale board/wind bed, stacked completion fanfare, invalid gain, or unbounded major-event peak | Pass |
 | Asset failure | Manifest and dimension rejection plus an absent-dolphin-atlas browser injection | Game starts; semantic fallback remains visible; restored production asset revalidates | Pass |
 

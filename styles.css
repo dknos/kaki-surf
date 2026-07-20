@@ -70,7 +70,8 @@ button {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-canvas:focus-visible {
+canvas:focus-visible,
+[data-gamepad-focus="true"] {
   outline: 3px solid var(--gold);
   outline-offset: 3px;
 }
@@ -515,7 +516,8 @@ canvas:focus-visible {
 }
 
 .top-controls button {
-  min-width: 42px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 5px 7px;
   border: 2px solid var(--ink);
   background: rgb(13 16 37 / 82%);
@@ -1141,12 +1143,6 @@ input[type="range"]::-moz-range-thumb {
   display: block !important;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .touch-controls {
-    display: none !important;
-  }
-}
-
 @media (max-width: 760px) {
   .title-layer {
     align-items: stretch;
@@ -1235,7 +1231,6 @@ input[type="range"]::-moz-range-thumb {
   .menu-stats { display: none; }
   .controls-line { font-size: 8px; }
   .pixel-card { transform: scale(0.84); }
-  .touch-dpad { transform: scale(0.78); transform-origin: left bottom; }
   .touch-actions { transform: scale(0.78); transform-origin: right bottom; }
 }
 
@@ -1468,28 +1463,109 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @media (max-width: 370px) and (orientation: portrait) {
+  .settings-card > header {
+    padding-inline: 12px;
+  }
+
+  .settings-card section {
+    padding-inline: 12px;
+  }
+
+  .settings-card label:not(.toggle) {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .settings-card select {
+    min-width: 0;
+    font-size: 8px;
+  }
+
   .touch-dpad {
-    transform: scale(0.86);
-    transform-origin: left bottom;
+    left: max(8px, env(safe-area-inset-left));
+    transform: none;
   }
 
   .touch-actions {
-    transform: scale(0.86);
-    transform-origin: right bottom;
+    right: max(8px, env(safe-area-inset-right));
+    width: calc(100vw - 172px);
+    transform: none;
   }
-}
 
-@media (max-width: 350px) and (orientation: portrait) {
-  .touch-dpad,
-  .touch-actions {
-    transform: scale(0.8);
+  .touch-actions .touch-action,
+  .touch-actions [data-control="edge"] {
+    width: 64px;
+    height: 64px;
+  }
+
+  .touch-actions .touch-trick {
+    right: 66px;
+    width: 58px;
+    height: 58px;
+  }
+
+  .touch-actions .touch-special {
+    right: 0;
+    top: 0;
+    width: 54px;
+    height: 44px;
   }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
+  .top-controls {
+    right: max(8px, env(safe-area-inset-right));
+    top: max(8px, env(safe-area-inset-top));
+    flex-direction: column;
+    gap: 3px;
+  }
+
   .touch-dpad,
   .touch-actions {
     /* Clear the in-canvas FAST and FLOW panels at the lower corners. */
     bottom: max(62px, calc(env(safe-area-inset-bottom) + 52px));
+  }
+
+  .touch-dpad {
+    /* Never scale directional hit targets below their physical 45px size. */
+    transform: none;
+  }
+
+  .touch-actions {
+    width: 156px;
+    height: 118px;
+    transform: none;
+  }
+
+  .touch-actions .touch-spin {
+    top: 0;
+    bottom: auto;
+    width: 44px;
+    height: 44px;
+  }
+
+  .touch-actions .touch-spin--left { left: 0; }
+  .touch-actions .touch-spin--right { left: 46px; }
+
+  .touch-actions .touch-special {
+    right: 0;
+    top: 0;
+    width: 54px;
+    height: 44px;
+  }
+
+  .touch-actions .touch-trick {
+    right: 66px;
+    bottom: 0;
+    width: 58px;
+    height: 58px;
+  }
+
+  .touch-actions .touch-action,
+  .touch-actions [data-control="edge"] {
+    right: 0;
+    bottom: 0;
+    width: 64px;
+    height: 64px;
   }
 }

@@ -10,6 +10,8 @@ const BOOLEAN_SETTINGS = Object.freeze([
   "landingAssist",
   "touchControls",
 ]);
+const FRESH_DEFAULT_CONDITION = "twilightGlass";
+const LEGACY_DEFAULT_CONDITION = "goldenCoast";
 
 export function createDefaultSave() {
   return {
@@ -18,7 +20,7 @@ export function createDefaultSave() {
     bestFlow: 0,
     totalRuns: 0,
     selectedBoard: "foamPuff",
-    selectedCondition: "goldenCoast",
+    selectedCondition: FRESH_DEFAULT_CONDITION,
     unlockedBoards: ["foamPuff", "mangoFish", "moonLog"],
     tutorialSeen: false,
     settings: { ...DEFAULT_SETTINGS },
@@ -61,7 +63,11 @@ export function loadSave(storage = undefined) {
       bestFlow: finiteRange(saved.bestFlow, fallback.bestFlow, 0, 100),
       totalRuns: Math.floor(finiteNonNegative(saved.totalRuns, fallback.totalRuns)),
       selectedBoard: Object.hasOwn(BOARDS, saved.selectedBoard) ? saved.selectedBoard : fallback.selectedBoard,
-      selectedCondition: Object.hasOwn(CONDITIONS, saved.selectedCondition) ? saved.selectedCondition : fallback.selectedCondition,
+      // Existing v1 profiles that predate condition selection keep their familiar
+      // Golden Coast session; only genuinely fresh profiles open on the hero barrel.
+      selectedCondition: Object.hasOwn(CONDITIONS, saved.selectedCondition)
+        ? saved.selectedCondition
+        : LEGACY_DEFAULT_CONDITION,
       unlockedBoards: unlockedBoards.length ? unlockedBoards : fallback.unlockedBoards,
       tutorialSeen: saved.tutorialSeen === true,
       settings,
@@ -125,7 +131,7 @@ function sanitizeLastRun(lastRun) {
   if (!lastRun || typeof lastRun !== "object") return null;
   const rank = typeof lastRun.rank === "string" && /^[SABCD]$/.test(lastRun.rank) ? lastRun.rank : "D";
   const board = Object.hasOwn(BOARDS, lastRun.board) ? lastRun.board : "foamPuff";
-  const condition = Object.hasOwn(CONDITIONS, lastRun.condition) ? lastRun.condition : "goldenCoast";
+  const condition = Object.hasOwn(CONDITIONS, lastRun.condition) ? lastRun.condition : LEGACY_DEFAULT_CONDITION;
   const at = Number.isFinite(Date.parse(lastRun.at)) ? lastRun.at : null;
   return {
     score: Math.round(finiteNonNegative(lastRun.score, 0)),

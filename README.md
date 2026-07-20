@@ -25,9 +25,11 @@ Simple Controls are the default:
 | Context trick | F or X | X or B | **Trick** |
 | Optional spin impulses | Q / E | Left / right bumper | Left / right **Spin** |
 | Mounted-animal special | T or Shift | Y | **Special** when ready |
-| Pause | Escape or P | Start | Settings |
+| Pause | Escape or P | Start | **II** pause button; Settings also pauses |
 
 Advanced Controls preserve the original Q/E/F/T map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
+
+The standard gamepad now owns the whole arcade loop: stick/D-pad navigation, A to activate, B to close dialogs or instantly retry results, and Start to pause/resume. Directional focus repeats deliberately, while sliders and selects adjust in place. Touch controls appear automatically on coarse-pointer or compact touch devices, stay off fine-pointer desktops, and neutralize safely when the device rotates.
 
 ## Surf both ways
 
@@ -42,7 +44,7 @@ Speed and Flow are separate:
 
 Simple Controls buffer one Trick request into the aerial context, choose an eligible move, fall back to a readable grab when a large move no longer fits, and begin helping the board toward the nearest valid landing tangent late in descent. Advanced Controls retain direct on-wave maneuvers and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
 
-Fresh profiles receive a six-step in-play **Surf School**: drop, carve, launch, rotate, trick, and land. Each lesson advances only after the physical action succeeds, persists until learned, and can be armed again from Settings.
+Fresh profiles open on **Twilight Glass**, the finished hero-barrel session, and receive a six-step in-play **Surf School**: drop, carve, launch, rotate, trick, and land. Each lesson advances only after the physical action succeeds, persists until learned, and can be armed again from Settings. Returning profiles keep their explicit board and condition choices.
 
 ## A living coast
 
@@ -83,7 +85,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **141/141 tests**, and the syntax gate checks **28 JavaScript modules**. The canonical real-browser gallery contains **118 deterministic 1280 x 720 captures**, including the six reviewed Twilight hero-barrel stages; the lifecycle/audio/wave pass additionally covers real-browser pause/resume, corrupt-save recovery, 100-restart, console/network, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
+The native suite passes **158/158 tests**, and the syntax gate checks **30 JavaScript modules**. The canonical real-browser gallery contains **118 deterministic 1280 x 720 captures**, including the six reviewed Twilight hero-barrel stages; the lifecycle/audio/wave pass additionally covers real-browser pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
 
 ## Static deployment and integration
 

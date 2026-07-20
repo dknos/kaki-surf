@@ -13,7 +13,7 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 | Context trick | F or X | X (2) or B (1) | **Trick** |
 | Optional counterclockwise / clockwise spin impulse | Q / E | Left / right bumper | Left / right **Spin** |
 | Mounted-animal special | T or either Shift | Y (3) | **Special** when ready |
-| Pause | Escape or P | Start (9) | Settings |
+| Pause | Escape or P | Start (9) | **II** pause button; Settings also pauses |
 | Restart / retry | R; Space on results | B on results; A on results | Results button |
 
 Action is always readable: hold on the face to compress, then release while carving upward on a useful line to earn an efficiency-scaled pump; carry that uphill line through the lip to launch. Releases below the charge/line gate consume their partial charge without a burst, and a short cadence floor rejects tapping. Action is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
@@ -46,6 +46,10 @@ Keyboard repeat cannot create duplicate edges. In Advanced mode Q/X/C are aliase
 Simple mode additionally exposes `trick`, `special`, `spinLeft`, and `spinRight`; Advanced mode exposes `trick1` through `trick4`. Inactive-mode actions remain false. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers; a held gamepad must return to neutral before it can create a new edge.
 
 Touch pointers are independent, allowing direction plus Action or a held Trick at the same time. Releasing one pointer does not cancel another.
+
+Outside active play, a standard gamepad navigates visible controls spatially with the stick or D-pad. A activates the focused control, B closes Settings or resumes from Pause, and Start remains the direct pause/resume control. Direction repeats after a 340 ms hold and then every 110 ms; A/B remain discrete. Left/right adjusts focused ranges and selects without ejecting focus. The same neutral-after-clear rule prevents a gameplay hold from activating a pause, menu, or results control.
+
+Touch presentation is capability-aware. The persistent setting allows the controls, while the runtime shows them only for a coarse primary pointer or a compact device that reports touch points. Fine-pointer desktops remain unobscured. A stable portrait/landscape transition pauses play and clears every held pointer before moving the controls.
 
 ## Bidirectional travel and switch stance
 

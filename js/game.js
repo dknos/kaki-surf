@@ -1,10 +1,18 @@
 import { BOARDS, CONDITIONS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_FRAME_DELTA, TUNING } from "./config.js";
 import { SurfAudio } from "./audio.js";
+import { PoliteAnnouncer } from "./announcer.js";
 import { InputManager } from "./input.js";
 import { clamp } from "./math.js";
 import { loadSave, recordRun, resolveStorage, sanitizeSettings, writeSave } from "./persistence.js";
 import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
+import {
+  adjustFormControl,
+  clearGamepadFocus,
+  findDirectionalTarget,
+  markGamepadFocus,
+  visibleFocusables,
+} from "./ui-navigation.js";
 
 const DEBUG_FIELDS = [
   ["speed", "Base speed", 40, 110, 1],
@@ -29,8 +37,42 @@ const DEBUG_FIELDS = [
 
 const DEFAULT_TUNING = Object.freeze({ ...TUNING });
 
-export function shouldShowTouchControls(state, enabled, settingsOpen = false) {
-  return Boolean(enabled && state === "running" && !settingsOpen);
+export function isTouchControlEnvironment({
+  coarsePointer = false,
+  maxTouchPoints = 0,
+  viewportWidth = Number.POSITIVE_INFINITY,
+} = {}) {
+  const compactTouchscreen = Number(maxTouchPoints) > 0 && Number(viewportWidth) <= 1024;
+  return Boolean(coarsePointer || compactTouchscreen);
+}
+
+export function shouldShowTouchControls(
+  state,
+  enabled,
+  settingsOpen = false,
+  touchEnvironment = true,
+  qaFixture = false,
+) {
+  if (qaFixture && state === "qa") return true;
+  return Boolean(enabled && state === "running" && !settingsOpen && touchEnvironment);
+}
+
+export function stableViewportOrientation(width, height, minimumAspectRatio = 1.12) {
+  const safeWidth = Number(width);
+  const safeHeight = Number(height);
+  if (!(safeWidth > 0) || !(safeHeight > 0)) return null;
+  const ratio = safeWidth / safeHeight;
+  if (ratio >= minimumAspectRatio) return "landscape";
+  if (ratio <= 1 / minimumAspectRatio) return "portrait";
+  return null;
+}
+
+export function resolveViewportTransition(previousOrientation, width, height) {
+  const observed = stableViewportOrientation(width, height);
+  return {
+    orientation: observed ?? previousOrientation ?? null,
+    changed: Boolean(previousOrientation && observed && observed !== previousOrientation),
+  };
 }
 
 export class KakiSurfGame {
@@ -69,9 +111,14 @@ export class KakiSurfGame {
     this.started = false;
     this.destroyed = false;
     this.runSequence = 0;
+    this.viewportOrientation = stableViewportOrientation(
+      globalThis.window?.innerWidth,
+      globalThis.window?.innerHeight,
+    );
     this.abort = new AbortController();
     this.host.innerHTML = gameMarkup();
     this.elements = collectElements(host);
+    this.announcer = new PoliteAnnouncer(this.elements.liveRegion);
     this.simulation = new SurfSimulation({ tuning: TUNING, controlMode: this.settings.controlMode });
     this.renderer = new KakiRenderer(this.elements.canvas, this.settings, visualAssets);
     this.ownsInput = !externalInput;
@@ -115,6 +162,7 @@ export class KakiSurfGame {
   async startRun() {
     if (this.destroyed) return;
     const runSequence = ++this.runSequence;
+    this.announcer.clear();
     this.save.selectedBoard = this.selectedBoard;
     this.save.selectedCondition = this.selectedCondition;
     writeSave(this.save, this.storage);
@@ -150,6 +198,7 @@ export class KakiSurfGame {
 
   pause(reason = "manual") {
     if (this.state !== "running") return;
+    this.announcer.clear();
     this.pausedFrom = reason;
     this.state = "paused";
     this.input.clear?.();
@@ -157,11 +206,15 @@ export class KakiSurfGame {
     this.audio.setLifecycle?.("paused");
     this.showLayer("pause");
     this.elements.resumeButton.focus({ preventScroll: true });
-    this.announce("Surfing paused.");
+    this.announce("Surfing paused.", { urgent: true });
   }
 
   resume() {
     if (this.state !== "paused") return;
+    this.announcer.clear();
+    // A/B can both activate pause UI and map to gameplay actions. Neutralize
+    // them before the same frame returns to the fixed-step simulation.
+    this.input.clear?.();
     this.state = "running";
     this.pausedFrom = null;
     this.lastFrame = performance.now();
@@ -179,6 +232,7 @@ export class KakiSurfGame {
 
   backToMenu() {
     this.runSequence += 1;
+    this.announcer.clear();
     this.input.clear?.();
     this.state = "menu";
     this.simulation.reset({
@@ -220,6 +274,7 @@ export class KakiSurfGame {
     const frameDelta = clamp((now - this.lastFrame) / 1000, 0, MAX_FRAME_DELTA);
     this.lastFrame = now;
     this.input.update?.(frameDelta);
+    const ui = this.input.consumeUi?.() ?? EMPTY_UI;
     const controlsBlocked = Boolean(this.elements.settingsDialog.open);
     const bufferedMeta = this.input.consumeMeta?.() ?? EMPTY_META;
     const meta = controlsBlocked ? EMPTY_META : bufferedMeta;
@@ -231,6 +286,8 @@ export class KakiSurfGame {
     }
     if (meta.restart && (this.state === "running" || this.state === "results")) this.restart();
     if (meta.retry && this.state === "results") this.restart();
+
+    if (this.state !== "running" || controlsBlocked) this.handleGamepadUi(ui);
 
     if (this.state === "running") {
       if (!this.renderer.shouldFreeze()) {
@@ -252,10 +309,10 @@ export class KakiSurfGame {
     } else if (this.state === "menu") {
       this.simulation.wave.update(frameDelta * 0.26, 24, 0);
       const controls = this.input.consumeStep?.() ?? EMPTY_CONTROLS;
-      if (!controlsBlocked && controls.edgePressed) this.startRun();
+      if (!controlsBlocked && controls.edgePressed && !ui.confirm) this.startRun();
     } else if (this.state === "results") {
       const controls = this.input.consumeStep?.() ?? EMPTY_CONTROLS;
-      if (!controlsBlocked && controls.edgePressed) this.restart();
+      if (!controlsBlocked && controls.edgePressed && !ui.confirm) this.restart();
     }
 
     this.renderer.update(frameDelta, this.simulation);
@@ -269,7 +326,12 @@ export class KakiSurfGame {
     this.simulation.consumeEvents((event) => {
       this.renderer.onEvent(event, this.simulation);
       if (event.type !== "complete") this.audio.onEvent?.(event, this.simulation);
-      if (event.type === "callout") this.announce(event.payload.subtext ? `${event.payload.text}. ${event.payload.subtext}` : event.payload.text);
+      if (event.type === "callout") {
+        this.announce(
+          event.payload.subtext ? `${event.payload.text}. ${event.payload.subtext}` : event.payload.text,
+          { urgent: ["risk", "wipeout"].includes(event.payload.tone) },
+        );
+      }
       if (event.type === "tutorialStep") {
         this.announce(`Surf School ${event.payload.index} of ${event.payload.total}. ${event.payload.text}. ${event.payload.hint}`);
       }
@@ -285,7 +347,7 @@ export class KakiSurfGame {
       if (event.type === "sharkCollision") this.rumble(92, 0.42, 0.58);
       if (event.type === "wildlifePhase" && ["telegraph", "distant", "blow"].includes(event.payload.phase)) {
         const cue = event.payload.kind === "shark" ? "Shark fin ahead." : event.payload.kind === "whale" ? "Whale event ahead." : "Dolphin opportunity ahead.";
-        this.announce(cue);
+        this.announce(cue, { urgent: event.payload.kind === "shark" });
       }
     });
   }
@@ -293,7 +355,10 @@ export class KakiSurfGame {
   rumble(duration, weakMagnitude, strongMagnitude) {
     if (this.settings.reducedMotion) return;
     try {
-      navigator.vibrate?.(Math.min(45, duration));
+      const userActivation = navigator.userActivation;
+      if (this.isTouchControlEnvironment() && userActivation?.hasBeenActive !== false) {
+        navigator.vibrate?.(Math.min(45, duration));
+      }
       const pads = Array.from(navigator.getGamepads?.() ?? []).filter(Boolean);
       const pad = pads.find((candidate) =>
         candidate.buttons?.some((button) => button?.pressed || button?.value > 0.5)
@@ -310,6 +375,10 @@ export class KakiSurfGame {
   }
 
   handleComplete(result) {
+    this.announcer.clear();
+    // Results owns a new focus context. Suppress held carving/repeat and action
+    // edges until the controller returns to neutral.
+    this.input.clear?.();
     const enriched = { ...result, board: this.selectedBoard, condition: this.selectedCondition };
     const isBest = recordRun(this.save, enriched);
     writeSave(this.save, this.storage);
@@ -372,6 +441,63 @@ export class KakiSurfGame {
     this.elements.resultCondition.textContent = CONDITIONS[this.selectedCondition].name;
   }
 
+  handleGamepadUi(ui) {
+    if (!ui || (!ui.x && !ui.y && !ui.confirm && !ui.cancel)) return false;
+    const settingsOpen = Boolean(this.elements.settingsDialog.open);
+    const container = settingsOpen
+      ? this.elements.settingsDialog
+      : this.state === "menu"
+        ? this.elements.menuLayer
+        : this.state === "paused"
+          ? this.elements.pauseLayer
+          : this.state === "results"
+            ? this.elements.resultsLayer
+            : null;
+    if (!container) return false;
+
+    if (ui.cancel) {
+      this.audio.onEvent?.("uiBack", this.simulation);
+      if (settingsOpen) this.closeSettings();
+      else if (this.state === "paused") this.resume();
+      // B remains the documented instant retry on Results via consumeMeta().
+      return true;
+    }
+
+    const focusables = visibleFocusables(container);
+    const active = container.contains?.(document.activeElement) ? document.activeElement : null;
+    const preferred = this.preferredGamepadFocus(settingsOpen, focusables);
+    let focused = active;
+
+    if (ui.x || ui.y) {
+      if (!focused) focused = markGamepadFocus(this.host, preferred ?? focusables[0]);
+      else if (!(ui.x && adjustFormControl(focused, ui.x))) {
+        const next = findDirectionalTarget(focused, focusables, ui.x, ui.y);
+        if (next) focused = markGamepadFocus(this.host, next);
+      }
+    }
+
+    if (ui.confirm) {
+      const target = focused ?? preferred ?? focusables[0];
+      if (target) {
+        markGamepadFocus(this.host, target);
+        target.click?.();
+      }
+    }
+    return true;
+  }
+
+  preferredGamepadFocus(settingsOpen, focusables) {
+    if (settingsOpen) {
+      return this.elements.settingsDialog.querySelector("[data-setting=controlMode]") ?? focusables[0];
+    }
+    if (this.state === "menu") {
+      return this.elements.startButton;
+    }
+    if (this.state === "paused") return this.elements.resumeButton;
+    if (this.state === "results") return this.elements.retryButton;
+    return focusables[0];
+  }
+
   bindUI() {
     const signal = this.abort.signal;
     this.elements.startButton.addEventListener("click", () => this.startRun(), { signal });
@@ -390,6 +516,7 @@ export class KakiSurfGame {
     }, { signal });
     this.elements.settingsDialog.addEventListener("close", () => this.finishSettingsClose(), { signal });
     this.elements.fullscreenButton.addEventListener("click", () => this.toggleFullscreen(), { signal });
+    this.elements.pauseButton.addEventListener("click", () => this.pause("touch"), { signal });
     this.elements.exitButton.addEventListener("click", () => {
       if (this.onExit) this.onExit(this.getSnapshot());
       else this.backToMenu();
@@ -406,7 +533,11 @@ export class KakiSurfGame {
       if (hidden) this.pause("visibility");
     }, { signal });
     window.addEventListener("blur", () => this.pause("blur"), { signal });
+    window.addEventListener("orientationchange", () => this.handleViewportChange(true), { signal });
+    window.addEventListener("resize", () => this.handleViewportChange(false), { signal });
+    window.addEventListener("pointerdown", () => clearGamepadFocus(this.host), { signal });
     window.addEventListener("keydown", (event) => {
+      clearGamepadFocus(this.host);
       if (event.code === "Escape" && this.elements.settingsDialog.open) {
         event.preventDefault();
         this.closeSettings();
@@ -570,11 +701,35 @@ export class KakiSurfGame {
   }
 
   showLayer(name) {
+    clearGamepadFocus(this.host);
     this.elements.menuLayer.hidden = name !== "menu";
     this.elements.pauseLayer.hidden = name !== "pause";
     this.elements.resultsLayer.hidden = name !== "results";
     this.elements.topControls.hidden = name === "menu";
+    this.elements.pauseButton.hidden = this.state !== "running";
     this.syncTouchControlsVisibility();
+  }
+
+  handleViewportChange(forceOrientationChange = false) {
+    const transition = resolveViewportTransition(
+      this.viewportOrientation,
+      globalThis.window?.innerWidth,
+      globalThis.window?.innerHeight,
+    );
+    this.viewportOrientation = transition.orientation;
+    if (forceOrientationChange || transition.changed) {
+      if (this.state === "running") this.pause("orientation");
+      else this.input.clear?.();
+    }
+    this.syncTouchControlsVisibility();
+  }
+
+  isTouchControlEnvironment() {
+    return isTouchControlEnvironment({
+      coarsePointer: Boolean(globalThis.window?.matchMedia?.("(pointer: coarse)")?.matches),
+      maxTouchPoints: globalThis.navigator?.maxTouchPoints,
+      viewportWidth: globalThis.window?.innerWidth,
+    });
   }
 
   syncTouchControlsVisibility() {
@@ -583,6 +738,8 @@ export class KakiSurfGame {
       this.state,
       this.settings.touchControls,
       this.elements.settingsDialog.open,
+      this.isTouchControlEnvironment(),
+      controls.classList.contains("qa-visible"),
     );
     if (!visible && !controls.hidden) this.input.clear?.();
     controls.hidden = !visible;
@@ -590,9 +747,8 @@ export class KakiSurfGame {
     controls.setAttribute("aria-hidden", String(!visible));
   }
 
-  announce(message) {
-    this.elements.liveRegion.textContent = "";
-    requestAnimationFrame(() => { this.elements.liveRegion.textContent = message; });
+  announce(message, options = {}) {
+    this.announcer.announce(message, options);
   }
 
   async toggleFullscreen() {
@@ -1101,6 +1257,7 @@ export class KakiSurfGame {
     this.abort.abort();
     this.input.clear?.();
     if (this.ownsInput) this.input.destroy?.();
+    this.announcer.destroy();
     this.audio.destroy?.();
     this.host.innerHTML = "";
   }
@@ -1119,6 +1276,7 @@ function collectElements(host) {
     menuButtons: host.querySelectorAll("[data-action=menu]"),
     settingsButtons: host.querySelectorAll("[data-action=settings]"),
     fullscreenButton: host.querySelector("[data-action=fullscreen]"),
+    pauseButton: host.querySelector("[data-action=pause-run]"),
     exitButton: host.querySelector("[data-action=exit]"),
     boardGrid: host.querySelector(".board-grid"),
     conditionGrid: host.querySelector(".condition-grid"),
@@ -1153,6 +1311,7 @@ function gameMarkup() {
         <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve and rotate with arrows or WASD, use Space or Z for action, F or X for a context trick, and T or Shift for an available animal special."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
+          <button type="button" data-action="pause-run" aria-label="Pause surfing">II</button>
           <button type="button" data-action="settings" aria-label="Open settings">SET</button>
           <button type="button" data-action="fullscreen" aria-label="Toggle fullscreen">FULL</button>
           <button type="button" data-action="exit" aria-label="Leave this run">EXIT</button>
@@ -1231,9 +1390,9 @@ function gameMarkup() {
         </aside>
       </div>
 
-      <dialog class="settings-dialog">
+      <dialog class="settings-dialog" aria-labelledby="settings-title">
         <form method="dialog" class="settings-card">
-          <header><div><p class="eyebrow">MAKE IT YOUR WAVE</p><h2>SETTINGS</h2></div><button type="button" data-action="close-settings" aria-label="Close settings">×</button></header>
+          <header><div><p class="eyebrow">MAKE IT YOUR WAVE</p><h2 id="settings-title">SETTINGS</h2></div><button type="button" data-action="close-settings" aria-label="Close settings">×</button></header>
           <section aria-labelledby="audio-heading">
             <h3 id="audio-heading">AUDIO</h3>
             <label class="toggle"><input type="checkbox" data-setting="muted"><span>MUTE ALL AUDIO</span></label>
@@ -1248,7 +1407,7 @@ function gameMarkup() {
             <label><span>SCREEN SHAKE <output data-setting-output="screenShake">70%</output></span><input type="range" min="0" max="1" step="0.05" data-setting="screenShake" aria-label="Screen shake intensity"></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedFlash"><span>FLASH REDUCTION</span></label>
             <label class="toggle"><input type="checkbox" data-setting="highContrast"><span>HIGH-CONTRAST SURF MARKERS</span></label>
-            <label class="toggle"><input type="checkbox" data-setting="touchControls"><span>TOUCH CONTROLS</span></label>
+            <label class="toggle"><input type="checkbox" data-setting="touchControls"><span>ALLOW TOUCH CONTROLS · AUTO</span></label>
             <label><span>WAVE READ</span><select data-setting="waveReadAssist" aria-label="Wave Read Assist"><option value="full">FULL</option><option value="subtle">SUBTLE</option><option value="off">OFF</option></select></label>
           </section>
           <section aria-labelledby="assist-heading">
@@ -1464,6 +1623,7 @@ export function qaWorldOverride(scene) {
 }
 
 const EMPTY_META = Object.freeze({ restart: false, retry: false, pause: false, debug: false });
+const EMPTY_UI = Object.freeze({ x: 0, y: 0, confirm: false, cancel: false });
 const EMPTY_CONTROLS = Object.freeze({
   x: 0,
   y: 0,

@@ -6,8 +6,11 @@ import {
   CONTROL_MODES,
   InputManager,
   KEY_BINDINGS,
+  UI_REPEAT_DELAY,
   applyDeadZone,
   createInputStep,
+  dominantUiDirection,
+  pollGamepad,
 } from "../js/input.js";
 
 const STEP_FIELDS = [
@@ -414,6 +417,63 @@ test("an active second controller wins over an idle first controller", () => {
   assert.ok(step.x < -0.7);
   assert.equal(step.edgePressed, true);
   input.destroy();
+});
+
+test("gamepad UI input has discrete confirm/back edges and deliberate directional repeat", () => {
+  const pad = createPad();
+  const input = new InputManager({ target: new FakeTarget(), getGamepads: () => [pad] });
+
+  pad.axes[0] = 0.85;
+  input.update(0);
+  assert.deepEqual(input.consumeUi(), { x: 1, y: 0, confirm: false, cancel: false });
+
+  input.update(UI_REPEAT_DELAY - 0.01);
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: false, cancel: false });
+  input.update(0.02);
+  assert.deepEqual(input.consumeUi(), { x: 1, y: 0, confirm: false, cancel: false });
+  input.update(0.01);
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: false, cancel: false }, "repeat rebases after a missed frame");
+
+  pad.axes[0] = 0;
+  pressButtons(pad, 0);
+  input.update(0);
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: true, cancel: false });
+  input.update(0.5);
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: false, cancel: false }, "held A never repeats");
+
+  pressButtons(pad, 1);
+  input.update(0);
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: false, cancel: true });
+  input.clear();
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: false, cancel: false });
+
+  input.update(0);
+  assert.deepEqual(input.consumeUi(), { x: 0, y: 0, confirm: false, cancel: false }, "clear suppresses held UI buttons");
+  releaseButtons(pad);
+  input.update(0);
+  pressButtons(pad, 0);
+  input.update(0);
+  assert.equal(input.consumeUi().confirm, true, "confirm returns after the pad reaches neutral");
+  input.destroy();
+});
+
+test("UI direction rejects drift and resolves diagonals to one dominant axis", () => {
+  assert.deepEqual(dominantUiDirection(0.49, -0.49), { x: 0, y: 0 });
+  assert.deepEqual(dominantUiDirection(-0.8, 0.55), { x: -1, y: 0 });
+  assert.deepEqual(dominantUiDirection(0.55, 0.9), { x: 0, y: 1 });
+  assert.deepEqual(dominantUiDirection(-1, -1), { x: -1, y: 0 });
+});
+
+test("gamepad polling walks sparse pad lists without an intermediate array pipeline", () => {
+  const idle = createPad();
+  const active = createPad();
+  pressButtons(active, 0);
+  const pads = { 0: null, 2: idle, 4: active, length: 5 };
+  const snapshot = pollGamepad(() => pads);
+  assert.equal(snapshot.edge, true);
+  assert.equal(snapshot.uiConfirm, true);
+  assert.equal(pollGamepad(() => null).connected, false);
+  assert.equal(pollGamepad(() => { throw new Error("denied"); }).connected, false);
 });
 
 test("Simple gamepad maps A/RT, X/B, Y, and bumpers without leaking Advanced trick edges", () => {

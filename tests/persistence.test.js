@@ -11,7 +11,7 @@ test("fresh profiles keep the backward-compatible v1 shape and current defaults"
   assert.equal(SAVE_KEY, "kaki-surf-meta-v1");
   assert.deepEqual(save.unlockedBoards, Object.keys(BOARDS));
   assert.equal(save.selectedBoard, "foamPuff");
-  assert.equal(save.selectedCondition, "goldenCoast");
+  assert.equal(save.selectedCondition, "twilightGlass", "fresh players see the MVP hero barrel first");
   assert.equal(save.settings.controlMode, "simple");
   assert.equal(save.settings.waveReadAssist, "full");
   assert.deepEqual(save.settings, DEFAULT_SETTINGS);

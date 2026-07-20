@@ -2,6 +2,9 @@ import { clamp } from "./math.js";
 
 export const DEAD_ZONE = 0.18;
 export const BUFFER_WINDOW = 0.12;
+export const UI_REPEAT_DELAY = 0.34;
+export const UI_REPEAT_INTERVAL = 0.11;
+export const UI_DIRECTION_THRESHOLD = 0.5;
 
 export const CONTROL_MODES = Object.freeze({
   SIMPLE: "simple",
@@ -49,6 +52,9 @@ const SIMPLE_ACTION_SET = new Set(SIMPLE_ACTIONS);
 const META_ACTIONS = Object.freeze(["restart", "pause", "retry", "debug"]);
 const DIRECTION_CONTROLS = new Set(["left", "right", "up", "down"]);
 const TOUCH_ACTIONS = new Set(STEP_ACTIONS);
+const UI_AXES = Object.freeze(["x", "y"]);
+const UI_ACTIONS = Object.freeze(["confirm", "cancel"]);
+const UI_GAMEPAD_FIELDS = Object.freeze({ confirm: "uiConfirm", cancel: "uiCancel" });
 
 export function createInputStep() {
   return {
@@ -111,6 +117,11 @@ export class InputManager {
     this.pauseBuffered = false;
     this.retryBuffered = false;
     this.debugBuffered = false;
+    this.uiBuffered = createUiInput();
+    this.uiConsumed = createUiInput();
+    this.uiDirection = { x: 0, y: 0 };
+    this.previousUi = createUiInput();
+    this.uiRepeat = { x: 0, y: 0 };
     this.step = createInputStep();
     this.lastDevice = "keyboard";
     this.enabled = true;
@@ -229,6 +240,7 @@ export class InputManager {
       this.gamepad = polledGamepad;
     }
     this.refreshEdges();
+    this.refreshUi(frameTime(dt));
 
     const keyboardX = Number(this.isDown("right")) - Number(this.isDown("left"));
     const keyboardY = Number(this.isDown("down")) - Number(this.isDown("up"));
@@ -278,6 +290,12 @@ export class InputManager {
     return meta;
   }
 
+  consumeUi() {
+    copyUiInput(this.uiConsumed, this.uiBuffered);
+    resetUiInput(this.uiBuffered);
+    return this.uiConsumed;
+  }
+
   setControlMode(mode) {
     const nextMode = normalizeControlMode(mode);
     if (nextMode === this.controlMode) return this.controlMode;
@@ -297,11 +315,17 @@ export class InputManager {
   }
 
   hasKeyboardAction() {
-    return Array.from(this.activeActions).some((action) => this.isDown(action));
+    for (const action of this.activeActions) {
+      if (this.isDown(action)) return true;
+    }
+    return false;
   }
 
   hasTouchAction() {
-    return Array.from(this.activeActions).some((action) => this.touch[action]);
+    for (const action of this.activeActions) {
+      if (this.touch[action]) return true;
+    }
+    return false;
   }
 
   refreshEdges() {
@@ -332,6 +356,34 @@ export class InputManager {
     }
   }
 
+  refreshUi(dt) {
+    const direction = setDominantUiDirection(this.gamepad.x, this.gamepad.y, this.uiDirection);
+    for (const axis of UI_AXES) {
+      const value = direction[axis];
+      const previous = this.previousUi[axis];
+      if (!value) {
+        this.uiRepeat[axis] = 0;
+      } else if (value !== previous) {
+        this.uiBuffered[axis] = value;
+        this.uiRepeat[axis] = UI_REPEAT_DELAY;
+      } else {
+        this.uiRepeat[axis] -= dt;
+        if (this.uiRepeat[axis] <= 0) {
+          this.uiBuffered[axis] = value;
+          // Rebase instead of catching up missed repeats after a long frame.
+          this.uiRepeat[axis] = UI_REPEAT_INTERVAL;
+        }
+      }
+      this.previousUi[axis] = value;
+    }
+
+    for (const action of UI_ACTIONS) {
+      const held = Boolean(this.gamepad[UI_GAMEPAD_FIELDS[action]]);
+      if (held && !this.previousUi[action]) this.uiBuffered[action] = true;
+      this.previousUi[action] = held;
+    }
+  }
+
   decayBuffers(dt) {
     const elapsed = Number.isFinite(dt) && dt > 0 ? dt : 0;
     for (const action of STEP_ACTIONS) {
@@ -358,6 +410,13 @@ export class InputManager {
     this.pauseBuffered = false;
     this.retryBuffered = false;
     this.debugBuffered = false;
+    resetUiInput(this.uiBuffered);
+    resetUiInput(this.uiConsumed);
+    resetUiInput(this.previousUi);
+    this.uiDirection.x = 0;
+    this.uiDirection.y = 0;
+    this.uiRepeat.x = 0;
+    this.uiRepeat.y = 0;
     Object.assign(this.step, createInputStep());
   }
 
@@ -401,8 +460,16 @@ export function pollGamepad(getGamepads = defaultGetGamepads) {
   } catch {
     return DISCONNECTED_GAMEPAD;
   }
-  const snapshots = Array.from(pads ?? []).filter(Boolean).map(snapshotGamepad);
-  return snapshots.find(isGamepadActive) ?? snapshots[0] ?? DISCONNECTED_GAMEPAD;
+  if (!pads) return DISCONNECTED_GAMEPAD;
+  let first = null;
+  for (let index = 0; index < pads.length; index += 1) {
+    const pad = pads[index];
+    if (!pad) continue;
+    const snapshot = snapshotGamepad(pad);
+    first ??= snapshot;
+    if (isGamepadActive(snapshot)) return snapshot;
+  }
+  return first ?? DISCONNECTED_GAMEPAD;
 }
 
 function snapshotGamepad(pad) {
@@ -423,6 +490,8 @@ function snapshotGamepad(pad) {
     trick4: buttonPressed(pad, 6) || buttonPressed(pad, 11),
     pause: buttonPressed(pad, 9),
     retry: buttonPressed(pad, 1),
+    uiConfirm: buttonPressed(pad, 0),
+    uiCancel: buttonPressed(pad, 1),
   };
 }
 
@@ -441,6 +510,8 @@ export const DISCONNECTED_GAMEPAD = Object.freeze({
   trick4: false,
   pause: false,
   retry: false,
+  uiConfirm: false,
+  uiCancel: false,
 });
 
 function defaultGetGamepads() {
@@ -476,6 +547,40 @@ function createBooleanRecord(actions) {
 
 function createActionBuffers() {
   return Object.fromEntries(STEP_ACTIONS.map((action) => [action, { pressed: 0, released: 0 }]));
+}
+
+function createUiInput() {
+  return { x: 0, y: 0, confirm: false, cancel: false };
+}
+
+function frameTime(dt) {
+  return Number.isFinite(dt) && dt > 0 ? dt : 0;
+}
+
+export function dominantUiDirection(x, y) {
+  return setDominantUiDirection(x, y, { x: 0, y: 0 });
+}
+
+function setDominantUiDirection(x, y, result) {
+  const horizontal = Math.abs(x) >= UI_DIRECTION_THRESHOLD ? Math.sign(x) : 0;
+  const vertical = Math.abs(y) >= UI_DIRECTION_THRESHOLD ? Math.sign(y) : 0;
+  result.x = !vertical || (horizontal && Math.abs(x) >= Math.abs(y)) ? horizontal : 0;
+  result.y = result.x ? 0 : vertical;
+  return result;
+}
+
+function copyUiInput(target, source) {
+  target.x = source.x;
+  target.y = source.y;
+  target.confirm = source.confirm;
+  target.cancel = source.cancel;
+}
+
+function resetUiInput(target) {
+  target.x = 0;
+  target.y = 0;
+  target.confirm = false;
+  target.cancel = false;
 }
 
 function isTouchControl(control) {
