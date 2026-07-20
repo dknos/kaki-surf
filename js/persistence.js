@@ -1,4 +1,11 @@
-import { BOARDS, CONDITIONS, DEFAULT_SETTINGS, SAVE_KEY } from "./config.js";
+import {
+  BOARDS,
+  CONDITIONS,
+  DEFAULT_RUN_MODE_ID,
+  DEFAULT_SETTINGS,
+  RUN_MODES,
+  SAVE_KEY,
+} from "./config.js";
 
 const VOLUME_SETTINGS = Object.freeze(["music", "effects", "waveAudio", "screenShake"]);
 const BOOLEAN_SETTINGS = Object.freeze([
@@ -21,6 +28,8 @@ export function createDefaultSave() {
     totalRuns: 0,
     selectedBoard: "foamPuff",
     selectedCondition: FRESH_DEFAULT_CONDITION,
+    selectedMode: DEFAULT_RUN_MODE_ID,
+    records: createModeRecords(),
     unlockedBoards: ["foamPuff", "mangoFish", "moonLog"],
     tutorialSeen: false,
     settings: { ...DEFAULT_SETTINGS },
@@ -57,10 +66,16 @@ export function loadSave(storage = undefined) {
     const unlockedBoards = Array.isArray(saved.unlockedBoards)
       ? [...new Set(saved.unlockedBoards.filter((id) => Object.hasOwn(BOARDS, id)))]
       : fallback.unlockedBoards;
+    const legacyBestScore = finiteNonNegative(saved.bestScore, fallback.bestScore);
+    const legacyBestFlow = finiteRange(saved.bestFlow, fallback.bestFlow, 0, 100);
+    const records = sanitizeModeRecords(saved.records, {
+      legacyBestScore,
+      legacyBestFlow,
+    });
     return {
       ...fallback,
-      bestScore: finiteNonNegative(saved.bestScore, fallback.bestScore),
-      bestFlow: finiteRange(saved.bestFlow, fallback.bestFlow, 0, 100),
+      bestScore: Math.max(legacyBestScore, ...Object.values(records).map((record) => record.bestScore)),
+      bestFlow: Math.max(legacyBestFlow, ...Object.values(records).map((record) => record.bestFlow)),
       totalRuns: Math.floor(finiteNonNegative(saved.totalRuns, fallback.totalRuns)),
       selectedBoard: Object.hasOwn(BOARDS, saved.selectedBoard) ? saved.selectedBoard : fallback.selectedBoard,
       // Existing v1 profiles that predate condition selection keep their familiar
@@ -68,6 +83,10 @@ export function loadSave(storage = undefined) {
       selectedCondition: Object.hasOwn(CONDITIONS, saved.selectedCondition)
         ? saved.selectedCondition
         : LEGACY_DEFAULT_CONDITION,
+      selectedMode: Object.hasOwn(RUN_MODES, saved.selectedMode)
+        ? saved.selectedMode
+        : fallback.selectedMode,
+      records,
       unlockedBoards: unlockedBoards.length ? unlockedBoards : fallback.unlockedBoards,
       tutorialSeen: saved.tutorialSeen === true,
       settings,
@@ -110,11 +129,23 @@ export function writeSave(save, storage = undefined) {
 }
 
 export function recordRun(save, result) {
-  const score = Math.round(result.score);
-  const flow = Math.round(result.flow);
-  const previousBest = save.bestScore;
-  save.bestScore = Math.max(save.bestScore, score);
-  save.bestFlow = Math.max(save.bestFlow, flow);
+  const score = Math.round(finiteNonNegative(result.score, 0));
+  const flow = Math.round(finiteRange(result.flow, 0, 0, 100));
+  const mode = Object.hasOwn(RUN_MODES, result.mode) ? result.mode : resolveModeId(save.selectedMode);
+  if (!save.records || typeof save.records !== "object") save.records = createModeRecords();
+  const record = sanitizeModeRecord(save.records[mode]);
+  const previousBest = record.bestScore;
+  const distance = Math.round(finiteNonNegative(result.distance, 0));
+  const set = Math.max(1, Math.floor(finiteNonNegative(result.set, 1)));
+  const duration = Math.round(finiteNonNegative(result.duration, 0));
+  record.bestScore = Math.max(record.bestScore, score);
+  record.bestFlow = Math.max(record.bestFlow, flow);
+  record.bestDistance = Math.max(record.bestDistance, distance);
+  record.bestSet = Math.max(record.bestSet, set);
+  record.longestRide = Math.max(record.longestRide, duration);
+  save.records[mode] = record;
+  save.bestScore = Math.max(finiteNonNegative(save.bestScore, 0), score);
+  save.bestFlow = Math.max(finiteRange(save.bestFlow, 0, 0, 100), flow);
   save.totalRuns += 1;
   save.lastRun = {
     score,
@@ -122,9 +153,17 @@ export function recordRun(save, result) {
     rank: result.rank.grade,
     board: result.board,
     condition: result.condition ?? save.selectedCondition,
+    mode,
+    distance,
+    set,
+    duration,
     at: new Date().toISOString(),
   };
   return score > previousBest;
+}
+
+export function getRunRecord(save, modeId = save?.selectedMode) {
+  return sanitizeModeRecord(save?.records?.[resolveModeId(modeId)]);
 }
 
 function sanitizeLastRun(lastRun) {
@@ -132,6 +171,11 @@ function sanitizeLastRun(lastRun) {
   const rank = typeof lastRun.rank === "string" && /^[SABCD]$/.test(lastRun.rank) ? lastRun.rank : "D";
   const board = Object.hasOwn(BOARDS, lastRun.board) ? lastRun.board : "foamPuff";
   const condition = Object.hasOwn(CONDITIONS, lastRun.condition) ? lastRun.condition : LEGACY_DEFAULT_CONDITION;
+  const mode = Object.hasOwn(RUN_MODES, lastRun.mode)
+    ? lastRun.mode
+    : lastRun.mode == null
+      ? "scoreAttack"
+      : DEFAULT_RUN_MODE_ID;
   const at = Number.isFinite(Date.parse(lastRun.at)) ? lastRun.at : null;
   return {
     score: Math.round(finiteNonNegative(lastRun.score, 0)),
@@ -139,8 +183,44 @@ function sanitizeLastRun(lastRun) {
     rank,
     board,
     condition,
+    mode,
+    distance: Math.round(finiteNonNegative(lastRun.distance, 0)),
+    set: Math.max(1, Math.floor(finiteNonNegative(lastRun.set, 1))),
+    duration: Math.round(finiteNonNegative(lastRun.duration, 0)),
     at,
   };
+}
+
+function createModeRecords() {
+  return Object.fromEntries(Object.keys(RUN_MODES).map((id) => [id, sanitizeModeRecord()]));
+}
+
+function sanitizeModeRecords(candidate, { legacyBestScore = 0, legacyBestFlow = 0 } = {}) {
+  const source = candidate && typeof candidate === "object" ? candidate : {};
+  const records = createModeRecords();
+  for (const id of Object.keys(RUN_MODES)) records[id] = sanitizeModeRecord(source[id]);
+  // Profiles written before modes existed were 78-second sessions. Preserve
+  // their history under Score Attack while the new primary mode starts clean.
+  if (!source.scoreAttack || typeof source.scoreAttack !== "object") {
+    records.scoreAttack.bestScore = legacyBestScore;
+    records.scoreAttack.bestFlow = legacyBestFlow;
+  }
+  return records;
+}
+
+function sanitizeModeRecord(record = null) {
+  const source = record && typeof record === "object" ? record : {};
+  return {
+    bestScore: Math.round(finiteNonNegative(source.bestScore, 0)),
+    bestFlow: Math.round(finiteRange(source.bestFlow, 0, 0, 100)),
+    bestDistance: Math.round(finiteNonNegative(source.bestDistance, 0)),
+    bestSet: Math.max(1, Math.floor(finiteNonNegative(source.bestSet, 1))),
+    longestRide: Math.round(finiteNonNegative(source.longestRide, 0)),
+  };
+}
+
+function resolveModeId(modeId) {
+  return Object.hasOwn(RUN_MODES, modeId) ? modeId : DEFAULT_RUN_MODE_ID;
 }
 
 function finiteNonNegative(value, fallback) {

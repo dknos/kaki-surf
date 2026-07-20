@@ -990,10 +990,12 @@ input[type="range"]::-moz-range-thumb {
   50% { translate: -4px 1px; opacity: 0.62; }
 }
 
+.mode-select,
 .condition-select {
   width: min(760px, 90vw);
 }
 
+.mode-select > p,
 .condition-select > p {
   margin: 0 0 5px;
   color: var(--foam-shadow);
@@ -1002,8 +1004,55 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.08em;
 }
 
+.mode-select > p b,
 .condition-select > p b {
   color: var(--gold);
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.mode-card {
+  min-height: 50px;
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  background: rgb(16 28 52 / 92%);
+  box-shadow: inset 0 0 0 1px #315574, 3px 3px 0 var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mode-card.is-selected {
+  border-color: var(--gold);
+  background: #244f6d;
+  box-shadow: inset 0 0 0 1px var(--foam), 3px 3px 0 var(--ink);
+}
+
+.mode-card span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mode-card strong {
+  color: var(--foam);
+  font-size: 10px;
+}
+
+.mode-card b {
+  color: var(--gold);
+  font-size: 8px;
+}
+
+.mode-card small {
+  display: block;
+  margin-top: 4px;
+  color: var(--foam-shadow);
+  font-size: 7px;
+  line-height: 1.2;
 }
 
 .condition-grid {
@@ -1086,6 +1135,10 @@ input[type="range"]::-moz-range-thumb {
   text-transform: uppercase;
 }
 
+.score-breakdown .score-breakdown-wide {
+  grid-column: 1 / -1;
+}
+
 .settings-card select {
   min-height: 30px;
   border: 2px solid var(--ink);
@@ -1162,6 +1215,12 @@ input[type="range"]::-moz-range-thumb {
     width: min(430px, 92vw);
   }
 
+  .mode-select,
+  .condition-select {
+    align-self: center;
+    width: min(430px, 92vw);
+  }
+
   .board-card {
     min-height: 142px;
     padding-left: 76px;
@@ -1225,7 +1284,10 @@ input[type="range"]::-moz-range-thumb {
   .board-card > span:last-child { display: none; }
   .board-specialty { display: none; }
   .condition-select > p,
+  .mode-select > p,
   .condition-card small { display: none; }
+  .mode-card { min-height: 38px; padding-block: 7px; }
+  .mode-card small { display: none; }
   .condition-card { min-height: 38px; padding-top: 11px; }
   .condition-card > span { height: 24px; }
   .menu-stats { display: none; }

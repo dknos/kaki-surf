@@ -14,13 +14,13 @@ npm run check
 git diff --check
 ```
 
-Current result: **171/171 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
+Current result: **174/174 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
 
 ## Browser capture matrix
 
 | Group | Required scenes | What must be visible | Status |
 | --- | --- | --- | --- |
-| Entry/UI | Menu, settings Simple, settings Advanced, six-step Surf School, results | Twilight travelling break and Simple selected for a fresh save; action-gated teaching and replay; controller-only spatial navigation; no stale POWER meter or seam-required copy; score and Flow distinct | Pass |
+| Entry/UI | Endless/Score Attack selector, menu, settings Simple, settings Advanced, six-step Surf School, results | Immediate start action before customization on portrait; mode-specific labels and records; Twilight travelling break and Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or overlapping long result rows | Pass |
 | Core ride | Neutral, right travel, left travel, committed reversal, downhill, four classic curl states, six Twilight travelling-break stages, rideable tube, max speed, pump | Rider-facing and wake follow signed travel while Twilight's break and downward pour do not mirror; Gather/Pitch/Pour/Deep/Maximum/Collapse advances left-to-right, opens real sky behind the passed edge, and preserves one collision-aligned contact; held Trick sustains the pocket pose and tube score | Pass |
 | Air/landing | Small/medium/huge air, dedicated Twilight big-air camera, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Clamped upward camera framing reveals more sky with no horizon seam; Reduced Motion stays fixed; board/body separation, nearest valid landing tangent, signed landing direction, and queued single-message callouts remain legible | Pass |
 | Wildlife | Dolphin approach/ride/dismount/gates, shark telegraph/near miss/contact, whale distant/breach/ramp/ride/splash, reduced variants | Minimum danger telegraph, friendly mount readability, no harmful animal reward, coherent phase silhouettes | Pass |
@@ -54,7 +54,7 @@ Current result: **171/171 tests pass** and **30 JavaScript modules pass syntax c
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 120 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 117 unique bitmaps. The two repeated-render groups are intentional identity fixtures: `foamPuff-stormbreak` / `stormbreak`, and `foamPuff-twilightGlass` / `twilightGlass` / `twilightTraffic-twilightGlass`. The Golden Coast base/board captures and the dedicated tube and big-air fixtures are distinct; the cargo ship, fishing boat, and sailboat fixtures remain visibly staged in the safe far-right water band. Rebuild deterministically with:
+The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 120 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 118 unique bitmaps. The two repeated-render pairs are the intentional Golden Coast base/Foam Puff identity and Twilight base/traffic identity. Staged Twilight frames, Stormbreak, the dedicated tube and big-air fixtures, and the cargo ship, fishing boat, and sailboat scenes remain distinct; the craft fixtures stay visibly staged in the safe far-right water band. Rebuild deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py

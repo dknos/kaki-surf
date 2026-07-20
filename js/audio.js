@@ -192,7 +192,8 @@ export class SurfAudio {
     const combo = Number(simulation.score?.combo ?? simulation.currentMultiplier?.() ?? 1);
     const airborne = player.state === "airborne";
     const tubeActive = Boolean(player.tubeRide?.active);
-    const seconds = Math.ceil(simulation.timeRemaining ?? 99);
+    const timed = simulation.mode?.timed !== false;
+    const seconds = timed ? Math.ceil(simulation.timeRemaining ?? 99) : Number.POSITIVE_INFINITY;
     const now = this.context.currentTime;
     this.conditionId = conditionIdFor(simulation, this.settings);
 
@@ -276,6 +277,11 @@ export class SurfAudio {
       : event?.payload ?? event ?? EMPTY_EVENT_PAYLOAD;
     const now = this.context.currentTime;
     switch (type) {
+      case "endlessSet":
+        this.duck(0.74, 0.28);
+        this.chirp(now, 196, payload.final ? 988 : 784, 0.22, 0.11);
+        this.tone(now + 0.08, payload.final ? 1174 : 880, 0.14, "square", 0.055, this.effectsGain, 1320);
+        break;
       case "pumpCharge":
         this.tone(now, 105 + (payload.charge ?? 0) * 75, 0.055, "triangle", 0.035, this.effectsGain, 145 + (payload.charge ?? 0) * 110);
         break;

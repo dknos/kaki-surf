@@ -1,6 +1,6 @@
 # Kaki Surf
 
-Kaki Surf is a standalone, no-bundler Canvas score-attack game starring Kitty Kaki. It runs at a fixed 384 x 216 logical resolution with a 1/120-second simulation step and deploys unchanged to a static host.
+Kaki Surf is a standalone, no-bundler Canvas arcade surfing game starring Kitty Kaki. Endless Surf is the primary survival run, with the original 78-second Score Attack preserved as a separate mode. It runs at a fixed 384 x 216 logical resolution with a 1/120-second simulation step and deploys unchanged to a static host.
 
 **[Play Kaki Surf on GitHub Pages](https://dknos.github.io/kaki-surf/)**
 
@@ -14,7 +14,7 @@ Open the hosted game, or serve this directory over HTTP:
 python -m http.server 8000
 ```
 
-Then visit `http://localhost:8000`, choose a board and condition, and select **Drop In**. No build or package installation is required.
+Then visit `http://localhost:8000`, choose a mode, board, and condition, and select the gold start button. No build or package installation is required.
 
 Simple Controls are the default:
 
@@ -45,6 +45,13 @@ Speed and Flow are separate:
 Simple Controls make Trick contextual: hold it inside Twilight's critical pocket to tuck into the tube, or use it around a launch to buffer an eligible aerial move. A large move that no longer fits falls back to a readable grab, and late descent begins helping the board toward the nearest valid landing tangent. Advanced Controls retain direct on-wave maneuvers, a dedicated held Tube Tuck/Soul Arch, and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
 
 Fresh profiles open on **Twilight Glass**, the finished travelling-break session, and receive a six-step in-play **Surf School**: drop, carve, launch, rotate, trick, and land. Each lesson advances only after the physical action succeeds, persists until learned, and can be armed again from Settings. Returning profiles keep their explicit board and condition choices.
+
+## Run modes
+
+- **Endless Surf** is the default. There is no hidden clock: the run ends after three wipeouts. Every 36 seconds of active riding advances a visible Set, increases curl pressure, and raises the scoring stake through Set 7. Entry and wipeout recovery do not advance the set timer or distance.
+- **Score Attack** preserves the focused 78-second run and countdown audio. It uses the same surfing, wildlife, conditions, and scoring systems without Endless escalation.
+
+Each mode owns independent best score, Flow, distance, set, and survival-time records. Existing pre-mode saves migrate their previous score and Flow to Score Attack, while the additive v1 save schema, all-mode legacy best, settings, boards, tutorial state, and run count remain intact. Results show mode, active ride time, distance, highlights, and a compact breakdown; long trick names receive a full-width row instead of colliding with adjacent statistics.
 
 Twilight is staged as a long side-scrolling wave face. Its coherent curl and breaking edge travel left-to-right while the whitewater pours downward under its own pause-safe presentation clock; carving back across the face never mirrors either motion. The passed area opens back to the real twilight sky, the pocket remains briefly rideable before the barrel catches up, and large aerials smoothly pan upward for extra sky and landing room. Reduced Motion freezes the falling-water cycle and vertical camera shift without changing gameplay.
 
@@ -87,7 +94,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **171/171 tests**, and the syntax gate checks **30 JavaScript modules**. The canonical local-browser gallery contains **120 deterministic 1280 x 720 captures**, including six travelling-break stages plus dedicated rideable-tube and big-air-camera scenes; the lifecycle/audio/wave pass additionally covers pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. This checkpoint records local evidence and does not by itself claim that the GitHub Pages deployment has refreshed. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
+The native suite passes **174/174 tests**, and the syntax gate checks **30 JavaScript modules**. The canonical local-browser gallery contains **120 deterministic 1280 x 720 captures**, including six travelling-break stages plus dedicated rideable-tube and big-air-camera scenes; the lifecycle/audio/wave pass additionally covers both run-mode contracts, pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. This checkpoint records local evidence and does not by itself claim that the GitHub Pages deployment has refreshed. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
 
 ## Static deployment and integration
 

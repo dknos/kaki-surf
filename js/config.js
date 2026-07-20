@@ -5,6 +5,31 @@ export const MAX_FRAME_DELTA = 0.1;
 
 export const DEFAULT_WAVE_STYLE_ID = "classic";
 
+export const DEFAULT_RUN_MODE_ID = "endless";
+export const SCORE_ATTACK_DURATION = 78;
+
+export const RUN_MODES = Object.freeze({
+  endless: Object.freeze({
+    id: "endless",
+    name: "Endless Surf",
+    shortName: "ENDLESS",
+    tagline: "Three paws. The break keeps building.",
+    timed: false,
+    startLabel: "CHASE THE HORIZON",
+    startHint: "3 PAWS / NO CLOCK",
+  }),
+  scoreAttack: Object.freeze({
+    id: "scoreAttack",
+    name: "Score Attack",
+    shortName: "78 SEC",
+    tagline: "Bank the biggest score before the horn.",
+    timed: true,
+    duration: SCORE_ATTACK_DURATION,
+    startLabel: "START SCORE ATTACK",
+    startHint: "78 SECONDS",
+  }),
+});
+
 /**
  * Condition-owned wave profiles. GameplayWave is the canonical consumer of
  * `surface`, `power`, `threat`, and `pocket`; the renderer may consume the
@@ -164,7 +189,13 @@ export const WAVE_STYLES = Object.freeze({
 });
 
 export const TUNING = {
-  runDuration: 78,
+  runDuration: SCORE_ATTACK_DURATION,
+  endlessSetDuration: 36,
+  endlessMaxSet: 7,
+  endlessThreatStart: 0.82,
+  endlessThreatStep: 0.12,
+  endlessScoreStep: 0.08,
+  endlessDistanceScale: 0.25,
   entryGrace: 8,
   maxWipeouts: 3,
   speed: 76,

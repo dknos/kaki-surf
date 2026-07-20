@@ -1,9 +1,26 @@
-import { BOARDS, CONDITIONS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_FRAME_DELTA, TUNING } from "./config.js";
+import {
+  BOARDS,
+  CONDITIONS,
+  DEFAULT_RUN_MODE_ID,
+  FIXED_STEP,
+  LOGICAL_HEIGHT,
+  LOGICAL_WIDTH,
+  MAX_FRAME_DELTA,
+  RUN_MODES,
+  TUNING,
+} from "./config.js";
 import { SurfAudio } from "./audio.js";
 import { PoliteAnnouncer } from "./announcer.js";
 import { InputManager } from "./input.js";
 import { clamp } from "./math.js";
-import { loadSave, recordRun, resolveStorage, sanitizeSettings, writeSave } from "./persistence.js";
+import {
+  getRunRecord,
+  loadSave,
+  recordRun,
+  resolveStorage,
+  sanitizeSettings,
+  writeSave,
+} from "./persistence.js";
 import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
 import {
@@ -119,7 +136,11 @@ export class KakiSurfGame {
     this.host.innerHTML = gameMarkup();
     this.elements = collectElements(host);
     this.announcer = new PoliteAnnouncer(this.elements.liveRegion);
-    this.simulation = new SurfSimulation({ tuning: TUNING, controlMode: this.settings.controlMode });
+    this.simulation = new SurfSimulation({
+      tuning: TUNING,
+      controlMode: this.settings.controlMode,
+      mode: this.save.selectedMode,
+    });
     this.renderer = new KakiRenderer(this.elements.canvas, this.settings, visualAssets);
     this.ownsInput = !externalInput;
     this.input = externalInput ?? new InputManager({
@@ -130,9 +151,11 @@ export class KakiSurfGame {
     this.audio = externalAudio ?? new SurfAudio(this.settings);
     this.selectedBoard = BOARDS[this.save.selectedBoard] ? this.save.selectedBoard : "foamPuff";
     this.selectedCondition = CONDITIONS[this.save.selectedCondition] ? this.save.selectedCondition : "goldenCoast";
+    this.selectedMode = RUN_MODES[this.save.selectedMode] ? this.save.selectedMode : DEFAULT_RUN_MODE_ID;
     this.host.dataset.condition = this.selectedCondition;
     this.bindUI();
     this.buildBoardCards();
+    this.buildModeCards();
     this.buildConditionCards();
     this.buildDebugPanel();
     this.syncSettingsUI();
@@ -141,10 +164,11 @@ export class KakiSurfGame {
     this.audio.setLifecycle?.("menu");
   }
 
-  start({ immediate = false, board = null, condition = null } = {}) {
+  start({ immediate = false, board = null, condition = null, mode = null } = {}) {
     if (this.destroyed) throw new Error("Cannot start a destroyed Kaki Surf instance.");
     if (board && BOARDS[board]) this.selectBoard(board);
     if (condition && CONDITIONS[condition]) this.selectCondition(condition);
+    if (mode && RUN_MODES[mode]) this.selectMode(mode);
     if (!this.started) {
       this.started = true;
       this.lastFrame = performance.now();
@@ -165,12 +189,14 @@ export class KakiSurfGame {
     this.announcer.clear();
     this.save.selectedBoard = this.selectedBoard;
     this.save.selectedCondition = this.selectedCondition;
+    this.save.selectedMode = this.selectedMode;
     writeSave(this.save, this.storage);
     this.input.clear?.();
     this.audio.resetRun?.();
     this.simulation.reset({
       board: this.selectedBoard,
       condition: this.selectedCondition,
+      mode: this.selectedMode,
       assists: {
         steering: this.settings.steeringAssist,
         landing: this.settings.landingAssist,
@@ -193,7 +219,7 @@ export class KakiSurfGame {
     } catch (error) {
       console.warn("Kaki Surf audio could not be unlocked; play continues silently.", error);
     }
-    this.announce(`Ride started on ${BOARDS[this.selectedBoard].name} at ${CONDITIONS[this.selectedCondition].name}.`);
+    this.announce(`${RUN_MODES[this.selectedMode].name} started on ${BOARDS[this.selectedBoard].name} at ${CONDITIONS[this.selectedCondition].name}.`);
   }
 
   pause(reason = "manual") {
@@ -238,6 +264,7 @@ export class KakiSurfGame {
     this.simulation.reset({
       board: this.selectedBoard,
       condition: this.selectedCondition,
+      mode: this.selectedMode,
       controlMode: this.settings.controlMode,
     });
     this.accumulator = 0;
@@ -254,13 +281,17 @@ export class KakiSurfGame {
       lifecycle: this.state,
       state: this.simulation.player.state,
       elapsed: this.simulation.elapsed,
-      timeRemaining: this.simulation.timeRemaining,
+      activeTime: this.simulation.activeTime,
+      timeRemaining: Number.isFinite(this.simulation.timeRemaining) ? this.simulation.timeRemaining : null,
       score: Math.round(this.simulation.score.total),
       multiplier: this.simulation.currentMultiplier(),
       wipeouts: this.simulation.wipeouts,
       board: this.selectedBoard,
       condition: this.selectedCondition,
-      bestScore: this.save.bestScore,
+      mode: this.selectedMode,
+      set: this.simulation.endlessSet,
+      distance: Math.round(this.simulation.rideDistance),
+      bestScore: getRunRecord(this.save, this.selectedMode).bestScore,
       tutorial: this.simulation.tutorial?.snapshot?.() ?? null,
       assists: { ...this.simulation.assists },
       controlMode: this.simulation.controlMode,
@@ -379,7 +410,12 @@ export class KakiSurfGame {
     // Results owns a new focus context. Suppress held carving/repeat and action
     // edges until the controller returns to neutral.
     this.input.clear?.();
-    const enriched = { ...result, board: this.selectedBoard, condition: this.selectedCondition };
+    const enriched = {
+      ...result,
+      board: this.selectedBoard,
+      condition: this.selectedCondition,
+      mode: this.selectedMode,
+    };
     const isBest = recordRun(this.save, enriched);
     writeSave(this.save, this.storage);
     if (isBest) {
@@ -414,12 +450,17 @@ export class KakiSurfGame {
   renderResults(result, isBest) {
     const breakdown = result.breakdown;
     const highlights = result.highlights ?? {};
+    const mode = RUN_MODES[result.mode] ?? RUN_MODES[this.selectedMode];
+    const record = getRunRecord(this.save, mode.id);
     this.elements.resultRank.textContent = result.rank.grade;
     this.elements.resultTitle.textContent = result.rank.title;
     this.elements.resultScore.textContent = Math.round(result.score).toLocaleString();
-    this.elements.resultBest.textContent = isBest ? "NEW PERSONAL BEST" : `BEST ${this.save.bestScore.toLocaleString()}`;
+    this.elements.resultBest.textContent = isBest ? "NEW PERSONAL BEST" : `${mode.shortName} BEST ${record.bestScore.toLocaleString()}`;
     this.elements.resultFlow.textContent = `${result.flow}%`;
     const rows = [
+      ["Ride Time", formatDuration(result.duration)],
+      ["Distance", `${Math.round(result.distance ?? 0)} M`],
+      ...(!mode.timed ? [["Best Set", String(result.set ?? 1)]] : []),
       ["Ride", breakdown.ride],
       ["Speed", breakdown.speed],
       ["Pocket", breakdown.pocket],
@@ -428,7 +469,7 @@ export class KakiSurfGame {
       ["Air", breakdown.air],
       ["Style", breakdown.style],
       ["Landings", breakdown.landings],
-    ].map(([label, value]) => [label, Math.round(value).toLocaleString()]);
+    ].map(([label, value]) => [label, typeof value === "number" ? Math.round(value).toLocaleString() : value]);
     if (highlights.biggestAir > 0) rows.push(["Biggest Air", `${Math.round(highlights.biggestAir)} PX`]);
     if (highlights.bestTrick) rows.push(["Best Trick", String(highlights.bestTrick).toUpperCase()]);
     if (highlights.perfectLandings > 0) rows.push(["Perfect", String(highlights.perfectLandings)]);
@@ -442,9 +483,9 @@ export class KakiSurfGame {
       ]);
     }
     this.elements.breakdown.innerHTML = rows
-      .map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`)
+      .map(([label, value]) => `<div${["Best Trick", "Best Tube"].includes(label) ? " class=score-breakdown-wide" : ""}><span>${label}</span><strong>${value}</strong></div>`)
       .join("");
-    this.elements.resultCondition.textContent = CONDITIONS[this.selectedCondition].name;
+    this.elements.resultCondition.textContent = `${mode.name} / ${CONDITIONS[this.selectedCondition].name}`;
   }
 
   handleGamepadUi(ui) {
@@ -568,6 +609,18 @@ export class KakiSurfGame {
     });
   }
 
+  buildModeCards() {
+    this.elements.modeGrid.innerHTML = Object.values(RUN_MODES).map((mode) => `
+      <button class="mode-card${mode.id === this.selectedMode ? " is-selected" : ""}" type="button" data-mode="${mode.id}" aria-pressed="${mode.id === this.selectedMode}">
+        <span><strong>${mode.name}</strong><b>${mode.shortName}</b></span>
+        <small>${mode.tagline}</small>
+      </button>
+    `).join("");
+    this.elements.modeGrid.querySelectorAll("[data-mode]").forEach((button) => {
+      button.addEventListener("click", () => this.selectMode(button.dataset.mode), { signal: this.abort.signal });
+    });
+  }
+
   buildConditionCards() {
     this.elements.conditionGrid.innerHTML = Object.values(CONDITIONS).map((condition) => `
       <button class="condition-card condition-card--${condition.id}${condition.id === this.selectedCondition ? " is-selected" : ""}" type="button" data-condition="${condition.id}" aria-pressed="${condition.id === this.selectedCondition}">
@@ -591,6 +644,24 @@ export class KakiSurfGame {
       button.setAttribute("aria-pressed", String(selected));
     });
     this.elements.selectedBoardName.textContent = BOARDS[boardId].name;
+    writeSave(this.save, this.storage);
+  }
+
+  selectMode(modeId) {
+    if (!RUN_MODES[modeId]) return;
+    this.selectedMode = modeId;
+    this.save.selectedMode = modeId;
+    this.simulation.mode = RUN_MODES[modeId];
+    this.simulation.modeId = modeId;
+    this.elements.modeGrid.querySelectorAll("[data-mode]").forEach((button) => {
+      const selected = button.dataset.mode === modeId;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    const mode = RUN_MODES[modeId];
+    this.elements.startLabel.textContent = mode.startLabel;
+    this.elements.startHint.textContent = mode.startHint;
+    this.updateMenuStats();
     writeSave(this.save, this.storage);
   }
 
@@ -672,6 +743,7 @@ export class KakiSurfGame {
       if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     }
     this.selectBoard(this.selectedBoard);
+    this.selectMode(this.selectedMode);
     this.selectCondition(this.selectedCondition);
     this.syncTouchActionState();
     this.syncTutorialReplayUI();
@@ -700,7 +772,10 @@ export class KakiSurfGame {
   }
 
   updateMenuStats() {
-    this.elements.bestScore.textContent = this.save.bestScore.toLocaleString();
+    const mode = RUN_MODES[this.selectedMode];
+    const record = getRunRecord(this.save, this.selectedMode);
+    this.elements.bestLabel.textContent = `${mode.shortName} BEST`;
+    this.elements.bestScore.textContent = record.bestScore.toLocaleString();
     this.elements.runCount.textContent = String(this.save.totalRuns);
     this.elements.selectedBoardName.textContent = BOARDS[this.selectedBoard].name;
     this.elements.selectedConditionName.textContent = CONDITIONS[this.selectedCondition].shortName;
@@ -782,8 +857,10 @@ export class KakiSurfGame {
     if (["menu", "settingsSimple", "settingsAdvanced"].includes(scene)) {
       this.selectedBoard = "foamPuff";
       this.selectedCondition = "goldenCoast";
+      this.selectedMode = DEFAULT_RUN_MODE_ID;
       this.host.dataset.condition = this.selectedCondition;
       this.buildBoardCards();
+      this.buildModeCards();
       this.buildConditionCards();
       this.updateMenuStats();
       this.simulation.condition = CONDITIONS.goldenCoast;
@@ -802,11 +879,16 @@ export class KakiSurfGame {
 
     if (scene === "results") {
       this.selectedCondition = "goldenCoast";
+      this.selectedMode = "endless";
       this.host.dataset.condition = this.selectedCondition;
       this.state = "results";
       this.renderResults({
         score: 18420,
         flow: 94,
+        mode: "endless",
+        duration: 147,
+        distance: 3228,
+        set: 5,
         rank: { grade: "S", title: "LEGENDARY PLUSH" },
         breakdown: {
           ride: 1280,
@@ -837,11 +919,13 @@ export class KakiSurfGame {
     const boardId = Object.keys(BOARDS).find((id) => scene === id || scene.startsWith(`${id}-`))
       ?? (scene === "maxSpeed" || scene === "tailGrab" || scene === "hugeAir" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff");
     this.selectedCondition = conditionId;
+    this.selectedMode = "endless";
     this.host.dataset.condition = conditionId;
     this.selectedBoard = boardId;
     this.simulation.reset({
       board: boardId,
       condition: conditionId,
+      mode: this.selectedMode,
       assists: { steering: false, landing: false },
       controlMode: this.settings.controlMode,
       worldQa: qaWorldOverride(scene),
@@ -1337,7 +1421,11 @@ function collectElements(host) {
     pauseButton: host.querySelector("[data-action=pause-run]"),
     exitButton: host.querySelector("[data-action=exit]"),
     boardGrid: host.querySelector(".board-grid"),
+    modeGrid: host.querySelector(".mode-grid"),
     conditionGrid: host.querySelector(".condition-grid"),
+    startLabel: host.querySelector("[data-start=label]"),
+    startHint: host.querySelector("[data-start=hint]"),
+    bestLabel: host.querySelector("[data-stat=best-label]"),
     bestScore: host.querySelector("[data-stat=best]"),
     runCount: host.querySelector("[data-stat=runs]"),
     selectedBoardName: host.querySelector("[data-stat=board]"),
@@ -1383,17 +1471,21 @@ function gameMarkup() {
             <span class="title-wave" aria-hidden="true"></span>
           </div>
           <p class="mission-copy">Drop downhill for speed, carve back to the lip, and turn one huge air into the next.</p>
+          <div class="mode-select">
+            <p><b>MODE</b> Pick the kind of run.</p>
+            <div class="mode-grid" aria-label="Choose a game mode"></div>
+          </div>
+          <div class="start-row">
+            <button class="primary-button" type="button" data-action="start"><span data-start="label">CHASE THE HORIZON</span><small data-start="hint">3 PAWS / NO CLOCK</small></button>
+            <button class="secondary-button" type="button" data-action="settings">ACCESS + AUDIO</button>
+          </div>
           <div class="board-grid" aria-label="Choose a board"></div>
           <div class="condition-select">
             <p><b>SESSION</b> Choose the light. The wave stays fair.</p>
             <div class="condition-grid" aria-label="Choose a surf condition"></div>
           </div>
-          <div class="start-row">
-            <button class="primary-button" type="button" data-action="start"><span>DROP IN</span><small>SPACE / GAMEPAD A</small></button>
-            <button class="secondary-button" type="button" data-action="settings">ACCESS + AUDIO</button>
-          </div>
           <dl class="menu-stats">
-            <div><dt>BEST</dt><dd data-stat="best">0</dd></div>
+            <div><dt data-stat="best-label">ENDLESS BEST</dt><dd data-stat="best">0</dd></div>
             <div><dt>BOARD</dt><dd data-stat="board">FOAM PUFF</dd></div>
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
@@ -1678,6 +1770,13 @@ export function qaWorldOverride(scene) {
     };
   }
   return null;
+}
+
+function formatDuration(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(total / 60);
+  const remainder = String(total % 60).padStart(2, "0");
+  return `${minutes}:${remainder}`;
 }
 
 const EMPTY_META = Object.freeze({ restart: false, retry: false, pause: false, debug: false });

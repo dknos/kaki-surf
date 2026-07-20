@@ -48,4 +48,6 @@ A supplemental 320 × 700 pass covered menu, Settings, Simple touch, and Advance
 
 The 2026-07-20 hero-tube rerun captured 25 shell states to a temporary review directory and passed at 1280 x 720, 844 x 390, and 390 x 844. The crest clears the top HUD, Kaki/board remain centered inside the pocket, the bottom Tube panel clears Speed/Flow, the falling curtain stays readable, and neither the atlas edge nor the playfield clips. Because the active-scene override replaces the ordinary mobile fixture, this focused rerun validates composition only; the separate lifecycle matrix above remains the touch-control evidence.
 
+The Endless-mode rerun repeated all 25 lifecycle captures after adding the two-card mode selector. At 390 x 844, Endless/Score Attack and the gold start action appear before the optional board/condition stack; at 844 x 390 the full selector, start row, boards, sessions, and control legend remain visible together. The in-canvas SET panel stays inside the existing center HUD slot. Results retain two compact columns, while Best Trick and Best Tube use a full-width row so long values do not collide.
+
 The browser evidence above is local to the checked-out static build. Physical iOS/Android safe areas, browser chrome, multi-touch behavior, and post-deployment GitHub Pages caching remain outside this automated capture pass.

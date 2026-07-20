@@ -12,7 +12,7 @@ npm run check
 git diff --check
 ```
 
-The current native Node run passed **171 tests with 0 failures**. `npm run check` parsed **30 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
+The current native Node run passed **174 tests with 0 failures**. `npm run check` parsed **30 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
 
 The current suite covers:
 
@@ -37,6 +37,7 @@ The current suite covers:
 - Asset-manifest paths for all 17 generated atlas families, generated-atlas dimensions, four-second optional-image timeout/fallback behavior, deterministic wave-source hashing, local-only static imports, 384 x 216 backing Canvas, and no runtime remote generation dependency.
 - Capability-aware touch lifecycle gating, explicit 44 px Pause/top controls, unscaled 45 px short-landscape D-pad, a measured 24 px portrait gutter, accessible Settings name, and rotation-safe held-pointer neutralization.
 - Fixed-step equivalence, finite-state assertions, event capacity, presentation/audio cleanup on retry, semantically corrupt-save normalization, monotonic records, and seeded random-input soak behavior.
+- Endless no-clock completion on the third wipeout, 36-second active-time Set escalation through the capped final set, increasing threat/score stakes, preserved 78-second Score Attack completion, mode-safe reset/result payloads, independent mode records, and legacy pre-mode best migration to Score Attack.
 
 ## Browser QA status
 
@@ -44,9 +45,10 @@ The canonical local-browser matrix contains 120 completed deterministic captures
 
 - The gallery, capture script, and contact-sheet source contain the same **120 scene identifiers**.
 - The checked-in capture directory contains all **120 normalized 1280 x 720 renders**. `docs/images/qa-contact-sheet.png` is the complete 1200 x 10674 assembly and includes Gather, Pitch, Pour, Deep, Maximum, Collapse, Tube, and Air.
-- An exact-image hash scan found 117 unique bitmaps. Two intentional identity groups repeat: the Twilight base/board/traffic triple and the Stormbreak base/board pair. The Golden Coast base/board captures and the dedicated tube, big-air, cargo ship, fishing boat, and sailboat fixtures are distinct.
+- An exact-image hash scan found 118 unique bitmaps. The two repeated identity pairs are Golden Coast base/Foam Puff and Twilight base/traffic; staged Twilight frames, Stormbreak, tube, big-air, cargo ship, fishing boat, and sailboat fixtures remain distinct.
 - The current CDP play probe exercised menu, native Settings slider input, modal Space suppression, native dialog close, start, pause, resume, corrupt-save reload, and a 100-restart stress loop with a stable 436-node DOM. It completed with **0 console errors, 0 uncaught exceptions, and 0 failed runtime loads**; the checked-in SVG favicon also removes the previous optional 404.
 - A fresh four-scene CDP release scan loaded menu, active tube, big-air, and results states from the final local tree with **0 console errors, 0 uncaught exceptions, and 0 failed or HTTP-error runtime loads**.
+- Fresh Chromium interaction probes selected and started both modes. Score Attack exposed `START SCORE ATTACK`, `78 SECONDS`, a finite 78-second snapshot, and the `78 SEC BEST` record; Endless exposed `CHASE THE HORIZON`, `3 PAWS / NO CLOCK`, a null public timer, Set 1, and the `ENDLESS BEST` record. Both probes reported **0 page errors**.
 - The responsive rerun captured menu, active play, pause, results, and options at 1280 x 720, 1366 x 768, 1024 x 768, 390 x 844, and 844 x 390. A real emulated touch drag scrolled the 844 x 390 Settings dialog from 0 to its 383 px maximum while the dialog reported `touch-action: pan-y`.
 - A browser fault injection temporarily removed the dolphin atlas. Launch remained successful and the deterministic dolphin fallback stayed visibly readable; the production atlas was then restored and size-checked.
 - Live banner text remains simulation-positioned on flexible cloth. Breaker-aware occlusion hides ordinary mid-watercraft before they enter the curl/player zone while retaining deliberate wake-race craft ahead of it, and gameplay callouts queue instead of stacking.
@@ -55,6 +57,8 @@ The canonical local-browser matrix contains 120 completed deterministic captures
 - A real-input CDP run caught and held a Tube Tuck through 1.1 seconds/+151, 2.2 seconds/+322, and 3.2 seconds/+519 before the barrel closed. The 82.3-second browser session completed at 3,651 points with two wipeouts; a later second tube session began only after a genuine button release and repress, validating the re-arm path outside deterministic fixtures.
 - The dedicated Twilight air fixture confirms clamped upward camera framing with extra sky and a coherent horizon; the unit contract caps the target at 62 logical pixels and returns zero under Reduced Motion or outside airborne state.
 - A fresh-storage controller-only CDP run selected Moon Log, started Twilight, paused and resumed without leaking A/B into gameplay, opened Settings, changed Effects volume, closed with B, navigated Results, and retried with A. A second real mobile run verified 44 px Pause, visible touch clusters, and pause/neutralization while Action remained held through landscape-to-portrait rotation. The 25-scene responsive matrix plus supplemental 320 × 700 Simple/Advanced passes were captured to temporary review directories and visually inspected.
+- The refreshed 25-scene responsive pass verified that the mode selector and start action remain visible before board/condition customization at 390 x 844, the complete menu fits at 844 x 390, the Endless SET panel clears the top HUD, and full-width Best Trick/Best Tube rows do not overlap either results column.
+- A 36,000-step Endless soak simulated five wall-clock minutes with the wipeout limit raised only for the probe. It reached capped Set 7, 273 seconds of active ride time, 5,675 displayed metres, 23 recoveries, and 28,291 points in 268.2 ms of Node time; state remained finite, the run remained active, and reported heap use was 9.3 MB. This is a deterministic simulation throughput observation, not a claim about mobile rendering frame rate.
 
 The [QA matrix](./QA.md) records the reviewed coverage, and [Visual audit](./VISUAL-AUDIT.md) records the adjustments made from that review.
 

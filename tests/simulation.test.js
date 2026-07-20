@@ -39,6 +39,8 @@ function simulationSnapshot(simulation) {
   const player = simulation.player;
   return {
     elapsed: simulation.elapsed,
+    activeTime: simulation.activeTime,
+    rideDistance: simulation.rideDistance,
     timeRemaining: simulation.timeRemaining,
     complete: simulation.complete,
     wipeouts: simulation.wipeouts,
@@ -121,10 +123,10 @@ function runAccumulatorSchedule(renderHz, targetSteps = 960) {
   return { frames, snapshot: simulationSnapshot(simulation) };
 }
 
-function beginRiding(board, { controlMode = "simple", condition = CONDITIONS.goldenCoast } = {}) {
-  const simulation = new SurfSimulation({ seed: 0x4b414b49 });
+function beginRiding(board, { controlMode = "simple", condition = CONDITIONS.goldenCoast, mode = "endless" } = {}) {
+  const simulation = new SurfSimulation({ seed: 0x4b414b49, mode });
   simulation.tutorialEnabled = false;
-  simulation.reset({ board, controlMode, condition });
+  simulation.reset({ board, controlMode, condition, mode });
   simulation.begin();
   simulation.player.state = "riding";
   simulation.player.stateTime = 1;
@@ -999,10 +1001,12 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
   assert.equal(simulation.player.travelDirection, 1);
   assert.ok(respawnEvents.some((event) => event.type === "respawn"));
 
-  simulation.reset({ board: BOARDS.foamPuff, assists: { steering: true, landing: true } });
+  simulation.reset({ board: BOARDS.foamPuff, assists: { steering: true, landing: true }, mode: "scoreAttack" });
   assert.equal(simulation.started, false);
   assert.equal(simulation.complete, false);
   assert.equal(simulation.elapsed, 0);
+  assert.equal(simulation.activeTime, 0);
+  assert.equal(simulation.rideDistance, 0);
   assert.equal(simulation.timeRemaining, TUNING.runDuration);
   assert.equal(simulation.wipeouts, 0);
   assert.equal(simulation.score.total, 0);
@@ -1015,6 +1019,54 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
   simulation.begin();
   simulation.update(FIXED_STEP, { edgePressed: true });
   assert.ok(simulation.elapsed > 0, "the restarted run advances normally");
+});
+
+test("Endless Surf replaces the clock with deterministic escalating sets and capped stakes", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, { mode: "endless" });
+  assert.equal(simulation.modeId, "endless");
+  assert.equal(simulation.timeRemaining, Number.POSITIVE_INFINITY);
+  assert.equal(simulation.endlessSet, 1);
+  const openingThreat = simulation.endlessThreatScale;
+  const openingMultiplier = simulation.currentMultiplier();
+
+  simulation.activeTime = TUNING.endlessSetDuration - FIXED_STEP / 2;
+  simulation.update(FIXED_STEP, {});
+  const setEvents = collectEvents(simulation);
+  assert.equal(simulation.endlessSet, 2);
+  assert.ok(simulation.endlessThreatScale > openingThreat);
+  assert.ok(simulation.currentMultiplier() > openingMultiplier);
+  assert.equal(setEvents.filter((event) => event.type === "endlessSet").length, 1);
+  assert.ok(setEvents.some((event) => event.type === "callout" && event.payload.text === "SET 2"));
+  assert.equal(simulation.complete, false, "survival is not ended by a hidden timer");
+
+  simulation.activeTime = TUNING.endlessSetDuration * 100;
+  simulation.update(FIXED_STEP, {});
+  assert.equal(simulation.endlessSet, TUNING.endlessMaxSet);
+  assert.ok(simulation.currentMultiplier() <= 7.5);
+});
+
+test("Score Attack preserves the 78-second finish while Endless ends on the third wipeout", () => {
+  const attack = beginRiding(BOARDS.foamPuff, { mode: "scoreAttack" });
+  assert.equal(attack.timeRemaining, TUNING.runDuration);
+  attack.timeRemaining = FIXED_STEP / 2;
+  attack.update(FIXED_STEP, {});
+  assert.equal(attack.complete, true);
+  assert.ok(collectEvents(attack).some((event) => event.type === "complete" && event.payload.reason === "time"));
+
+  const endless = beginRiding(BOARDS.foamPuff, { mode: "endless" });
+  endless.elapsed = 1;
+  endless.activeTime = 1;
+  endless.wipeouts = TUNING.maxWipeouts - 1;
+  endless.triggerWipeout("FOAM SNACK!", "landing");
+  endless.player.stateTime = 1.08;
+  endless.update(FIXED_STEP, {});
+  const complete = collectEvents(endless).find((event) => event.type === "complete");
+  assert.equal(endless.complete, true);
+  assert.equal(complete.payload.reason, "wipeouts");
+  assert.equal(complete.payload.mode, "endless");
+  assert.ok(complete.payload.duration >= 1);
+  assert.ok(complete.payload.distance >= 0);
+  assert.equal(complete.payload.set, endless.endlessSet);
 });
 
 test("720-degree rotation is named from the actual accumulated rotation", () => {
@@ -1133,9 +1185,9 @@ test("long seeded randomized play remains finite, bounded, and restartable", () 
   const random = seededRandom(0x5eedcafe);
   const boardIds = Object.keys(BOARDS);
   let boardIndex = 0;
-  const simulation = new SurfSimulation({ seed: 0x5eedcafe });
+  const simulation = new SurfSimulation({ seed: 0x5eedcafe, mode: "scoreAttack" });
   simulation.tutorialEnabled = false;
-  simulation.reset({ board: BOARDS[boardIds[boardIndex]] });
+  simulation.reset({ board: BOARDS[boardIds[boardIndex]], mode: "scoreAttack" });
   simulation.begin();
   collectEvents(simulation);
 

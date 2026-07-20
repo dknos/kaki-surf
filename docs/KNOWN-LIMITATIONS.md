@@ -1,11 +1,11 @@
 # Known limitations
 
-The implementation includes Simple and Advanced controls, compositional aerials, bidirectional/switch surfing, a rideable tube, three boards and conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 120-state browser QA matrix, and a static-host adapter. The current release is a strong score-attack slice, but the broader commercial-arcade roadmap still has product work as well as physical-lab validation.
+The implementation includes complete Endless Surf and Score Attack loops, Simple and Advanced controls, compositional aerials, bidirectional/switch surfing, a rideable tube, three boards and conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 120-state browser QA matrix, and a static-host adapter. The broader commercial-arcade roadmap still has product work as well as physical-lab validation.
 
 ## Current limitations
 
 - **Physical input coverage:** browser-level automated tests cover both control modes, standard gamepad mappings, and independent touch pointers, but the release still needs representative physical-device passes across controllers, trigger layouts, rumble implementations, phones, tablets, multi-touch stacks, orientation changes, and safe-area insets.
-- **Mode and progression scope:** the 78-second score-attack loop, records, boards, conditions, tutorial, results, and instant retry are complete. Endless escalation, Big Air, Zen, daily seeds, challenges, unlock progression, achievements, and leaderboards have not yet been shipped.
+- **Mode and progression scope:** Endless Surf and the 78-second Score Attack now have complete mode selection, pacing, records, results, and instant retry. Big Air, Zen, daily seeds, challenges, unlock progression, achievements, and leaderboards have not yet been shipped.
 - **Wave coverage:** Twilight Glass owns the finished travelling-break presentation and is the fresh-player default. Golden Coast and Stormbreak still use the earlier classic profile; their distinct authored level waves remain future work.
 - **Twilight ambience scope:** ordinary boats, aircraft, and carrier traffic are deliberately suppressed in Twilight so they cannot appear in the sky opening or wave face. Adding richer wave-safe background life to this level remains future art-direction work.
 - **Fallback fidelity:** missing long-barrel back art or High Contrast falls through the coherent break, earlier full barrel, and connected procedural curl. Collision, a downward curtain, and the tube opening remain playable, but the fallback intentionally has less authored pixel detail than the selected Grok atlas.
@@ -17,7 +17,7 @@ The implementation includes Simple and Advanced controls, compositional aerials,
 
 ## Release follow-up
 
-1. Build Endless Surf pacing and escalation on the stable Twilight core, then add progression/challenges without fragmenting the movement simulation.
+1. Tune Endless set pacing from broader player data, then add progression/challenges without fragmenting the movement simulation.
 2. Author the next level-specific wave profile only after Twilight's travelling break remains visually and mechanically locked.
 3. Run and record a physical controller/mobile matrix in both modes, including simultaneous direction plus Action/Trick, conditional Special, and B's gameplay-versus-results context.
 4. Complete a screen-reader, keyboard-only, switch/voice, focus, and zoom audit; log concrete issues rather than assuming Canvas labels provide gameplay equivalence.

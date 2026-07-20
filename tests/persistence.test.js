@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { BOARDS, DEFAULT_SETTINGS, SAVE_KEY } from "../js/config.js";
-import { createDefaultSave, loadSave, recordRun, resolveStorage, writeSave } from "../js/persistence.js";
+import { createDefaultSave, getRunRecord, loadSave, recordRun, resolveStorage, writeSave } from "../js/persistence.js";
 
 test("fresh profiles keep the backward-compatible v1 shape and current defaults", () => {
   const save = createDefaultSave();
@@ -12,6 +12,15 @@ test("fresh profiles keep the backward-compatible v1 shape and current defaults"
   assert.deepEqual(save.unlockedBoards, Object.keys(BOARDS));
   assert.equal(save.selectedBoard, "foamPuff");
   assert.equal(save.selectedCondition, "twilightGlass", "fresh players see the MVP hero barrel first");
+  assert.equal(save.selectedMode, "endless");
+  assert.deepEqual(Object.keys(save.records), ["endless", "scoreAttack"]);
+  assert.deepEqual(getRunRecord(save, "endless"), {
+    bestScore: 0,
+    bestFlow: 0,
+    bestDistance: 0,
+    bestSet: 1,
+    longestRide: 0,
+  });
   assert.equal(save.settings.controlMode, "simple");
   assert.equal(save.settings.waveReadAssist, "full");
   assert.deepEqual(save.settings, DEFAULT_SETTINGS);
@@ -19,6 +28,8 @@ test("fresh profiles keep the backward-compatible v1 shape and current defaults"
   const anotherSave = createDefaultSave();
   assert.notStrictEqual(anotherSave.settings, save.settings, "settings must not be shared between profiles");
   assert.notStrictEqual(anotherSave.unlockedBoards, save.unlockedBoards, "board lists must be independently mutable");
+  assert.notStrictEqual(anotherSave.records, save.records, "mode records must not be shared between profiles");
+  assert.notStrictEqual(anotherSave.records.endless, save.records.endless, "nested mode records must be independently mutable");
 });
 
 test("legacy v1 payloads retain progress and settings while migrating missing controlMode to Advanced", () => {
@@ -47,6 +58,10 @@ test("legacy v1 payloads retain progress and settings while migrating missing co
   assert.equal(save.selectedBoard, legacy.selectedBoard);
   assert.deepEqual(save.unlockedBoards, legacy.unlockedBoards);
   assert.equal(save.selectedCondition, "goldenCoast");
+  assert.equal(save.selectedMode, "endless");
+  assert.equal(save.records.scoreAttack.bestScore, legacy.bestScore);
+  assert.equal(save.records.scoreAttack.bestFlow, legacy.bestFlow);
+  assert.equal(save.records.endless.bestScore, 0);
   assert.deepEqual(save.settings, {
     ...DEFAULT_SETTINGS,
     ...legacy.settings,
@@ -136,6 +151,10 @@ test("semantically corrupt v1 fields are normalized without discarding valid pro
     rank: "D",
     board: "foamPuff",
     condition: "goldenCoast",
+    mode: "scoreAttack",
+    distance: 0,
+    set: 1,
+    duration: 0,
     at: null,
   });
   assert.doesNotThrow(() => save.bestScore.toLocaleString());
@@ -165,9 +184,13 @@ test("recordRun only raises bests and records board and condition metadata", () 
       score: 751,
       flow: 40,
       rank: "A",
-      board: "moonLog",
-      condition: "stormbreak",
-      at: undefined,
+    board: "moonLog",
+    condition: "stormbreak",
+    mode: "endless",
+    distance: 0,
+    set: 1,
+    duration: 0,
+    at: undefined,
     },
   );
   assert.ok(Number.isFinite(Date.parse(save.lastRun.at)), "lastRun.at should be an ISO timestamp");
@@ -184,6 +207,50 @@ test("recordRun only raises bests and records board and condition metadata", () 
   assert.equal(save.bestFlow, 100, "flow can set its own independent best");
   assert.equal(save.totalRuns, 2);
   assert.equal(save.lastRun.condition, "twilightGlass", "missing run metadata uses the selected condition");
+});
+
+test("Endless and Score Attack keep independent score, distance, set, and survival records", () => {
+  const save = createDefaultSave();
+  const endlessBest = recordRun(save, {
+    score: 4200,
+    flow: 72,
+    rank: { grade: "A" },
+    board: "mangoFish",
+    condition: "twilightGlass",
+    mode: "endless",
+    distance: 2380,
+    set: 4,
+    duration: 131,
+  });
+  const attackBest = recordRun(save, {
+    score: 1900,
+    flow: 48,
+    rank: { grade: "B" },
+    board: "foamPuff",
+    condition: "goldenCoast",
+    mode: "scoreAttack",
+    distance: 1210,
+    set: 1,
+    duration: 78,
+  });
+
+  assert.equal(endlessBest, true);
+  assert.equal(attackBest, true, "a lower global score can still be a Score Attack best");
+  assert.deepEqual(getRunRecord(save, "endless"), {
+    bestScore: 4200,
+    bestFlow: 72,
+    bestDistance: 2380,
+    bestSet: 4,
+    longestRide: 131,
+  });
+  assert.deepEqual(getRunRecord(save, "scoreAttack"), {
+    bestScore: 1900,
+    bestFlow: 48,
+    bestDistance: 1210,
+    bestSet: 1,
+    longestRide: 78,
+  });
+  assert.equal(save.bestScore, 4200, "legacy global best remains the all-mode maximum");
 });
 
 test("writeSave writes once and only under kaki-surf-meta-v1", () => {

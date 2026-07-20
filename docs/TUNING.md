@@ -10,10 +10,15 @@ Shipping values live in `js/config.js` under `TUNING`, `WAVE_STYLES`, `BOARDS`, 
 | `FIXED_STEP` | 1/120 s | Simulation step |
 | `MAX_FRAME_DELTA` | 0.1 s | Largest accepted render-frame delta |
 | `runDuration` | 78 s | Timed score-attack ride |
+| `endlessSetDuration` | 36 s | Active riding time between Endless set escalations |
+| `endlessMaxSet` | 7 | Highest visible Endless set |
+| `endlessThreatStart` / `endlessThreatStep` | 0.82 / 0.12 | Opening curl-speed scale and per-set increase |
+| `endlessScoreStep` | 0.08 | Per-set multiplier stake added after Set 1 |
+| `endlessDistanceScale` | 0.25 | Logical wave travel converted to displayed metres |
 | `entryGrace` | 8 s | Early extra-grip easing period |
 | `maxWipeouts` | 3 | Paws available before the run ends |
 
-The game loop accumulates at most 14 fixed steps per frame. Render interpolation, camera motion, particles, and Web Audio do not calculate gameplay outcomes. Event-driven impact freeze may briefly pause fixed-step consumption, but it does not write simulation fields or change per-step physics.
+The game loop accumulates at most 14 fixed steps per frame. Render interpolation, camera motion, particles, and Web Audio do not calculate gameplay outcomes. Event-driven impact freeze may briefly pause fixed-step consumption, but it does not write simulation fields or change per-step physics. Endless set time and displayed distance accumulate only during active riding/air/landing states; entry and wipeout recovery are excluded. Score Attack decrements only during the same active states. The set stake multiplies the ordinary Flow/risk/board result and remains capped at x7.5.
 
 ## Riding and wave defaults
 

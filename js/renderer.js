@@ -749,7 +749,8 @@ export class KakiRenderer {
     const ctx = this.ctx;
     const p = this.palette;
     const score = String(Math.round(simulation.score.total)).padStart(6, "0");
-    const seconds = Math.ceil(simulation.timeRemaining);
+    const timed = simulation.mode?.timed !== false;
+    const seconds = timed ? Math.ceil(simulation.timeRemaining) : null;
     const multiplier = simulation.currentMultiplier();
     const player = simulation.player;
     const guide = player.speedPotential ?? waveGuideAt(simulation.wave, player, simulation.board);
@@ -763,7 +764,12 @@ export class KakiRenderer {
     this.drawSpeedMeter(player, speedCap);
 
     panel(ctx, 166, 5, 52, 19, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, `${seconds}`, 192, 9, { scale: 2, spacing: 1, align: "center", color: seconds <= 10 ? p.danger : p.sun, shadow: p.ink });
+    if (timed) {
+      drawPixelText(ctx, `${seconds}`, 192, 9, { scale: 2, spacing: 1, align: "center", color: seconds <= 10 ? p.danger : p.sun, shadow: p.ink });
+    } else {
+      drawPixelText(ctx, "SET", 174, 11, { color: p.foamShade, shadow: p.ink });
+      drawPixelText(ctx, `${simulation.endlessSet}`, 210, 9, { scale: 2, spacing: 1, align: "right", color: simulation.endlessSet >= simulation.tuning.endlessMaxSet ? p.danger : p.sun, shadow: p.ink });
+    }
 
     panel(ctx, 288, 5, 91, 19, p.deepInk, p.waterDeep);
     drawPixelText(ctx, "PAWS", 293, 9, { color: p.foamShade, shadow: p.ink });

@@ -1,4 +1,12 @@
-import { BOARDS, CONDITIONS, FIXED_STEP, SCORE, TUNING } from "./config.js";
+import {
+  BOARDS,
+  CONDITIONS,
+  DEFAULT_RUN_MODE_ID,
+  FIXED_STEP,
+  RUN_MODES,
+  SCORE,
+  TUNING,
+} from "./config.js";
 import { clamp, damp, shortestAngle, smoothstep, TAU } from "./math.js";
 import { ScoreSystem } from "./scoring.js";
 import { SurfSchool } from "./tutorial.js";
@@ -63,6 +71,7 @@ export class SurfSimulation {
     tuning = TUNING,
     controlMode = "simple",
     tutorialEnabled = false,
+    mode = DEFAULT_RUN_MODE_ID,
   } = {}) {
     this.seed = seed >>> 0;
     this.tuning = tuning;
@@ -84,6 +93,8 @@ export class SurfSimulation {
     this.assists = { steering: false, landing: false };
     this.board = BOARDS.foamPuff;
     this.condition = CONDITIONS.goldenCoast;
+    this.mode = resolveRunMode(mode);
+    this.modeId = this.mode.id;
     this.controlMode = normalizeControlMode(controlMode);
     this.worldTravel = 0;
     this.player = createPlayer();
@@ -93,7 +104,7 @@ export class SurfSimulation {
     this._worldPreviousPlayerY = 128;
     this._worldContext = createWorldStepContext();
     this.highlights = createRunHighlights();
-    this.reset({ tutorialEnabled });
+    this.reset({ tutorialEnabled, mode });
   }
 
   reset({
@@ -102,6 +113,7 @@ export class SurfSimulation {
     assists = this.assists,
     controlMode = this.controlMode,
     tutorialEnabled = this.tutorialEnabled,
+    mode = this.mode,
     seed = this.seed,
     worldQa = null,
   } = {}) {
@@ -112,6 +124,8 @@ export class SurfSimulation {
       : condition?.id && CONDITIONS[condition.id]
         ? CONDITIONS[condition.id]
         : CONDITIONS.goldenCoast;
+    this.mode = resolveRunMode(mode);
+    this.modeId = this.mode.id;
     this.controlMode = normalizeControlMode(controlMode);
     this.assists = {
       steering: Boolean(assists.steering),
@@ -128,7 +142,14 @@ export class SurfSimulation {
     this.tutorial.reset(this.tutorialEnabled);
     this.comboCueLevel = 1;
     this.elapsed = 0;
-    this.timeRemaining = this.tuning.runDuration;
+    this.activeTime = 0;
+    this.rideDistance = 0;
+    this.timeRemaining = this.mode.timed
+      ? Number(this.mode.duration ?? this.tuning.runDuration)
+      : Number.POSITIVE_INFINITY;
+    this.endlessSet = 1;
+    this.endlessThreatScale = this.mode.timed ? 1 : this.tuning.endlessThreatStart;
+    this.endlessScoreBonus = 1;
     this.wipeouts = 0;
     this.complete = false;
     this.started = false;
@@ -179,13 +200,18 @@ export class SurfSimulation {
     player.previousAirY = player.airY;
     player.stateTime += dt;
     this.elapsed += dt;
+    if (player.state !== "entry" && player.state !== "wipeout") {
+      this.activeTime += dt;
+      this.rideDistance += Math.max(0, player.speed) * dt * this.tuning.endlessDistanceScale;
+    }
+    this.updateEndlessEscalation();
     player.skillMomentum = clamp(
       player.skillMomentum - TUNING.skillMomentumDecay * dt,
       0,
       1,
     );
 
-    if (player.state !== "entry" && player.state !== "wipeout") {
+    if (this.mode.timed && player.state !== "entry" && player.state !== "wipeout") {
       this.timeRemaining = Math.max(0, this.timeRemaining - dt);
     }
 
@@ -200,7 +226,7 @@ export class SurfSimulation {
     this.wave.update(
       dt,
       waveSpeed,
-      this.tuning.curlSpeed,
+      this.tuning.curlSpeed * this.endlessThreatScale,
       waveSpeed * player.travelDirection,
       threatContext,
     );
@@ -237,9 +263,38 @@ export class SurfSimulation {
     player.flow = this.score.flow;
     this.updateTutorialSignals(dt, input);
 
-    if (!this.complete && this.timeRemaining <= 0 && player.state !== "airborne") {
+    if (!this.complete && this.mode.timed && this.timeRemaining <= 0 && player.state !== "airborne") {
       this.finishRun("time");
     }
+  }
+
+  updateEndlessEscalation() {
+    if (this.mode.timed) return;
+    const duration = Math.max(1, Number(this.tuning.endlessSetDuration) || 36);
+    const maxSet = Math.max(1, Math.floor(Number(this.tuning.endlessMaxSet) || 1));
+    const nextSet = Math.min(maxSet, Math.floor(this.activeTime / duration) + 1);
+    // Entry and wipeout already own strong full-screen feedback. Hold a new
+    // set until Kaki is active so its warning cannot be swallowed by recovery.
+    if (nextSet > this.endlessSet && ["entry", "wipeout"].includes(this.player.state)) return;
+    const changed = nextSet > this.endlessSet;
+    this.endlessSet = nextSet;
+    this.endlessThreatScale = this.tuning.endlessThreatStart
+      + (this.endlessSet - 1) * this.tuning.endlessThreatStep;
+    this.endlessScoreBonus = 1 + (this.endlessSet - 1) * this.tuning.endlessScoreStep;
+    if (!changed) return;
+    const finalSet = this.endlessSet >= maxSet;
+    this.emit("endlessSet", {
+      set: this.endlessSet,
+      threatScale: this.endlessThreatScale,
+      scoreBonus: this.endlessScoreBonus,
+      final: finalSet,
+    });
+    this.emit("callout", {
+      text: `SET ${this.endlessSet}`,
+      subtext: finalSet ? "MAXIMUM BREAK" : "CURL SPEED UP",
+      tone: finalSet ? "risk" : "flow",
+      channel: "set",
+    });
   }
 
   updateWorld(dt, previousWorldTravel) {
@@ -1899,7 +1954,7 @@ export class SurfSimulation {
     player.boardAngle -= player.wipeoutSpin * 0.55 * dt;
     if (player.stateTime < 1.08) return;
 
-    if (this.wipeouts >= this.tuning.maxWipeouts || this.timeRemaining <= 0) {
+    if (this.wipeouts >= this.tuning.maxWipeouts || (this.mode.timed && this.timeRemaining <= 0)) {
       this.finishRun(this.wipeouts >= this.tuning.maxWipeouts ? "wipeouts" : "time");
       return;
     }
@@ -1936,17 +1991,21 @@ export class SurfSimulation {
       score: Math.round(this.score.total),
       rank,
       flow: this.flowRating,
+      mode: this.modeId,
+      duration: Math.round(this.activeTime),
+      distance: Math.round(this.rideDistance),
+      set: this.endlessSet,
       breakdown: { ...this.score.breakdown },
       highlights: { ...this.highlights },
     });
   }
 
   currentMultiplier() {
-    return this.score.multiplier(
+    return Math.min(7.5, this.score.multiplier(
       this.wave.pocketRisk(this.player.x),
       this.board.style,
       this.assists.steering || this.assists.landing,
-    );
+    ) * this.endlessScoreBonus);
   }
 
   scoreScales() {
@@ -2443,6 +2502,11 @@ function nearestLandingAlignment(boardAngle, surfaceAngle, takeoffDirection = 1)
 
 function normalizeControlMode(mode) {
   return String(mode).toLowerCase() === "advanced" ? "advanced" : "simple";
+}
+
+function resolveRunMode(mode) {
+  const id = typeof mode === "string" ? mode : mode?.id;
+  return RUN_MODES[id] ?? RUN_MODES[DEFAULT_RUN_MODE_ID];
 }
 
 function finiteOr(value, fallback, min, max) {
