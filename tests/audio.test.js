@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { SurfAudio } from "../js/audio.js";
+import { SurfAudio, safeLevel } from "../js/audio.js";
 
 function createAudioProbe() {
   const audio = new SurfAudio();
@@ -169,3 +169,210 @@ test("effect bursts reuse one noise buffer instead of regenerating samples per e
   assert.equal(sourceCreations, 2);
   assert.equal(audio.noiseCursor, 2);
 });
+
+test("every continuous audio bus is silent before its noise source starts", () => {
+  const previousAudioContext = globalThis.AudioContext;
+  const timeline = [];
+  let gainIndex = 0;
+  const gainNames = ["master", "music", "effects", "wave", "board", "wind"];
+
+  const parameter = (name, initialValue = 1) => ({
+    value: initialValue,
+    setValueAtTime(value) {
+      this.value = value;
+      timeline.push({ type: "gainValue", name, value });
+    },
+    setTargetAtTime(value) {
+      // A real AudioParam starts a target curve from its current value. Keep
+      // that current value intact so the fake catches graph-start ordering.
+      timeline.push({ type: "gainTarget", name, value });
+    },
+  });
+  const node = (name) => ({
+    name,
+    connect(destination) {
+      this.destination = destination;
+      return destination;
+    },
+    disconnect() {},
+  });
+
+  class FakeAudioContext {
+    constructor() {
+      this.currentTime = 0;
+      this.sampleRate = 32;
+      this.state = "suspended";
+      this.destination = node("destination");
+    }
+
+    createGain() {
+      const name = gainNames[gainIndex++] ?? `transient-${gainIndex}`;
+      return { ...node(name), gain: parameter(name) };
+    }
+
+    createBiquadFilter() {
+      return {
+        ...node("filter"),
+        type: "lowpass",
+        Q: parameter("filter-q", 0),
+        frequency: parameter("filter-frequency", 0),
+      };
+    }
+
+    createDynamicsCompressor() {
+      return {
+        ...node("limiter"),
+        threshold: parameter("limiter-threshold", 0),
+        knee: parameter("limiter-knee", 0),
+        ratio: parameter("limiter-ratio", 0),
+        attack: parameter("limiter-attack", 0),
+        release: parameter("limiter-release", 0),
+      };
+    }
+
+    createBuffer(_channels, length, sampleRate) {
+      return {
+        duration: length / sampleRate,
+        getChannelData: () => new Float32Array(length),
+      };
+    }
+
+    createBufferSource() {
+      return {
+        ...node("continuous-source"),
+        start() {
+          timeline.push({
+            type: "sourceStart",
+            destination: this.destination.name,
+            gain: this.destination.gain.value,
+          });
+        },
+        stop() {},
+      };
+    }
+  }
+
+  globalThis.AudioContext = FakeAudioContext;
+  try {
+    const audio = new SurfAudio();
+    audio.createGraph();
+
+    const starts = timeline.filter((entry) => entry.type === "sourceStart");
+    assert.deepEqual(
+      starts,
+      [
+        { type: "sourceStart", destination: "wave", gain: 0 },
+        { type: "sourceStart", destination: "board", gain: 0 },
+        { type: "sourceStart", destination: "wind", gain: 0 },
+      ],
+    );
+
+    const firstStart = timeline.findIndex((entry) => entry.type === "sourceStart");
+    for (const name of gainNames) {
+      const zeroed = timeline.findIndex((entry) => (
+        entry.type === "gainValue" && entry.name === name && entry.value === 0
+      ));
+      assert.ok(zeroed >= 0 && zeroed < firstStart, `${name} bus must be zeroed before continuous audio starts`);
+    }
+  } finally {
+    if (previousAudioContext === undefined) delete globalThis.AudioContext;
+    else globalThis.AudioContext = previousAudioContext;
+  }
+});
+
+test("a long pause rebases the music transport instead of catching up missed beats", () => {
+  const audio = createReactiveAudioProbe();
+  const scheduled = [];
+  audio.scheduleBeat = (time) => scheduled.push(time);
+  audio.nextBeat = 1;
+  audio.context.currentTime = 611;
+
+  audio.update(createAudioSimulation("riding"));
+
+  assert.ok(scheduled.length <= 2, `expected at most two current beats, saw ${scheduled.length}`);
+  assert.ok(scheduled.every((time) => time >= 611), "no beat may be scheduled in the paused interval");
+  assert.ok(audio.nextBeat > 611);
+});
+
+test("lifecycle transitions fade physical layers and resume from a fresh music clock", () => {
+  const audio = createReactiveAudioProbe();
+  audio.context.currentTime = 20;
+  audio.setLifecycle("paused");
+  assert.equal(audio.lifecycle, "paused");
+  assert.equal(audio.boardGain.gain.value, 0);
+  assert.equal(audio.windGain.gain.value, 0);
+
+  audio.context.currentTime = 620;
+  audio.setLifecycle("running");
+  assert.equal(audio.nextBeat, 620.06);
+
+  audio.update(createAudioSimulation("riding"));
+  const ridingBoard = audio.boardGain.gain.value;
+  const ridingWind = audio.windGain.gain.value;
+  assert.ok(ridingBoard > ridingWind, "surface contact leads the riding mix");
+
+  audio.context.currentTime += 0.016;
+  audio.update(createAudioSimulation("airborne"));
+  assert.equal(audio.boardGain.gain.value, 0);
+  assert.ok(audio.windGain.gain.value > ridingWind, "airborne speed opens the wind layer");
+
+  let resumeCalls = 0;
+  audio.setLifecycle("paused");
+  audio.context.state = "suspended";
+  audio.context.resume = () => { resumeCalls += 1; return Promise.resolve(); };
+  audio.setLifecycle("running");
+  assert.equal(resumeCalls, 1, "a direct resume gesture revives a browser-suspended context");
+});
+
+test("audio levels remain finite and bounded when settings are corrupted", () => {
+  assert.equal(safeLevel(Number.NaN, 0.58), 0.58);
+  assert.equal(safeLevel("not-a-level", 0.78), 0.78);
+  assert.equal(safeLevel(12, 0.5), 1);
+  assert.equal(safeLevel(-4, 0.5), 0);
+
+  const audio = createReactiveAudioProbe();
+  audio.applySettings({ music: Number.NaN, effects: "broken", waveAudio: Infinity });
+  for (const bus of [audio.master, audio.musicGain, audio.effectsGain, audio.waveGain]) {
+    assert.ok(Number.isFinite(bus.gain.value));
+  }
+});
+
+function createReactiveAudioProbe() {
+  const audio = new SurfAudio({ music: 0.58, effects: 0.78, waveAudio: 0.52 });
+  const param = (value = 0) => ({
+    value,
+    setTargetAtTime(next) { this.value = next; },
+  });
+  const gain = () => ({ gain: param() });
+  audio.started = true;
+  audio.lifecycle = "running";
+  audio.context = { currentTime: 12, state: "running", resume: () => Promise.resolve() };
+  audio.master = gain();
+  audio.musicGain = gain();
+  audio.effectsGain = gain();
+  audio.waveGain = gain();
+  audio.boardGain = gain();
+  audio.windGain = gain();
+  audio.waveFilter = { frequency: param() };
+  audio.boardFilter = { frequency: param() };
+  audio.windFilter = { frequency: param() };
+  audio.tone = () => {};
+  audio.noiseTick = () => {};
+  return audio;
+}
+
+function createAudioSimulation(state) {
+  return {
+    player: {
+      state,
+      speed: 118,
+      x: 230,
+      faceVelocity: state === "riding" ? 0.9 : 0,
+      speedPotential: { risk: 0.62, potential: 0.78 },
+    },
+    wave: { pocketRisk: () => 0.62 },
+    score: { combo: 2.4 },
+    timeRemaining: 54,
+    condition: { id: "goldenCoast" },
+  };
+}

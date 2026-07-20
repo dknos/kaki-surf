@@ -73,6 +73,7 @@ test("catalog fixes bounded layer pools and only exposes the final three powerup
   assert.deepEqual(Object.keys(POWERUP_CATALOG), ["mangoRush", "moonPop", "starFoam"]);
   for (const kind of ["sailboat", "speedboat", "fishingBoat", "tugboat", "cargoShip", "jetSki", "rescueCraft"]) {
     assert.equal(isBoatKind(kind), true, `${kind} is catalogued as a boat`);
+    assert.ok(["horizon", "waterBack"].includes(TRAFFIC_CATALOG[kind].renderBand), `${kind} stays behind the wave`);
   }
   for (const kind of ["propPlane", "seaplane", "helicopter", "bannerPlane"]) {
     assert.equal(TRAFFIC_CATALOG[kind].aircraft, true);
@@ -126,7 +127,8 @@ test("ordinary boats disappear behind the curl while race craft remain safely ah
   const simulation = { wave: { curlX: 72 }, player: { x: 232 } };
   assert.equal(watercraftClearsBreaker({ kind: "fishingBoat" }, 130, simulation), false);
   assert.equal(watercraftClearsBreaker({ kind: "fishingBoat" }, 300, simulation), true);
-  assert.equal(watercraftClearsBreaker({ kind: "speedboat", activity: "race" }, 204, simulation), true);
+  assert.equal(watercraftClearsBreaker({ kind: "speedboat", activity: "race" }, 330, simulation), true);
+  assert.equal(watercraftClearsBreaker({ kind: "speedboat", activity: "race" }, 204, simulation), false);
   assert.equal(watercraftClearsBreaker({ kind: "speedboat", activity: "race" }, 148, simulation), false);
 });
 
@@ -468,7 +470,14 @@ test("speedboat and jet-ski races have deterministic start/finish and no loss pe
     eventSeed: 9,
   });
   assert.ok(race);
-  assert.equal(winner.findTrafficEntity(race.trafficId).collidable, false);
+  const competitor = winner.findTrafficEntity(race.trafficId);
+  assert.equal(competitor.collidable, false);
+  assert.equal(competitor.renderBand, "waterBack");
+  assert.equal(competitor.y, WORLD_LAYER_CONFIG.mid.waterYRange[0]);
+  assert.equal(competitor.scale, 0.68);
+  const competitorX = projectWorldX(competitor.worldX, winner.context.cameraWorldX, WORLD_LAYER_CONFIG.mid.parallax);
+  assert.ok(competitorX >= 294, "race craft starts on the distant safe side of the playfield");
+  assert.ok(watercraftClearsBreaker(competitor, competitorX, { wave: { curlX: 40 }, player: { x: 192 } }));
   const winInteractions = [];
   let camera = 0;
   for (let step = 0; step < 180; step += 1) {

@@ -7,7 +7,7 @@ import {
   createWavePresentationClocks,
   drawLayeredWave,
   waveGuideAt,
-  waveVisualTravel,
+  waveSurfaceTravel,
 } from "./wave-visuals.js";
 import {
   drawActivePowerupHud,
@@ -54,6 +54,25 @@ export class KakiRenderer {
   applySettings(settings) {
     this.settings = { ...this.settings, ...settings };
     this.palette = this.settings.highContrast ? PALETTES.contrast : paletteForCondition(this.conditionId);
+  }
+
+  resetRunPresentation(simulation = null) {
+    for (const particle of this.particles) particle.life = 0;
+    this.activeCallout = createCallout();
+    this.calloutQueue.length = 0;
+    this.calloutSequence = 0;
+    this.particleCursor = 0;
+    this.calloutGap = 0;
+    this.cameraY = 0;
+    this.shake = 0;
+    this.impact = 0;
+    this.flash = 0;
+    this.freeze = 0;
+    this.sprayClock = 0;
+    this.pumpRelease = 0;
+    this.lastLandingQuality = "clean";
+    this.currentBoard = simulation?.board ?? null;
+    this.wavePresentationClocks = createWavePresentationClocks();
   }
 
   onEvent(event, simulation) {
@@ -286,7 +305,7 @@ export class KakiRenderer {
     this.drawBackWater(simulation);
     drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
     this.drawWave(simulation);
-    drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "watercraft");
+    drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "foreground");
     this.drawMaxSpeedFeedback(simulation);
     this.drawImpactCavity(simulation);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, false);
@@ -331,7 +350,7 @@ export class KakiRenderer {
     ctx.fillRect(0, 66, LOGICAL_WIDTH, 15);
 
     drawPixelSun(ctx, 318, 28, 16, p.sun, p.gold);
-    const visualTravel = waveVisualTravel(simulation.wave);
+    const visualTravel = waveSurfaceTravel(simulation.wave);
     const cloudShift = Math.floor((visualTravel * 0.018) % 440);
     drawCloud(ctx, 58 - cloudShift * 0.12, 29, p.white, p.haze);
     drawCloud(ctx, 212 - cloudShift * 0.06, 18, p.white, p.haze);
@@ -369,7 +388,7 @@ export class KakiRenderer {
       const y = 8 + (index * 19) % 43;
       ctx.fillRect(x, y, index % 4 === 0 ? 2 : 1, 1);
     }
-    const shift = Math.floor(waveVisualTravel(simulation.wave) * 0.025) % 460;
+    const shift = Math.floor(waveSurfaceTravel(simulation.wave) * 0.025) % 460;
     ctx.fillStyle = p.distant;
     drawSteppedHill(ctx, -48 - shift * 0.025, 72, 178, 10);
     drawSteppedHill(ctx, 226 - shift * 0.018, 70, 190, 12);
@@ -388,7 +407,7 @@ export class KakiRenderer {
     ctx.fillRect(0, 27, LOGICAL_WIDTH, 38);
     ctx.fillStyle = p.distant;
     ctx.fillRect(0, 65, LOGICAL_WIDTH, 15);
-    const shift = Math.floor((waveVisualTravel(simulation.wave) * 0.02 + (this.settings.reducedMotion ? 0 : this.time * 5)) % 430);
+    const shift = Math.floor((waveSurfaceTravel(simulation.wave) * 0.02 + (this.settings.reducedMotion ? 0 : this.time * 5)) % 430);
     drawStormCloud(ctx, 24 - shift * 0.08, 16, p.deepInk, p.distant);
     drawStormCloud(ctx, 178 - shift * 0.04, 7, p.ink, p.distant);
     drawStormCloud(ctx, 342 - shift * 0.07, 22, p.deepInk, p.distant);
@@ -458,40 +477,35 @@ export class KakiRenderer {
       this.visualAssets,
       this.wavePresentationClocks,
       (window) => {
-        // Repaint the authored sky/horizon through the shallow trailing
-        // breaker cutout so an advancing curl leaves the real coast behind.
+        // Repaint a sky-only crop through the trailing opening. The foreground
+        // wave is intentionally a tall arcade wall, so revealing sky (rather
+        // than another water slab) makes its left-to-right passage unmistakable.
         this.ctx.save();
         this.ctx.translate(0, -Math.round(this.cameraY));
-        this.drawSky(simulation);
-        this.drawTrailingSkyExtension(window);
+        this.drawPassedSkyBackdrop(simulation, window);
         this.ctx.restore();
       },
     );
   }
 
-  drawTrailingSkyExtension(window) {
+  drawPassedSkyBackdrop(simulation, window) {
     const ctx = this.ctx;
-    const colors = trailingSkyColors(this.conditionId, this.palette, this.settings.highContrast);
-    const top = Math.round(window?.horizon ?? 80);
-    const bottom = Math.round(window?.bottom ?? top);
-    if (bottom <= top) return;
-    ctx.fillStyle = colors.base;
-    ctx.fillRect(0, top, LOGICAL_WIDTH, bottom - top + 1);
+    const bottom = Math.round(window?.bottom ?? 104);
+    const p = this.palette;
+    this.drawSky(simulation);
+    if (bottom <= 80) return;
 
-    // Small cloud clusters continue the authored sky without creating another
-    // set of horizontal water bars or a single flat triangular color slab.
-    ctx.save();
-    ctx.globalAlpha = this.settings.highContrast ? 0.82 : 0.62;
-    const count = Math.max(3, Math.ceil((Number(window?.right) || 0) / 28));
-    for (let index = 0; index < count; index += 1) {
-      const x = 7 + index * 29 + (index % 2) * 5;
-      const y = top + 5 + (index * 7) % Math.max(8, bottom - top - 5);
-      ctx.fillStyle = index % 3 === 0 ? colors.light : colors.shadow;
-      ctx.fillRect(x, y, 4, 3);
-      ctx.fillRect(x + 3, y - 2, 5, 5);
-      ctx.fillRect(x + 8, y + 1, 3, 3);
+    // The authored sky strip ends at the horizon. A very shallow haze apron
+    // continues it under the curling lip without becoming the old sand-colored
+    // slab or adding another set of moving water lines.
+    ctx.fillStyle = p.haze;
+    ctx.fillRect(0, 80, LOGICAL_WIDTH, bottom - 79);
+    ctx.fillStyle = p.sky;
+    for (let index = 0; index < 10; index += 1) {
+      const x = 8 + index * 29;
+      const y = 83 + (index * 7) % Math.max(4, bottom - 84);
+      ctx.fillRect(x, y, 2 + index % 3, 2);
     }
-    ctx.restore();
   }
 
   drawMaxSpeedFeedback(simulation) {
@@ -1236,19 +1250,6 @@ function paletteForCondition(conditionId) {
   if (conditionId === "twilightGlass") return PALETTES.twilightGlass ?? PALETTES.standard;
   if (conditionId === "stormbreak") return PALETTES.stormbreak ?? PALETTES.standard;
   return PALETTES.standard;
-}
-
-function trailingSkyColors(conditionId, palette, highContrast) {
-  if (highContrast) {
-    return { base: palette.sky, light: palette.haze, shadow: palette.distant };
-  }
-  if (conditionId === "twilightGlass") {
-    return { base: "#5a4598", light: "#8b5088", shadow: "#3c4a98" };
-  }
-  if (conditionId === "stormbreak") {
-    return { base: "#294858", light: "#466a79", shadow: "#203947" };
-  }
-  return { base: "#e8d48d", light: "#ffe69a", shadow: "#c8ca91" };
 }
 
 function rideSpeedCapFor(simulation) {

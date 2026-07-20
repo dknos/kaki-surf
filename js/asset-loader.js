@@ -8,6 +8,7 @@ const CONDITION_IDS = Object.freeze([
 
 const BACKGROUND_WIDTH = 384;
 const BACKGROUND_HEIGHT = 80;
+const IMAGE_LOAD_TIMEOUT_MS = 4000;
 
 let visualAssetsPromise = null;
 
@@ -24,14 +25,12 @@ async function loadVisualAssets() {
   const requests = [];
   for (const conditionId of CONDITION_IDS) {
     requests.push(loadImage(conditionId, "backgrounds", `${conditionId}-strip.png`, true));
-    requests.push(loadImage(conditionId, "menus", `${conditionId}-menu.png`, false));
   }
   for (const [family, descriptor] of Object.entries(GENERATED_ASSET_MANIFEST)) {
     requests.push(loadGeneratedAtlas(family, descriptor));
   }
 
   const backgrounds = Object.create(null);
-  const menus = Object.create(null);
   const generated = Object.create(null);
   const missing = [];
   for (const result of await Promise.all(requests)) {
@@ -39,15 +38,16 @@ async function loadVisualAssets() {
       generated[result.family] = result.image;
       if (!result.image) missing.push(`generated:${result.family}`);
     } else {
-      const target = result.group === "backgrounds" ? backgrounds : menus;
-      target[result.conditionId] = result.image;
+      backgrounds[result.conditionId] = result.image;
       if (!result.image) missing.push(`${result.conditionId}:${result.group}`);
     }
   }
 
   return Object.freeze({
     backgrounds: Object.freeze(backgrounds),
-    menus: Object.freeze(menus),
+    // Menu art is CSS-owned; retain the empty field for host-adapter compatibility
+    // without downloading the same three files a second time through Image().
+    menus: Object.freeze(Object.create(null)),
     generated: Object.freeze(generated),
     generatedManifest: GENERATED_ASSET_MANIFEST,
     missing: Object.freeze(missing),
@@ -61,11 +61,7 @@ async function loadImage(conditionId, group, filename, validateBackground) {
   const url = new URL(`../assets/backgrounds/${filename}`, import.meta.url);
 
   try {
-    await new Promise((resolve, reject) => {
-      image.addEventListener("load", resolve, { once: true });
-      image.addEventListener("error", reject, { once: true });
-      image.src = url.href;
-    });
+    await waitForImageLoad(image, url.href);
     if (typeof image.decode === "function") {
       try {
         await image.decode();
@@ -88,11 +84,7 @@ async function loadGeneratedAtlas(family, descriptor) {
   image.decoding = "async";
   const url = new URL(`../assets/generated/${descriptor.filename}`, import.meta.url);
   try {
-    await new Promise((resolve, reject) => {
-      image.addEventListener("load", resolve, { once: true });
-      image.addEventListener("error", reject, { once: true });
-      image.src = url.href;
-    });
+    await waitForImageLoad(image, url.href);
     if (typeof image.decode === "function") {
       try {
         await image.decode();
@@ -106,4 +98,27 @@ async function loadGeneratedAtlas(family, descriptor) {
   } catch {
     return { family, group: "generated", image: null };
   }
+}
+
+export function waitForImageLoad(image, url, timeoutMs = IMAGE_LOAD_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      image.removeEventListener?.("load", onLoad);
+      image.removeEventListener?.("error", onError);
+      callback(value);
+    };
+    const onLoad = () => finish(resolve);
+    const onError = () => finish(reject, new Error(`Image failed to load: ${url}`));
+    const timeout = setTimeout(
+      () => finish(reject, new Error(`Image load timed out after ${timeoutMs}ms: ${url}`)),
+      Math.max(1, Number(timeoutMs) || IMAGE_LOAD_TIMEOUT_MS),
+    );
+    image.addEventListener("load", onLoad, { once: true });
+    image.addEventListener("error", onError, { once: true });
+    image.src = url;
+  });
 }

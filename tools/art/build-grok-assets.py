@@ -71,7 +71,7 @@ FAMILIES = (
         source_rows=4,
     ),
     Family(
-        source="wave-progression-source.png",
+        source="wave-progression-source-v2.png",
         output="wave-progression-atlas.png",
         columns=2,
         rows=2,
@@ -88,7 +88,7 @@ FAMILIES = (
         resample="nearest",
         sharpen=False,
         source_size=(1280, 720),
-        source_sha256="4f94dc3224049cf3f2e6cce60be8316a97875b2ba87d725e1452891a4d669173",
+        source_sha256="066da3c2e9466c319458502fdba299fd521371d42bf783a0784fcdb1f66f9070",
     ),
     Family(
         source="dolphin-source.png",

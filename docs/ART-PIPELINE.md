@@ -89,7 +89,7 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-Eleven modular source families were generated with the local Grok Imagine workflow, visually reviewed at source and atlas size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the other selected families are 1280 x 720. Corrected passes were selected for the wave-breaker, birds, and UI-ornament families, while superseded sources remain preserved for auditability.
+Twelve modular source families were generated with the local Grok Imagine workflow, visually reviewed at source and atlas size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage wave progression, birds, and UI ornaments, while superseded sources remain preserved for auditability.
 
 `tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The new 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts and tightly crops each cell, reduces with Lanczos, thresholds alpha, quantizes and sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges.
 
@@ -97,11 +97,12 @@ Eleven modular source families were generated with the local Grok Imagine workfl
 python3 tools/art/build-grok-assets.py
 ```
 
-Outputs are the 11 PNGs under `assets/generated`:
+Outputs are the 12 PNGs under `assets/generated`:
 
 | Family | Atlas dimensions |
 | --- | ---: |
 | Wave breaker | 288 x 128 |
+| Wave progression | 320 x 192 |
 | Dolphin | 224 x 80 |
 | Shark | 224 x 72 |
 | Whale | 352 x 108 |

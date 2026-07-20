@@ -20,9 +20,9 @@ The current code and assets are structured to address those points:
 
 - a deterministic four-stage Grok atlas gives the breaker distinct swell, pitch, open-curl, and collapse silhouettes; a broad code-authored fallback remains for High Contrast or asset failure;
 - continuous water mass remains code-owned and terminates on the simulation's `curlX + 13` contact, while generated stages decorate only the upper silhouette and a growing textured cutout repaints sky behind the breaker so it reads as passing rather than as a solid wall;
-- sparse curved swell contours and small face glints replace the previous dense horizontal-line texture; six accumulated presentation clocks can change rate but never reverse when the rider turns, while scenic parallax still follows signed `worldTravel`;
+- sparse curved swell contours and small face glints replace the previous dense horizontal-line texture; all six accumulated presentation clocks and fallback scenic parallax can change rate but never reverse when the rider turns;
 - rider, board, wake, air carry, wildlife, pickups, and parallax use signed travel direction;
-- far/mid/near boats, birds, aircraft, banners, wildlife, powerups, and a festival carrier fill the coast with bounded simulation state; watercraft use dedicated waterline bands, disappear before entering the curl/player zone, and preserve intended screen travel through camera reversals;
+- far/mid/near boats, birds, aircraft, banners, wildlife, powerups, and a festival carrier fill the coast with bounded simulation state; every catalogued hull renders in a horizon/water-back band behind the wave, race craft stay small and distant, and intended screen travel survives camera reversals;
 - Speed has physical tiers and redundant motion/audio cues, while Flow owns the style/combo presentation;
 - Simple controls reduce the primary surface to Action plus context Trick, with optional spin and conditional Special;
 - generated atlases use compact silhouettes and local fallbacks so presentation can degrade without hiding gameplay state;
@@ -32,7 +32,7 @@ The current code and assets are structured to address those points:
 
 All selected Grok source sheets and all 12 output atlases were inspected at actual size during authoring, including the 1024 x 1024 modular wave source and new 1280 x 720 staged-breaker source.
 
-- Wave v2 was accepted only after removing literal feather/hand motifs.
+- Wave v2 was accepted only after removing literal feather/hand motifs; the staged breaker received a second tapered pass after native-size review exposed the first pass's heavy base.
 - Bird v2 removed visible panel dividers.
 - UI v2 created adequate gutters and removed pseudo-writing.
 - Dolphin, shark, and whale silhouettes remain playful and readable rather than realistic or violent.
@@ -48,7 +48,7 @@ The post-integration set is complete: 112 deterministic 1280 x 720 Chromium capt
 
 The final review confirmed:
 
-- four curl positions read as one passing breaker with distinct growth/collapse phases, an open sky trail, collision-aligned contact, no rectangular panels, and restrained generated foam accents;
+- four curl positions read as one passing breaker with distinct growth/collapse phases, a shallow authored-sky trail painted after the curl, collision-aligned contact, no rectangular panels, near-native raster proportions, and restrained generated foam accents;
 - dolphin, shark, whale, boards, carrier, pickups, boats, birds, and aircraft retain readable silhouettes at 384 x 216;
 - left/right travel, reversal, switch landing, wake, monotonic water contours, stable traffic travel, and reverse-parallax scenes remain directionally coherent;
 - wildlife and pickup telegraphs stay readable in normal, High Contrast, and Reduced Motion scenes;
@@ -57,6 +57,6 @@ The final review confirmed:
 - Fleet Airshow remains horizon spectacle while its generated foam gates stay distinct from hazards;
 - a temporarily absent dolphin atlas produced a readable local fallback and no launch failure.
 
-The review also drove concrete iteration: bird/aircraft QA heights were corrected, three initially cramped live banner messages gained flexible outlined cloth, and a redundant Airshow capture was removed. The first follow-up pass removed wave-atlas rectangles, replaced the water barcode with sparse contours, and constrained boats to waterline bands. The latest polish pass added the staged breaker and trailing sky opening, accumulated nonnegative water clocks, event-led Flow integrity, readable callout priority, six-step Surf School, and lifecycle-safe mobile controls. Targeted desktop curl/reversal captures plus true 390 x 844 CDP emulation were inspected; the current browser play probe reported no console messages, uncaught exceptions, or failed runtime loads. The canonical broad gallery remains the 112-scene matrix described above.
+The review also drove concrete iteration: bird/aircraft QA heights were corrected, three initially cramped live banner messages gained flexible outlined cloth, and a redundant Airshow capture was removed. Follow-up passes removed wave-atlas rectangles, replaced the water barcode with sparse contours, constrained every hull to a behind-wave water band, moved race craft to the distant horizon, replaced the vertically stretched breaker with the tapered Grok pass, and made the post-curl sky composite final. Targeted desktop curl/reversal/boat captures plus true 390 x 844 CDP emulation were inspected; the current browser play probe reported no console messages, uncaught exceptions, or failed runtime loads. The canonical broad gallery remains the 112-scene matrix described above.
 
 See [QA matrix](./QA.md) for the scene coverage and [Validation results](./TEST-RESULTS.md) for automated and browser totals.

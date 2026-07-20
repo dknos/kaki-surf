@@ -119,16 +119,18 @@ export function waveGoldGlintOffset(presentationClock, index = 0) {
 export function breakerSkyWindow(wave) {
   const curl = clamp(Number(wave?.curlX ?? 0), 0, LOGICAL_WIDTH);
   const crest = clamp(Number(wave?.crestY?.(curl) ?? 78), 54, 112);
-  const right = clamp(curl - 24, 0, LOGICAL_WIDTH - 20);
+  const right = clamp(curl - 8, 0, LOGICAL_WIDTH - 20);
+  const bottom = clamp(crest + 18, 96, 110);
   return {
     right,
-    shoulder: Math.max(0, right - 34),
-    top: 54,
+    shoulder: Math.max(0, right - 44),
+    top: 0,
     horizon: 80,
-    fold: clamp(crest + 8, 84, 102),
-    // A bounded trailing pocket stays shallow enough to read as background,
-    // while the renderer extends the authored sky palette below its horizon.
-    bottom: 116,
+    fold: clamp(crest + 8, 84, bottom - 3),
+    // Keep the revealed sky above the distant-water band. Extending the mask
+    // deep into the face creates another solid triangle, while this shallow
+    // curved edge reads as open air behind a breaker that has already passed.
+    bottom,
   };
 }
 
@@ -171,9 +173,11 @@ export function drawLayeredWave(
   drawSwellContours(ctx, wave, palette, settings, speedRatio, momentum, presentationClocks?.swellContours ?? 0);
   drawFaceGlints(ctx, wave, palette, settings, speedRatio, momentum, presentationClocks?.faceGlints ?? 0);
   drawPowerSeam(ctx, wave, player, palette, settings, presentationClocks?.powerSeam ?? 0);
-  drawPassedSkyWindow(ctx, wave, repaintTrailingSky);
   drawCurlMass(ctx, simulation, palette, time, conditionId, settings, assets);
   drawCrestAndLip(ctx, wave, player, palette, conditionId, settings, speedRatio, momentum, presentationClocks?.crest ?? 0);
+  // The passed-wave opening is a final compositing cutout. Painting it before
+  // the breaker would let the opaque curl mass close the sky again.
+  drawPassedSkyWindow(ctx, wave, repaintTrailingSky);
   drawWaveReadAssist(ctx, wave, player, simulation.board, palette, settings, time);
 }
 
@@ -309,9 +313,10 @@ function drawCurlMass(ctx, simulation, p, time, conditionId, settings, assets) {
   );
   if (hasProgression && !settings.highContrast) {
     const baseAlpha = conditionId === "twilightGlass" ? 0.78 : conditionId === "stormbreak" ? 0.84 : 0.9;
-    const options = { scale: 1, scaleX: 0.92, scaleY: 1.46 };
+    const options = { scale: 1, scaleX: 0.94, scaleY: 0.96 };
     const impactStage = progression.to === "impact";
-    const overlayDepth = impactStage ? 60 : 91;
+    const overlayDepth = impactStage ? 72 : 92;
+    const overlayAnchorY = crest + overlayDepth;
     const fromAlpha = impactStage
       ? baseAlpha * (1 - progression.mix * 0.62)
       : baseAlpha * (1 - progression.mix);
@@ -335,11 +340,11 @@ function drawCurlMass(ctx, simulation, p, time, conditionId, settings, assets) {
     ctx.lineTo(-4, -4);
     ctx.closePath();
     ctx.clip();
-    drawAtlasFrame(ctx, assets, "waveProgression", progression.from, contactX + 1, LOGICAL_HEIGHT + 1, {
+    drawAtlasFrame(ctx, assets, "waveProgression", progression.from, contactX + 1, overlayAnchorY, {
       ...options,
       alpha: fromAlpha,
     });
-    drawAtlasFrame(ctx, assets, "waveProgression", progression.to, contactX + 1, LOGICAL_HEIGHT + 1, {
+    drawAtlasFrame(ctx, assets, "waveProgression", progression.to, contactX + 1, overlayAnchorY, {
       ...options,
       alpha: toAlpha,
     });

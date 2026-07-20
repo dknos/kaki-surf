@@ -2,7 +2,7 @@ import { BOARDS, CONDITIONS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_FRAM
 import { SurfAudio } from "./audio.js";
 import { InputManager } from "./input.js";
 import { clamp } from "./math.js";
-import { loadSave, recordRun, writeSave } from "./persistence.js";
+import { loadSave, recordRun, sanitizeSettings, writeSave } from "./persistence.js";
 import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
 
@@ -54,7 +54,12 @@ export class KakiSurfGame {
     this.initialQaScene = qaScene;
     this.qaFreeze = false;
     this.save = loadSave(storage);
-    if (hostSettings) this.save.settings = { ...this.save.settings, ...hostSettings };
+    if (hostSettings) {
+      this.save.settings = sanitizeSettings(
+        { ...this.save.settings, ...hostSettings },
+        { legacyControlMode: this.save.settings.controlMode },
+      );
+    }
     this.settings = this.save.settings;
     this.state = "menu";
     this.pausedFrom = null;
@@ -63,6 +68,7 @@ export class KakiSurfGame {
     this.frameHandle = 0;
     this.started = false;
     this.destroyed = false;
+    this.runSequence = 0;
     this.abort = new AbortController();
     this.host.innerHTML = gameMarkup();
     this.elements = collectElements(host);
@@ -85,6 +91,7 @@ export class KakiSurfGame {
     this.syncSettingsUI();
     this.updateMenuStats();
     this.showLayer("menu");
+    this.audio.setLifecycle?.("menu");
   }
 
   start({ immediate = false, board = null, condition = null } = {}) {
@@ -107,10 +114,12 @@ export class KakiSurfGame {
 
   async startRun() {
     if (this.destroyed) return;
+    const runSequence = ++this.runSequence;
     this.save.selectedBoard = this.selectedBoard;
     this.save.selectedCondition = this.selectedCondition;
     writeSave(this.save, this.storage);
     this.input.clear?.();
+    this.audio.resetRun?.();
     this.simulation.reset({
       board: this.selectedBoard,
       condition: this.selectedCondition,
@@ -121,6 +130,7 @@ export class KakiSurfGame {
       controlMode: this.settings.controlMode,
       tutorialEnabled: !this.save.tutorialSeen,
     });
+    this.renderer.resetRunPresentation?.(this.simulation);
     this.simulation.begin();
     this.accumulator = 0;
     this.state = "running";
@@ -128,7 +138,10 @@ export class KakiSurfGame {
     this.showLayer(null);
     this.elements.canvas.focus({ preventScroll: true });
     try {
+      this.audio.setLifecycle?.("running");
       await this.audio.unlock?.();
+      if (runSequence !== this.runSequence || this.state !== "running") return;
+      this.audio.onEvent?.("uiConfirm", this.simulation);
     } catch (error) {
       console.warn("Kaki Surf audio could not be unlocked; play continues silently.", error);
     }
@@ -140,7 +153,10 @@ export class KakiSurfGame {
     this.pausedFrom = reason;
     this.state = "paused";
     this.input.clear?.();
+    this.audio.onEvent?.("uiPause", this.simulation);
+    this.audio.setLifecycle?.("paused");
     this.showLayer("pause");
+    this.elements.resumeButton.focus({ preventScroll: true });
     this.announce("Surfing paused.");
   }
 
@@ -151,6 +167,7 @@ export class KakiSurfGame {
     this.lastFrame = performance.now();
     this.accumulator = 0;
     this.showLayer(null);
+    this.audio.setLifecycle?.("running");
     this.elements.canvas.focus({ preventScroll: true });
     this.announce("Surfing resumed.");
   }
@@ -161,6 +178,7 @@ export class KakiSurfGame {
   }
 
   backToMenu() {
+    this.runSequence += 1;
     this.input.clear?.();
     this.state = "menu";
     this.simulation.reset({
@@ -169,6 +187,9 @@ export class KakiSurfGame {
       controlMode: this.settings.controlMode,
     });
     this.accumulator = 0;
+    this.renderer.resetRunPresentation?.(this.simulation);
+    this.audio.onEvent?.("uiBack", this.simulation);
+    this.audio.setLifecycle?.("menu");
     this.updateMenuStats();
     this.showLayer("menu");
     this.elements.startButton.focus({ preventScroll: true });
@@ -199,7 +220,9 @@ export class KakiSurfGame {
     const frameDelta = clamp((now - this.lastFrame) / 1000, 0, MAX_FRAME_DELTA);
     this.lastFrame = now;
     this.input.update?.(frameDelta);
-    const meta = this.input.consumeMeta?.() ?? EMPTY_META;
+    const controlsBlocked = Boolean(this.elements.settingsDialog.open);
+    const bufferedMeta = this.input.consumeMeta?.() ?? EMPTY_META;
+    const meta = controlsBlocked ? EMPTY_META : bufferedMeta;
 
     if (meta.debug) this.toggleDebug();
     if (meta.pause) {
@@ -229,10 +252,10 @@ export class KakiSurfGame {
     } else if (this.state === "menu") {
       this.simulation.wave.update(frameDelta * 0.26, 24, 0);
       const controls = this.input.consumeStep?.() ?? EMPTY_CONTROLS;
-      if (controls.edgePressed) this.startRun();
+      if (!controlsBlocked && controls.edgePressed) this.startRun();
     } else if (this.state === "results") {
       const controls = this.input.consumeStep?.() ?? EMPTY_CONTROLS;
-      if (controls.edgePressed) this.restart();
+      if (!controlsBlocked && controls.edgePressed) this.restart();
     }
 
     this.renderer.update(frameDelta, this.simulation);
@@ -245,7 +268,7 @@ export class KakiSurfGame {
   processEvents() {
     this.simulation.consumeEvents((event) => {
       this.renderer.onEvent(event, this.simulation);
-      this.audio.onEvent?.(event, this.simulation);
+      if (event.type !== "complete") this.audio.onEvent?.(event, this.simulation);
       if (event.type === "callout") this.announce(event.payload.subtext ? `${event.payload.text}. ${event.payload.subtext}` : event.payload.text);
       if (event.type === "tutorialStep") {
         this.announce(`Surf School ${event.payload.index} of ${event.payload.total}. ${event.payload.text}. ${event.payload.hint}`);
@@ -269,13 +292,21 @@ export class KakiSurfGame {
 
   rumble(duration, weakMagnitude, strongMagnitude) {
     if (this.settings.reducedMotion) return;
-    navigator.vibrate?.(Math.min(45, duration));
-    const pad = Array.from(navigator.getGamepads?.() ?? []).find(Boolean);
-    pad?.vibrationActuator?.playEffect?.("dual-rumble", {
-      duration,
-      weakMagnitude,
-      strongMagnitude,
-    }).catch?.(() => {});
+    try {
+      navigator.vibrate?.(Math.min(45, duration));
+      const pads = Array.from(navigator.getGamepads?.() ?? []).filter(Boolean);
+      const pad = pads.find((candidate) =>
+        candidate.buttons?.some((button) => button?.pressed || button?.value > 0.5)
+        || candidate.axes?.some((axis) => Math.abs(Number(axis) || 0) > 0.18))
+        ?? pads[0];
+      pad?.vibrationActuator?.playEffect?.("dual-rumble", {
+        duration,
+        weakMagnitude,
+        strongMagnitude,
+      }).catch?.(() => {});
+    } catch {
+      // Vibration support is optional and must never interrupt the frame loop.
+    }
   }
 
   handleComplete(result) {
@@ -286,8 +317,9 @@ export class KakiSurfGame {
       const event = { type: "personalBest", payload: { score: result.score }, time: this.simulation.elapsed };
       this.renderer.onEvent(event, this.simulation);
       this.audio.onEvent?.(event, this.simulation);
-    }
+    } else this.audio.onEvent?.({ type: "complete", payload: result }, this.simulation);
     this.state = "results";
+    this.audio.setLifecycle?.("results");
     this.renderResults(enriched, isBest);
     this.showLayer("results");
     this.elements.retryButton.focus({ preventScroll: true });
@@ -352,6 +384,11 @@ export class KakiSurfGame {
     this.elements.settingsDialog.addEventListener("click", (event) => {
       if (event.target === this.elements.settingsDialog) this.closeSettings();
     }, { signal });
+    this.elements.settingsDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      this.closeSettings();
+    }, { signal });
+    this.elements.settingsDialog.addEventListener("close", () => this.finishSettingsClose(), { signal });
     this.elements.fullscreenButton.addEventListener("click", () => this.toggleFullscreen(), { signal });
     this.elements.exitButton.addEventListener("click", () => {
       if (this.onExit) this.onExit(this.getSnapshot());
@@ -511,12 +548,17 @@ export class KakiSurfGame {
 
   openSettings() {
     if (this.state === "running") this.pause("settings");
+    this.input.clear?.();
     this.elements.settingsDialog.showModal();
   }
 
   closeSettings() {
     if (!this.elements.settingsDialog.open) return;
     this.elements.settingsDialog.close();
+  }
+
+  finishSettingsClose() {
+    this.input.clear?.();
     if (this.state === "paused" && this.pausedFrom === "settings") this.resume();
   }
 
@@ -1021,6 +1063,7 @@ export class KakiSurfGame {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.runSequence += 1;
     cancelAnimationFrame(this.frameHandle);
     this.abort.abort();
     this.input.clear?.();
@@ -1160,6 +1203,7 @@ function gameMarkup() {
           <header><div><p class="eyebrow">MAKE IT YOUR WAVE</p><h2>SETTINGS</h2></div><button type="button" data-action="close-settings" aria-label="Close settings">×</button></header>
           <section aria-labelledby="audio-heading">
             <h3 id="audio-heading">AUDIO</h3>
+            <label class="toggle"><input type="checkbox" data-setting="muted"><span>MUTE ALL AUDIO</span></label>
             <label><span>MUSIC <output data-setting-output="music">58%</output></span><input type="range" min="0" max="1" step="0.01" data-setting="music" aria-label="Music volume"></label>
             <label><span>EFFECTS <output data-setting-output="effects">78%</output></span><input type="range" min="0" max="1" step="0.01" data-setting="effects" aria-label="Effects volume"></label>
             <label><span>WAVE <output data-setting-output="waveAudio">52%</output></span><input type="range" min="0" max="1" step="0.01" data-setting="waveAudio" aria-label="Wave volume"></label>
@@ -1241,8 +1285,9 @@ function qaWorldOverride(scene) {
         kind: scene === "speedboatRace" ? "speedboat" : "jetSki",
         phase: "racing",
         layer: "mid",
-        screenX: 204,
-        y: 92,
+        screenX: 330,
+        y: 82,
+        scale: scene === "speedboatRace" ? 0.68 : 0.62,
         direction: 1,
       },
     };

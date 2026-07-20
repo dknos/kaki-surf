@@ -171,7 +171,7 @@ test("presentation clocks never reverse across sharp speed, momentum, or directi
   const clocks = createWavePresentationClocks();
   const wave = { travel: 0, worldTravel: 0 };
   const player = { speed: 132, waveMomentum: 1, travelDirection: 1 };
-  const phaseKeys = ["backWater", "speedFeedback", "swellContours", "faceGlints", "powerSeam"];
+  const phaseKeys = ["backWater", "speedFeedback", "swellContours", "faceGlints", "powerSeam", "crest"];
   advanceWavePresentationClocks(clocks, wave, player, 138);
 
   const samples = [
@@ -222,7 +222,7 @@ test("the passing breaker reveals a growing sky window behind its contact edge",
   assert.ok(late.right < wave.curlX + 13, "the reveal stays behind the collision/contact edge");
   assert.ok(late.bottom > late.fold && late.fold > late.top, "the opening has a readable trailing slope");
   assert.equal(late.horizon, 80, "the authored horizon anchors the sky extension");
-  assert.ok(late.bottom <= 116, "the textured sky extension stays shallow");
+  assert.ok(late.bottom <= 110, "the textured sky extension stays shallow");
 });
 
 test("renderer guide reads the exact canonical power face", () => {
