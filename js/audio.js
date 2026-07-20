@@ -191,20 +191,26 @@ export class SurfAudio {
     const speed = Number(player.speed ?? 0);
     const combo = Number(simulation.score?.combo ?? simulation.currentMultiplier?.() ?? 1);
     const airborne = player.state === "airborne";
+    const tubeActive = Boolean(player.tubeRide?.active);
     const seconds = Math.ceil(simulation.timeRemaining ?? 99);
     const now = this.context.currentTime;
     this.conditionId = conditionIdFor(simulation, this.settings);
 
     const conditionFilter = this.conditionId === "stormbreak" ? 360 : this.conditionId === "twilightGlass" ? 180 : 0;
-    setParamTarget(this.waveFilter?.frequency, 560 + speed * 4.5 + risk * 1180 + potential * 310 + conditionFilter, now, 0.08);
-    const pocketGain = 0.05 + risk * 0.15 + potential * 0.045 + (airborne ? -0.025 : 0);
+    const openWaveFrequency = 560 + speed * 4.5 + risk * 1180 + potential * 310 + conditionFilter;
+    setParamTarget(this.waveFilter?.frequency, openWaveFrequency * (tubeActive ? 0.56 : 1), now, 0.08);
+    const pocketGain = 0.05 + risk * 0.15 + potential * 0.045
+      + (airborne ? -0.025 : 0)
+      + (tubeActive ? 0.055 : 0);
     setParamTarget(this.waveGain?.gain, safeLevel(this.settings.waveAudio, 0.52) * pocketGain, now, 0.07);
 
     const contact = ["riding", "lip", "landing", "wobble"].includes(player.state);
     const speedMix = clamp((speed - 28) / 118, 0, 1);
     const carveMix = clamp(Math.abs(Number(player.faceVelocity) || 0) / 1.4, 0, 1);
     const effectsLevel = safeLevel(this.settings.effects, 0.78);
-    const boardLevel = contact ? effectsLevel * (0.012 + speedMix * 0.045 + carveMix * 0.055) : 0;
+    const boardLevel = contact
+      ? effectsLevel * (0.012 + speedMix * 0.045 + carveMix * 0.055) * (tubeActive ? 0.58 : 1)
+      : 0;
     const windLevel = airborne ? effectsLevel * (0.018 + speedMix * 0.095) : effectsLevel * speedMix * 0.008;
     setParamTarget(this.boardGain?.gain, boardLevel, now, 0.045);
     setParamTarget(this.boardFilter?.frequency, 780 + speedMix * 1750 + carveMix * 920, now, 0.055);
@@ -323,6 +329,15 @@ export class SurfAudio {
       case "floater":
       case "tubeTuck":
         this.playManeuver(now, type);
+        break;
+      case "tubeExit":
+        if (payload.reason === "complete") break;
+        this.chirp(now, 196, 784, 0.16, 0.1);
+        this.noiseTick(now + 0.035, 0.025, 0.018);
+        break;
+      case "tubeFail":
+        this.noiseBurst(now, 0.18, 0.09, "lowpass", 760, 180);
+        this.tone(now, 146, 0.18, "triangle", 0.075, this.effectsGain, 62);
         break;
       case "trickStarted":
       case "trickStart":
@@ -867,7 +882,7 @@ function normalizeCueId(id) {
   if (value.includes("twist") || value.includes("signature")) return "kakiTwist";
   if (value.includes("cutback")) return "cutback";
   if (value.includes("floater")) return "floater";
-  if (value.includes("tube")) return "tubeTuck";
+  if (value.includes("tube") || value.includes("soularch")) return "tubeTuck";
   if (value.includes("snap")) return "snap";
   return "frontRail";
 }

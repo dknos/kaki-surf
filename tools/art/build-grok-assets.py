@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build compact, transparent runtime atlases from approved Grok source sheets.
+"""Build compact, transparent runtime atlases from approved generated source sheets.
 
-The source images remain in docs/art-source/grok. This script removes the
-chroma-magenta field, extracts equal-grid cells, normalizes each silhouette,
+The source images remain in docs/art-source/<generator>. This script removes
+the chroma-magenta field, extracts equal-grid cells, normalizes each silhouette,
 reduces the palette, and writes small local PNG atlases plus frame metadata.
 """
 
@@ -19,7 +19,7 @@ from PIL import Image, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_DIR = ROOT / "docs" / "art-source" / "grok"
+SOURCE_ROOT = ROOT / "docs" / "art-source"
 OUTPUT_DIR = ROOT / "assets" / "generated"
 
 
@@ -39,6 +39,7 @@ class Family:
     source_rows: int | None = None
     connected_chroma: bool = False
     edge_blend: bool = False
+    passing_left_blend: bool = False
     lower_continuation_blend: bool = False
     preserve_layout: bool = False
     source_inset: int = 0
@@ -46,9 +47,33 @@ class Family:
     sharpen: bool = True
     source_size: tuple[int, int] | None = None
     source_sha256: str | None = None
+    source_directory: str = "grok"
 
 
 FAMILIES = (
+    Family(
+        source="twilight-long-barrel-back-edit-v1.png",
+        output="twilight-long-barrel-back-atlas.png",
+        columns=1,
+        rows=1,
+        cell=(352, 198),
+        names=("longBarrelBack",),
+        # The empty pocket sits just ahead of the canonical falling edge. Kaki
+        # is rendered between this stable mass and the code-authored front rim.
+        # The source's lip tip lands on the live curtain tip at this anchor;
+        # Kaki then sits inside the negative-space pocket instead of ahead of it.
+        anchor=(0.48, 0.92),
+        colors=32,
+        padding=0,
+        connected_chroma=True,
+        edge_blend=True,
+        passing_left_blend=True,
+        preserve_layout=True,
+        resample="nearest",
+        sharpen=False,
+        source_size=(1280, 720),
+        source_sha256="269800eda215821d40c9bbf24eaf7fa77f47e3a2159e36b9221720892975e05b",
+    ),
     Family(
         source="twilight-hero-barrel-source.png",
         output="twilight-hero-barrel-atlas.png",
@@ -461,6 +486,36 @@ def blend_open_wave_edges(image: Image.Image) -> Image.Image:
     return rgba
 
 
+def blend_passing_wave_left_edge(image: Image.Image) -> Image.Image:
+    """Break up the trailing source boundary as the breaker passes on-screen.
+
+    The hero source intentionally continues through x=0. Once its anchor moves
+    right, an opaque first column would reveal a ruler-straight pasted seam.
+    Quantized, row-varying alpha steps dissolve that edge into runtime backwater
+    without introducing a soft full-height gradient or horizontal streaks.
+    """
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    pixels = list(rgba.get_flattened_data())
+    nominal_width = max(1.0, width * 0.125)
+    blended: list[tuple[int, int, int, int]] = []
+    for index, (red, green, blue, alpha) in enumerate(pixels):
+        x = index % width
+        y = index // width
+        row_step = (y // max(2, height // 72))
+        ragged = 0.76 + ((row_step * 7) % 11) / 40
+        fade_width = nominal_width * ragged
+        if x >= fade_width or alpha == 0:
+            blended.append((red, green, blue, alpha))
+            continue
+        progress = max(0.0, min(1.0, x / fade_width))
+        tooth = ((x // max(1, width // 320) + row_step * 3) % 5) * 0.035
+        stepped = round(max(0.0, min(1.0, progress - tooth)) * 4) / 4
+        blended.append((red, green, blue, round(alpha * stepped)))
+    rgba.putdata(blended)
+    return rgba
+
+
 def blend_lower_wave_continuation(image: Image.Image) -> Image.Image:
     """Feather only the lower/right face that must join procedural water.
 
@@ -539,6 +594,8 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
     keyed = remove_connected_chroma(source_cell) if family.connected_chroma else remove_chroma(source_cell)
     if family.edge_blend:
         keyed = blend_open_wave_edges(keyed)
+    if family.passing_left_blend:
+        keyed = blend_passing_wave_left_edge(keyed)
     if family.lower_continuation_blend:
         keyed = blend_lower_wave_continuation(keyed)
     if family.foam_only:
@@ -596,7 +653,7 @@ def extract_cell(source: Image.Image, family: Family, index: int) -> Image.Image
 
 
 def build_family(family: Family) -> dict[str, object]:
-    source_path = SOURCE_DIR / family.source
+    source_path = SOURCE_ROOT / family.source_directory / family.source
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
     source_digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
@@ -637,7 +694,7 @@ def build_family(family: Family) -> dict[str, object]:
         "width": atlas.width,
         "height": atlas.height,
         "frames": frames,
-        "source": f"docs/art-source/grok/{family.source}",
+        "source": f"docs/art-source/{family.source_directory}/{family.source}",
         "sourceSha256": source_digest,
     }
 

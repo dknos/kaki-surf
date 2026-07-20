@@ -187,7 +187,7 @@ export class ScoreSystem {
     const seconds = Math.max(0, Number(dt) || 0);
     const awarded = this.add(
       "style",
-      seconds * 58 * (1 + clamp(Number(risk) || 0, 0, 1) * 0.55),
+      seconds * SCORE.tubeStylePerSecond * (1 + clamp(Number(risk) || 0, 0, 1) * 0.55),
       multiplier,
     );
     if (awarded > 0) this.addFlow(seconds * 0.025);

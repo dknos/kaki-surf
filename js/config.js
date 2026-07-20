@@ -191,6 +191,16 @@ export const TUNING = {
   curlReliefSpeedEnd: 126,
   curlRespawnRetreat: 42,
   curlRespawnSafeX: 90,
+  tubeEntryRisk: 0.58,
+  tubeHoldRisk: 0.5,
+  tubeEntryFaceMin: 0.16,
+  tubeEntryFaceMax: 0.76,
+  tubeHoldFaceMin: 0.12,
+  tubeHoldFaceMax: 0.82,
+  tubeExitGrace: 0.12,
+  tubeCleanExitTime: 0.45,
+  tubeSteeringScale: 0.46,
+  tubeSpeedPushScale: 0.08,
   pumpStrength: 18.5,
   pumpChargeRate: 1.55,
   pumpMinCharge: 0.28,
@@ -369,6 +379,7 @@ export const SCORE = {
   comboMax: 4.2,
   switchTakeoff: 80,
   switchLanding: 135,
+  tubeStylePerSecond: 58,
 };
 
 export const DEFAULT_SETTINGS = {

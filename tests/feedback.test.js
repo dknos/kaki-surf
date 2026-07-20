@@ -214,6 +214,54 @@ test("stale queued hints expire instead of replacing current action feedback lat
   assert.deepEqual(renderer.calloutQueue, []);
 });
 
+test("tube state callouts replace stale states after one readable beat", () => {
+  const canvas = {
+    getContext() {
+      return { imageSmoothingEnabled: false };
+    },
+  };
+  const renderer = new KakiRenderer(canvas, {
+    highContrast: false,
+    reducedMotion: true,
+    reducedFlash: true,
+    screenShake: 0,
+  });
+  renderer.pushCallout("TUBE OPEN", "HOLD T TO TUCK", "hint", { channel: "tube" });
+  renderer.time = 0.2;
+  renderer.activeCallout.life = renderer.activeCallout.duration - 0.2;
+  renderer.pushCallout("TUBE TUCK", "HOLD THE POCKET", "risk", { channel: "tube" });
+  renderer.time = 0.55;
+  renderer.pushCallout("CLEAN TUBE EXIT", "0.5S  +120", "perfect", { channel: "tube" });
+
+  assert.equal(renderer.activeCallout.text, "TUBE OPEN");
+  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["CLEAN TUBE EXIT"]);
+  renderer.activeCallout.life = 0;
+  renderer.calloutGap = 0;
+  renderer.activateNextCallout();
+  assert.equal(renderer.activeCallout.text, "CLEAN TUBE EXIT");
+});
+
+test("tube state callouts replace queued predecessors behind unrelated feedback", () => {
+  const canvas = {
+    getContext() {
+      return { imageSmoothingEnabled: false };
+    },
+  };
+  const renderer = new KakiRenderer(canvas, {
+    highContrast: false,
+    reducedMotion: true,
+    reducedFlash: true,
+    screenShake: 0,
+  });
+  renderer.pushCallout("PERFECT LANDING", "", "perfect");
+  renderer.pushCallout("TUBE OPEN", "HOLD T TO TUCK", "hint", { channel: "tube" });
+  renderer.pushCallout("TUBE TUCK", "HOLD THE POCKET", "risk", { channel: "tube" });
+  renderer.pushCallout("CLEAN TUBE EXIT", "0.5S  +120", "perfect", { channel: "tube" });
+
+  assert.equal(renderer.activeCallout.text, "PERFECT LANDING");
+  assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["CLEAN TUBE EXIT"]);
+});
+
 test("large aerials pan the world down to reveal sky and Reduced Motion stays fixed", () => {
   const highAir = {
     state: "airborne",

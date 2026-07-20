@@ -166,6 +166,13 @@ export class SurfSimulation {
 
     const player = this.player;
     const previousWorldTravel = this.worldTravel;
+    // Presentation tails are lifecycle state, not riding-only state. Aging
+    // them here prevents a tube veil from freezing in the air and reappearing
+    // after the next landing.
+    player.tubeRide.visualExit = Math.max(
+      0,
+      Number(player.tubeRide.visualExit ?? 0) - dt,
+    );
     player.previousX = player.x;
     player.previousFace = player.face;
     player.previousAirX = player.airX;
@@ -415,6 +422,7 @@ export class SurfSimulation {
 
   mountAnimal(kind) {
     const player = this.player;
+    if (player.tubeRide.active) this.endTubeRide("animal");
     if (player.state === "airborne") {
       player.x = player.airX;
       player.face = player.landingFace;
@@ -883,6 +891,7 @@ export class SurfSimulation {
     const mountAtLaunch = player.animalMount;
     const worldModifiers = this.world.getModifiers();
     const sourceManeuver = player.maneuver.id;
+    if (player.tubeRide.active) this.endTubeRide("launch");
     const baseSpeed = this.tuning.speed * this.board.acceleration;
     const hardMaxSpeed = Math.max(baseSpeed, this.tuning.maxSpeed * this.board.maxSpeed);
     const speedRange = Math.max(1, hardMaxSpeed - 34);
@@ -1470,58 +1479,177 @@ export class SurfSimulation {
     }
 
     const presses = this.consumeTrickPresses(input);
+    const tubeEligible = isTubeRideEligible(potential, player, this.tuning);
+    const tubeScale = this.updateTubeRide(dt, {
+      held: input.trick4,
+      pressed: presses.trick4,
+    }, potential);
+    if (tubeScale !== null) return tubeScale;
+    // A live barrel session owns the maneuver channel for the whole step.
+    // Ordinary lip tricks resume on the next step after a deliberate exit,
+    // never score underneath Tube Tuck or restart its pose in the same frame.
     if (presses.trick1) this.trySnap(potential);
     if (presses.trick2) this.tryCutback(potential);
     if (presses.trick3) this.tryFloater(potential);
-
-    const tubeEligible = isTubeRideEligible(potential, player);
-    if (input.trick4 && tubeEligible) {
-      return this.sustainTubeRide(dt, potential);
-    }
     if (presses.trick4 && !tubeEligible) {
       this.rejectManeuver("trick4", "tubeTuck", "FIND POCKET");
-    }
-    if ((!input.trick4 || !tubeEligible)
-      && (player.maneuver.id === "tubeTuck" || player.maneuver.id === "soulArch")) {
-      player.maneuver.id = "";
-      player.maneuver.progress = 0;
-      player.maneuverTime = 0;
     }
     return 1;
   }
 
   updateSimpleRidingManeuver(dt, input, potential) {
+    const tubeScale = this.updateTubeRide(dt, {
+      held: input.trick,
+      pressed: input.trickPressed,
+    }, potential);
+    if (tubeScale !== null) return tubeScale;
+    return 1;
+  }
+
+  updateTubeRide(dt, input, potential) {
     const player = this.player;
-    const tubeEligible = isTubeRideEligible(potential, player);
-    if (input.trick && tubeEligible) {
-      // In Simple Controls, TRICK is contextual. Holding it inside the pocket
-      // tucks Kaki into the tube instead of reserving that press for an aerial.
+    const tube = player.tubeRide;
+    if (!input.held) tube.releaseRequired = false;
+    const entryEligible = isTubeRideEligible(potential, player, this.tuning);
+    const holdEligible = isTubeRideEligible(potential, player, this.tuning, true);
+    const ready = entryEligible && !tube.active && !tube.releaseRequired;
+    player.tubeReady = ready;
+
+    if (ready && !tube.wasReady && !tube.hintShown && !input.held
+      && (!this.tutorialEnabled || this.tutorial.complete)) {
+      tube.hintShown = true;
+      this.emit("tubeReady", {
+        action: this.controlMode === "advanced" ? "T" : "TRICK",
+        risk: potential.risk,
+      });
+      this.emit("callout", {
+        text: "TUBE OPEN",
+        subtext: this.controlMode === "advanced" ? "HOLD T TO TUCK" : "HOLD TRICK TO TUCK",
+        tone: "hint",
+        channel: "tube",
+      });
+    }
+    tube.wasReady = ready;
+
+    if (input.held && !tube.active && entryEligible && !tube.releaseRequired) {
+      this.beginTubeRide(potential);
+      return this.sustainTubeRide(dt, potential);
+    }
+    if (input.held && tube.active) {
+      if (holdEligible) {
+        tube.exitGrace = finiteTuning(this.tuning.tubeExitGrace, TUNING.tubeExitGrace);
+        return this.sustainTubeRide(dt, potential);
+      }
+      tube.exitGrace = Math.max(0, tube.exitGrace - dt);
+      if (tube.exitGrace > 0) return finiteTuning(
+        this.tuning.tubeSteeringScale,
+        TUNING.tubeSteeringScale,
+      );
+      this.endTubeRide("pocket", { requireRelease: true });
+      return 1;
+    }
+    if (tube.active) {
+      this.endTubeRide("release");
+      return 1;
+    }
+    return null;
+  }
+
+  beginTubeRide(potential) {
+    const player = this.player;
+    const tube = player.tubeRide;
+    const id = this.board.id === "moonLog" ? "soulArch" : "tubeTuck";
+    tube.active = true;
+    tube.id = id;
+    tube.time = 0;
+    tube.score = 0;
+    tube.exitGrace = finiteTuning(this.tuning.tubeExitGrace, TUNING.tubeExitGrace);
+    tube.releaseRequired = false;
+    tube.visualExit = 0;
+    player.tubeReady = false;
+    this.highlights.tubeRides += 1;
+    if (this.controlMode === "simple") {
+      // Context Trick belongs to the tube once it starts; it must not be
+      // replayed as an aerial request when the same hold is released.
       const context = player.contextTrick;
       context.consumedId = context.requestId;
       context.pending = false;
       context.released = false;
       context.activeAction = "";
       context.syntheticHold = 0;
-      return this.sustainTubeRide(dt, potential);
     }
-    if ((!input.trick || !tubeEligible)
-      && (player.maneuver.id === "tubeTuck" || player.maneuver.id === "soulArch")) {
-      player.maneuver.id = "";
-      player.maneuver.progress = 0;
-      player.maneuverTime = 0;
-    }
-    return 1;
+    this.startManeuver(id, 0.8, potential);
+    this.emit("callout", {
+      text: id === "soulArch" ? "SOUL ARCH" : "TUBE TUCK",
+      subtext: "HOLD THE POCKET",
+      tone: "risk",
+      channel: "tube",
+    });
   }
 
   sustainTubeRide(dt, potential) {
     const player = this.player;
-    const id = this.board.id === "moonLog" ? "soulArch" : "tubeTuck";
+    const tube = player.tubeRide;
+    const id = tube.id || (this.board.id === "moonLog" ? "soulArch" : "tubeTuck");
+    if (!tube.active) this.beginTubeRide(potential);
     if (player.maneuver.id !== id) this.startManeuver(id, 0.8, potential);
     player.maneuverTime += dt;
     player.maneuver.progress = clamp(player.maneuverTime / 0.8, 0, 1);
-    this.score.updateTube(dt, potential.risk, this.currentMultiplier());
-    player.speed += this.tuning.wavePush * potential.acceleration * 0.08 * dt;
-    return 0.46;
+    const awarded = this.score.updateTube(dt, potential.risk, this.currentMultiplier());
+    tube.time += dt;
+    tube.score += awarded;
+    this.highlights.longestTube = Math.max(this.highlights.longestTube, tube.time);
+    if (tube.score > this.highlights.bestTubeScore) {
+      this.highlights.bestTubeScore = tube.score;
+      this.highlights.bestTubeDuration = tube.time;
+    }
+    player.speed += this.tuning.wavePush
+      * potential.acceleration
+      * finiteTuning(this.tuning.tubeSpeedPushScale, TUNING.tubeSpeedPushScale)
+      * dt;
+    return finiteTuning(this.tuning.tubeSteeringScale, TUNING.tubeSteeringScale);
+  }
+
+  endTubeRide(reason = "release", { failure = false, requireRelease = false, silent = false } = {}) {
+    const player = this.player;
+    const tube = player.tubeRide;
+    if (!tube.active) return null;
+    const payload = {
+      id: tube.id,
+      reason,
+      duration: tube.time,
+      score: tube.score,
+    };
+    tube.active = false;
+    tube.id = "";
+    tube.exitGrace = 0;
+    tube.wasReady = false;
+    tube.releaseRequired = Boolean(requireRelease);
+    tube.visualExit = failure || silent ? 0 : 0.18;
+    player.tubeReady = false;
+    if (isTubeManeuver(player.maneuver.id)) {
+      player.maneuver.id = "";
+      player.maneuver.progress = 0;
+      player.maneuverTime = 0;
+    }
+    if (failure) {
+      this.emit("tubeFail", payload);
+      return payload;
+    }
+    if (silent) return payload;
+    this.emit("tubeExit", payload);
+    if (payload.duration >= finiteTuning(
+      this.tuning.tubeCleanExitTime,
+      TUNING.tubeCleanExitTime,
+    )) {
+      this.emit("callout", {
+        text: "CLEAN TUBE EXIT",
+        subtext: `${payload.duration.toFixed(1)}S  +${Math.round(payload.score)}`,
+        tone: "perfect",
+        channel: "tube",
+      });
+    }
+    return payload;
   }
 
   consumeTrickPresses(input) {
@@ -1725,6 +1853,10 @@ export class SurfSimulation {
   triggerWipeout(text, cause) {
     if (this.player.state === "wipeout" || this.complete) return;
     const player = this.player;
+    const failedTube = player.tubeRide.active
+      ? this.endTubeRide(cause || "wipeout", { failure: true })
+      : null;
+    if (failedTube && cause === "curl") text = "TUBE CLOSED!";
     if (player.animalMount) this.world.cancelMountedAnimals(cause || "wipeout");
     player.animalMount = "";
     player.animalSpecialReady = false;
@@ -1793,6 +1925,7 @@ export class SurfSimulation {
   }
 
   finishRun(reason) {
+    if (this.player.tubeRide.active) this.endTubeRide("complete", { silent: true });
     this.complete = true;
     this.flowRating = Math.round(clamp(this.score.flowPeak, 0, 1) * 100);
     const rank = this.score.rank();
@@ -1888,6 +2021,10 @@ function createRunHighlights() {
     animalBonuses: 0,
     nearMisses: 0,
     powerups: 0,
+    tubeRides: 0,
+    longestTube: 0,
+    bestTubeScore: 0,
+    bestTubeDuration: 0,
   };
 }
 
@@ -1899,6 +2036,10 @@ function resetRunHighlights(highlights) {
   highlights.animalBonuses = 0;
   highlights.nearMisses = 0;
   highlights.powerups = 0;
+  highlights.tubeRides = 0;
+  highlights.longestTube = 0;
+  highlights.bestTubeScore = 0;
+  highlights.bestTubeDuration = 0;
 }
 
 function beginCarveArc(player, sign) {
@@ -1974,6 +2115,8 @@ function createPlayer() {
     lipMemory: 0,
     curlTimer: 0,
     pocketAnnounced: false,
+    tubeReady: false,
+    tubeRide: createTubeRide(),
     airX: 212,
     previousAirX: 212,
     airY: 118,
@@ -2063,6 +2206,8 @@ function resetPlayer(player, resetPosition = true, baseSpeed = TUNING.speed) {
   player.lipMemory = 0;
   player.curlTimer = 0;
   player.pocketAnnounced = false;
+  player.tubeReady = false;
+  resetTubeRide(player.tubeRide);
   player.airX = player.x;
   player.previousAirX = player.x;
   player.airY = 118;
@@ -2205,10 +2350,54 @@ function resetContextTrick(state) {
   state.syntheticHold = 0;
 }
 
-function isTubeRideEligible(potential, player) {
-  return (potential?.zone === "critical" || Number(potential?.risk ?? 0) >= 0.58)
-    && Number(player?.face ?? 0) >= 0.16
-    && Number(player?.face ?? 0) <= 0.76;
+function isTubeRideEligible(potential, player, tuning = TUNING, holding = false) {
+  const risk = Number(potential?.risk ?? 0);
+  const minimumRisk = finiteTuning(
+    holding ? tuning.tubeHoldRisk : tuning.tubeEntryRisk,
+    holding ? TUNING.tubeHoldRisk : TUNING.tubeEntryRisk,
+  );
+  const minimumFace = finiteTuning(
+    holding ? tuning.tubeHoldFaceMin : tuning.tubeEntryFaceMin,
+    holding ? TUNING.tubeHoldFaceMin : TUNING.tubeEntryFaceMin,
+  );
+  const maximumFace = finiteTuning(
+    holding ? tuning.tubeHoldFaceMax : tuning.tubeEntryFaceMax,
+    holding ? TUNING.tubeHoldFaceMax : TUNING.tubeEntryFaceMax,
+  );
+  return (potential?.zone === "critical" || risk >= minimumRisk)
+    && Number(player?.face ?? 0) >= minimumFace
+    && Number(player?.face ?? 0) <= maximumFace;
+}
+
+function isTubeManeuver(id) {
+  return id === "tubeTuck" || id === "soulArch";
+}
+
+function createTubeRide() {
+  return {
+    active: false,
+    id: "",
+    time: 0,
+    score: 0,
+    exitGrace: 0,
+    releaseRequired: false,
+    visualExit: 0,
+    hintShown: false,
+    wasReady: false,
+  };
+}
+
+function resetTubeRide(tube) {
+  if (!tube) return;
+  tube.active = false;
+  tube.id = "";
+  tube.time = 0;
+  tube.score = 0;
+  tube.exitGrace = 0;
+  tube.releaseRequired = false;
+  tube.visualExit = 0;
+  tube.hintShown = false;
+  tube.wasReady = false;
 }
 
 function simpleTapTrickFor(manifest) {

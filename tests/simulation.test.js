@@ -73,6 +73,7 @@ function simulationSnapshot(simulation) {
       carveArcExcursion: player.carveArcExcursion,
       lateralVelocity: player.lateralVelocity,
       travelVelocity: player.travelVelocity,
+      tubeRide: { ...player.tubeRide },
       travelDirection: player.travelDirection,
       directionIntent: player.directionIntent,
       directionCommit: player.directionCommit,
@@ -477,15 +478,187 @@ test("Simple TRICK holds a scored tube tuck inside Twilight's rideable pocket", 
   player.x = simulation.wave.contactX() + 112;
   player.previousX = player.x;
   simulation.update(FIXED_STEP, { trick: true });
-  assert.equal(player.maneuver.id, "", "leaving the pocket clears a held tuck pose");
+  assert.equal(player.maneuver.id, "tubeTuck", "brief pocket jitter keeps the tuck stable");
+  for (let step = 0; step < Math.ceil(TUNING.tubeExitGrace / FIXED_STEP) + 2; step += 1) {
+    simulation.update(FIXED_STEP, { trick: true });
+  }
+  assert.equal(player.maneuver.id, "", "sustained pocket loss clears the tuck after grace");
 
   player.x = simulation.wave.contactX() + 13;
   player.previousX = player.x;
   player.face = simulation.wave.powerFaceAt(player.x);
   simulation.update(FIXED_STEP, { trick: true });
-  assert.equal(player.maneuver.id, "tubeTuck");
+  assert.equal(player.maneuver.id, "", "a held input cannot silently create a second tube session");
+  simulation.update(FIXED_STEP, { trickReleased: true });
+  simulation.update(FIXED_STEP, { trick: true, trickPressed: true });
+  assert.equal(player.maneuver.id, "tubeTuck", "release and press explicitly re-arm Tube Tuck");
   simulation.update(FIXED_STEP, { trickReleased: true });
   assert.equal(player.maneuver.id, "");
+});
+
+test("Tube sessions expose one readable entry, persistent value, clean exit, and failure", () => {
+  const simulation = beginRiding(BOARDS.moonLog, {
+    controlMode: "advanced",
+    condition: CONDITIONS.twilightGlass,
+  });
+  const player = simulation.player;
+  simulation.wave.curlX = 100;
+  simulation.wave.pressure = 0.84;
+  simulation.wave.time = TUNING.curlGrace + 0.4;
+  player.x = simulation.wave.contactX() + 13;
+  player.previousX = player.x;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  player.previousFace = player.face;
+  collectEvents(simulation);
+
+  for (let step = 0; step < 72; step += 1) {
+    simulation.update(FIXED_STEP, {
+      trick4: true,
+      trick4Pressed: step === 0,
+    });
+  }
+  const holdEvents = collectEvents(simulation);
+  assert.equal(player.tubeRide.active, true);
+  assert.equal(player.tubeRide.id, "soulArch");
+  assert.equal(player.maneuver.id, "soulArch");
+  assert.ok(player.tubeRide.time >= 0.59 && player.tubeRide.time <= 0.61);
+  assert.ok(player.tubeRide.score > 0);
+  assert.equal(holdEvents.filter((event) => event.type === "maneuver").length, 1);
+  assert.equal(simulation.highlights.tubeRides, 1);
+
+  const scoreBeforeBlockedSnap = simulation.score.total;
+  simulation.update(FIXED_STEP, {
+    trick4: true,
+    trick1: true,
+    trick1Pressed: true,
+  });
+  const blockedSnapEvents = collectEvents(simulation);
+  assert.equal(player.maneuver.id, "soulArch");
+  assert.equal(blockedSnapEvents.some((event) => event.type === "maneuver"
+    && event.payload.id === "snap"), false, "tube ownership blocks overlapping lip tricks");
+  assert.ok(simulation.score.total - scoreBeforeBlockedSnap < 10, "only continuous tube value is added");
+
+  simulation.update(FIXED_STEP, { trick4Released: true });
+  const exitEvents = collectEvents(simulation);
+  const exit = exitEvents.find((event) => event.type === "tubeExit");
+  assert.ok(exit);
+  assert.equal(exit.payload.id, "soulArch");
+  assert.ok(exit.payload.duration >= TUNING.tubeCleanExitTime);
+  assert.equal(player.tubeRide.active, false);
+  assert.ok(player.tubeRide.visualExit > 0, "front foam receives a short release tail");
+  assert.ok(exitEvents.some((event) => event.type === "callout"
+    && event.payload.text === "CLEAN TUBE EXIT"));
+
+  player.x = simulation.wave.contactX() + 13;
+  player.previousX = player.x;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  simulation.update(FIXED_STEP, { trick4: true, trick4Pressed: true });
+  collectEvents(simulation);
+  simulation.triggerWipeout("CURL ATE IT!", "curl");
+  const failEvents = collectEvents(simulation);
+  assert.equal(failEvents.filter((event) => event.type === "tubeFail").length, 1);
+  assert.equal(failEvents.filter((event) => event.type === "wipeout").length, 1);
+  assert.ok(failEvents.some((event) => event.type === "callout"
+    && event.payload.text === "TUBE CLOSED!"));
+  assert.equal(player.tubeRide.active, false);
+});
+
+test("Tube prompt uses the mapped Advanced key and a held exit must re-arm", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, {
+    controlMode: "advanced",
+    condition: CONDITIONS.twilightGlass,
+  });
+  simulation.tutorialEnabled = false;
+  const player = simulation.player;
+  simulation.wave.curlX = 100;
+  simulation.wave.pressure = 0.84;
+  simulation.wave.time = TUNING.curlGrace + 0.4;
+  player.x = simulation.wave.contactX() + 13;
+  player.previousX = player.x;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  player.previousFace = player.face;
+  collectEvents(simulation);
+
+  simulation.update(FIXED_STEP, {});
+  const readyEvents = collectEvents(simulation);
+  assert.equal(readyEvents.find((event) => event.type === "tubeReady")?.payload.action, "T");
+  assert.equal(readyEvents.find((event) => event.type === "callout")?.payload.subtext, "HOLD T TO TUCK");
+
+  simulation.update(FIXED_STEP, { trick4: true, trick4Pressed: true });
+  collectEvents(simulation);
+  assert.equal(player.tubeRide.active, true);
+  assert.equal(simulation.highlights.tubeRides, 1);
+
+  player.x = simulation.wave.contactX() + 112;
+  player.previousX = player.x;
+  for (let step = 0; step < Math.ceil(TUNING.tubeExitGrace / FIXED_STEP) + 2; step += 1) {
+    simulation.update(FIXED_STEP, { trick4: true });
+    collectEvents(simulation);
+  }
+  assert.equal(player.tubeRide.active, false);
+  assert.equal(player.tubeRide.releaseRequired, true);
+
+  player.x = simulation.wave.contactX() + 13;
+  player.previousX = player.x;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  for (let step = 0; step < 8; step += 1) simulation.update(FIXED_STEP, { trick4: true });
+  collectEvents(simulation);
+  assert.equal(player.tubeRide.active, false, "returning while held cannot create a second session");
+  assert.equal(simulation.highlights.tubeRides, 1);
+
+  simulation.update(FIXED_STEP, { trick4Released: true });
+  collectEvents(simulation);
+  simulation.update(FIXED_STEP, { trick4: true, trick4Pressed: true });
+  assert.equal(player.tubeRide.active, true, "release explicitly re-arms the tube input");
+  assert.equal(simulation.highlights.tubeRides, 2);
+});
+
+test("Best Tube keeps one real duration-score tuple and timer completion is not a clean exit", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, {
+    controlMode: "advanced",
+    condition: CONDITIONS.twilightGlass,
+  });
+  const lowRisk = { risk: 0, acceleration: 0.5 };
+  simulation.beginTubeRide(lowRisk);
+  simulation.sustainTubeRide(0.8, lowRisk);
+  simulation.endTubeRide("release");
+  collectEvents(simulation);
+
+  simulation.score.flow = 1;
+  simulation.score.syncCombo();
+  const highRisk = { risk: 1, acceleration: 0.5 };
+  simulation.beginTubeRide(highRisk);
+  simulation.sustainTubeRide(0.4, highRisk);
+  assert.equal(simulation.highlights.longestTube, 0.8);
+  assert.equal(simulation.highlights.bestTubeDuration, 0.4);
+  assert.ok(simulation.highlights.bestTubeScore > 100);
+
+  collectEvents(simulation);
+  simulation.finishRun("time");
+  const finishEvents = collectEvents(simulation);
+  assert.equal(finishEvents.some((event) => event.type === "tubeExit"), false,
+    "timer completion does not impersonate a player-earned tube exit");
+  assert.equal(finishEvents.some((event) => event.type === "callout"
+    && event.payload.text === "CLEAN TUBE EXIT"), false);
+});
+
+test("tube foreground exit tail ages while airborne and cannot reappear after landing", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, {
+    controlMode: "advanced",
+    condition: CONDITIONS.twilightGlass,
+  });
+  simulation.beginTubeRide({ risk: 0.8, acceleration: 0.5 });
+  simulation.launch({ x: 0 });
+
+  assert.equal(simulation.player.state, "airborne");
+  assert.ok(simulation.player.tubeRide.visualExit > 0);
+  for (let step = 0; step < Math.ceil(0.18 / FIXED_STEP) + 2; step += 1) {
+    simulation.update(FIXED_STEP, {});
+  }
+  assert.equal(simulation.player.tubeRide.visualExit, 0);
+  simulation.setState("riding");
+  assert.equal(simulation.player.tubeRide.visualExit, 0,
+    "returning to the face cannot resurrect stale foreground foam");
 });
 
 test("Simple failed advanced tap becomes a readable fallback grab without rejection spam", () => {

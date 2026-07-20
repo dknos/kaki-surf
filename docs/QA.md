@@ -1,6 +1,6 @@
 # QA matrix
 
-Date: 2026-07-19.
+Date: 2026-07-20.
 
 This document distinguishes automated truth from browser-capture evidence. The deterministic gallery and capture pipeline contain 120 checked-in browser states: six locked Twilight travelling-break stages plus dedicated rideable-tube and big-air-camera scenes. The refreshed [contact sheet](./images/qa-contact-sheet.png) contains the complete normalized set.
 
@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **164/164 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
+Current result: **171/171 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
 
 ## Browser capture matrix
 
@@ -54,7 +54,7 @@ Current result: **164/164 tests pass** and **30 JavaScript modules pass syntax c
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 120 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 116 unique bitmaps. The three repeated-render groups are intentional board/condition identity fixtures: `foamPuff-goldenCoast` / `goldenCoast`, `foamPuff-stormbreak` / `stormbreak`, and `foamPuff-twilightGlass` / `twilightGlass` / `twilightTraffic-twilightGlass`. The dedicated tube and big-air fixtures are distinct; the cargo ship, fishing boat, and sailboat fixtures remain visibly staged in the safe far-right water band. Rebuild deterministically with:
+The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 120 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 117 unique bitmaps. The two repeated-render groups are intentional identity fixtures: `foamPuff-stormbreak` / `stormbreak`, and `foamPuff-twilightGlass` / `twilightGlass` / `twilightTraffic-twilightGlass`. The Golden Coast base/board captures and the dedicated tube and big-air fixtures are distinct; the cargo ship, fishing boat, and sailboat fixtures remain visibly staged in the safe far-right water band. Rebuild deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py

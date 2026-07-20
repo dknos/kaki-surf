@@ -66,6 +66,7 @@ const POSE_ALIASES = Object.freeze({
   kakisignature: "kakiTwist",
   kakitwist: "kakiTwist",
   tubetuck: "tubeTuck",
+  soularch: "tubeTuck",
   resultvictory: "victory",
   resultdisappointed: "disappointed",
 });

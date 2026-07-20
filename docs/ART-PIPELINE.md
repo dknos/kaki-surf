@@ -89,20 +89,21 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-Sixteen source families were generated with the local Grok Imagine workflow, visually reviewed at source and runtime size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the Twilight wave studies and other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage classic progression, Twilight components, falling curtain, final coherent travelling break, birds, and UI ornaments, while superseded sources remain preserved for auditability.
+Seventeen source families were generated with the local Grok Imagine workflow, visually reviewed at source and runtime size, and preserved without modification under `docs/art-source/grok`. The latest wave-breaker polish source is 1024 x 1024; the Twilight wave studies and other selected families are 1280 x 720. Corrected passes were selected for the wave breaker, tapered four-stage classic progression, Twilight components, falling curtain, coherent travelling break, long barrel back layer, birds, and UI ornaments, while superseded sources remain preserved for auditability.
 
-`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts each cell, applies either tight-crop or contact-preserving layout rules, uses the declared family filter, thresholds alpha unless soft continuation is declared, quantizes and conditionally sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave-breaker family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges. Twilight components preserve their 2 x 2 source layout; the new 4 x 1 curtain and coherent-break sheets use connected-chroma removal and nearest-neighbor reduction. The coherent break keeps crisp curl/foam edges while an irregular alpha treatment feathers only the lower and side continuation into procedural water.
+`tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source directory, source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The 2 x 4 wave source is repacked into the existing 4 x 2 runtime contract. The script removes chroma magenta, extracts each cell, applies either tight-crop or contact-preserving layout rules, uses the declared family filter, thresholds alpha unless soft continuation is declared, quantizes and conditionally sharpens the local sprite, packs a transparent RGBA atlas, and writes `assets/generated/manifest.json`. The wave-breaker family receives one extra deterministic matte pass: it keeps organic light foam plus nearby ink and removes teal water fill that could expose rectangular source-cell edges. Twilight components preserve their 2 x 2 source layout; the 4 x 1 curtain and coherent-break sheets use connected-chroma removal and nearest-neighbor reduction. The long barrel retains its one-cell framing and receives a deterministic stepped alpha blend only along the passing left edge, eliminating the vertical source boundary without softening the crest or pocket.
 
-Normal Twilight rendering cross-fades the final coherent-break frames around the canonical pitching-lip contact, joins them to code-authored face volume, tube shadow, falling strands, impact churn, and foreground water, adds the curtain study only as restrained internal falling texture, then adds the component atlas's `contactSpray` at the board. The generated art remains presentation: runtime geometry still owns the playable surface, contact, collision, stage pressure, passed-sky extent, and monotonic left-to-right break direction. A missing coherent-break asset or High Contrast uses the earlier coherent full-barrel study; loss of that secondary asset switches to the complete connected procedural break. The component cells `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for provenance but are not rendered.
+Normal Twilight rendering places the selected 352 x 198 long barrel behind Kaki as the stable face and pocket, aligns its lip tip to the canonical pitching contact, then draws Kaki, the segmented forward curtain, low foreground foam, and component `contactSpray`. The coherent-break frames remain available for the active edge and fallback transitions; the earlier curtain study is restrained internal texture only. This back/rider/front stack makes Kaki visibly ride inside the barrel while the left edge opens onto real sky. Runtime geometry still owns the playable surface, contact, collision, stage pressure, passed-sky extent, and monotonic left-to-right break direction. High Contrast or a missing long-back asset falls through the coherent break, earlier full-barrel study, and complete connected procedural break. The component cells `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for provenance but are not rendered.
 
 ```console
 python3 tools/art/build-grok-assets.py
 ```
 
-Outputs are the 16 PNGs under `assets/generated`:
+Outputs are the 17 PNGs under `assets/generated`:
 
 | Family | Atlas dimensions |
 | --- | ---: |
+| Twilight long barrel back | 352 x 198 |
 | Twilight hero barrel | 256 x 144 |
 | Twilight waterfall curtain | 352 x 112 |
 | Twilight coherent break | 512 x 136 |
@@ -121,6 +122,8 @@ Outputs are the 16 PNGs under `assets/generated`:
 | UI ornaments | 320 x 104 |
 
 The source sheets, SHA-256 values, selected/rejected decisions, and every Grok prompt are in [Grok asset provenance](./GROK-ASSET-PROVENANCE.md). The runtime/frame mapping is in [Asset manifest](./ASSET-MANIFEST.md).
+
+`tools/art/run-qwen-edit.mjs` is an optional offline experiment helper for the local ComfyUI Qwen Image Edit workflow. It is not part of the deterministic build. Both preserved seam experiments were rejected after they damaged framing/chroma or regenerated horizontal rails; the browser never loads them.
 
 ## Blender wave/curl study
 

@@ -197,7 +197,7 @@ export function drawHeroBarrelBack(
   drawAheadFaceVolume(ctx, wave, geometry, palette, settings);
   drawPassedSky(ctx, geometry, repaintTrailingSky);
   drawTrailingWhitewater(ctx, geometry, palette, settings, clock);
-  const authoredBreak = drawCoherentHeroBreak(ctx, geometry, palette, settings, assets);
+  const authoredBreak = drawLongHeroBarrelBack(ctx, geometry, palette, settings, assets);
   drawTubePocket(ctx, geometry, palette, settings);
   drawFallingCurtainBack(ctx, geometry, palette, settings, assets, clock, authoredBreak);
   // Keep the collision edge legible without painting it over Kaki. The whole
@@ -223,6 +223,7 @@ export function drawHeroBarrelFront(
   if (heroPourMix(geometry) > 0.04) {
     drawImpactChurn(ctx, geometry, palette, settings, assets, clock, true);
   }
+  drawTubeRiderForeground(ctx, simulation, geometry, palette, settings, clock);
   drawBoardContactSpray(ctx, simulation, palette, settings, assets, Math.floor(clock * 0.42));
 }
 
@@ -239,27 +240,39 @@ function drawAheadFaceVolume(ctx, wave, g, p, settings) {
   ctx.globalAlpha = settings?.highContrast ? 0.68 : 0.42;
   ctx.fillRect(g.contactX - 6, HORIZON_Y, LOGICAL_WIDTH - g.contactX + 12, LOGICAL_HEIGHT - HORIZON_Y);
 
-  // Curved down-face planes give the long wall depth. They are broad volume
-  // marks, never moving left/right streaks.
-  ctx.lineCap = "round";
-  for (let lane = 0; lane < 3; lane += 1) {
-    const t = lane / 2;
-    ctx.strokeStyle = lane === 2 && settings?.highContrast ? p.foam : lane === 0 ? p.waterLight : p.crest;
-    ctx.lineWidth = 8 - lane * 1.1;
-    ctx.globalAlpha = settings?.highContrast ? 0.28 : 0.055 + t * 0.025;
-    ctx.beginPath();
-    ctx.moveTo(g.contactX + 9 + lane * 11, HORIZON_Y + 17 + lane * 7);
-    ctx.bezierCurveTo(
-      g.contactX + 23 + lane * 14,
-      112 + lane * 7,
-      g.focusX + 7 + lane * 10,
-      g.focusY + 9 + lane * 8,
-      Math.min(LOGICAL_WIDTH + 8, g.focusX + 106 + lane * 18),
-      178 + lane * 9,
-    );
-    ctx.stroke();
-  }
+  // One broad, edgeless light volume joins the authored trough to the live
+  // face. Narrow diagonal beams read like moving lane markers, so the hero
+  // level deliberately avoids them.
+  const glow = ctx.createRadialGradient(
+    g.focusX + 20,
+    g.focusY + 18,
+    8,
+    g.focusX + 42,
+    g.focusY + 34,
+    126,
+  );
+  glow.addColorStop(0, colorWithAlpha(p.waterLight, settings?.highContrast ? 0.18 : 0.1));
+  glow.addColorStop(1, colorWithAlpha(p.waterLight, 0));
+  ctx.fillStyle = glow;
+  ctx.globalAlpha = 1;
+  ctx.fillRect(g.contactX, HORIZON_Y, LOGICAL_WIDTH - g.contactX + 8, LOGICAL_HEIGHT - HORIZON_Y);
   ctx.restore();
+}
+
+function drawLongHeroBarrelBack(ctx, g, p, settings, assets) {
+  if (!settings?.highContrast) {
+    const drawn = drawAtlasFrame(
+      ctx,
+      assets,
+      "twilightLongBarrelBack",
+      "longBarrelBack",
+      g.contactX + 13,
+      g.curtain.baseY,
+      { alpha: 0.96 },
+    );
+    if (drawn) return true;
+  }
+  return drawCoherentHeroBreak(ctx, g, p, settings, assets);
 }
 
 function drawTubePocket(ctx, g, p, settings) {
@@ -418,30 +431,45 @@ function drawFallingCurtainBack(ctx, g, p, settings, assets, clock, coherentBrea
   const frame = heroWaterfallFrame(clock, g.collapse, settings?.reducedMotion);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(-8, HORIZON_Y - 12, Math.max(0, c.edgeX + 12), LOGICAL_HEIGHT - HORIZON_Y + 20);
+  ctx.rect(-8, HORIZON_Y - 12, Math.max(0, c.lipTipX + 12), LOGICAL_HEIGHT - HORIZON_Y + 20);
   ctx.clip();
   // The first Grok waterfall study contributes only internal falling texture
   // inside the accepted coherent curl. It is never allowed to become the base
   // silhouette, so a missing final atlas cannot regress to a pasted pillar.
   if (coherentBreak && !settings?.highContrast) {
-    drawAtlasFrame(ctx, assets, "twilightHeroCurtain", frame, c.edgeX - 15, c.baseY + 4, {
+    drawAtlasFrame(ctx, assets, "twilightHeroCurtain", frame, (c.lipTipX + c.baseX) * 0.5, c.baseY + 4, {
       scale,
-      scaleX: 1.38,
-      alpha: (0.13 + g.foamEnergy * 0.06) * pourMix,
+      scaleX: 0.9,
+      alpha: (0.1 + g.foamEnergy * 0.055) * pourMix,
     });
   }
 
   traceCurtainSheet(ctx, g);
+  ctx.fillStyle = p.waterLight;
+  ctx.globalAlpha = (settings?.highContrast ? 0.48 : 0.2 + g.foamEnergy * 0.07) * pourMix;
+  ctx.fill();
+  traceCurtainSheet(ctx, g);
   ctx.clip();
   const fallPhase = settings?.reducedMotion ? 0 : Math.floor(Math.max(0, clock) * 1.16) % 22;
   for (let lane = 0; lane < 9; lane += 1) {
-    const t = lane / 8;
-    const x = c.topX - 4 - t * (c.lean + 24);
-    const y = c.topY + ((FALL_OFFSETS[lane] + fallPhase) % 22);
+    const across = lane / 8;
+    const startProgress = ((FALL_OFFSETS[lane] + fallPhase) % 22)
+      / Math.max(1, c.baseY - c.lipTipY);
+    const point = curtainEdgePoint(g, startProgress);
+    const backOffset = across * (21 + g.foamEnergy * 10) * (1 - startProgress * 0.45);
     ctx.fillStyle = lane % 3 === 0 ? p.foam : lane % 2 ? p.waterLight : p.foamShade;
-    ctx.globalAlpha = (settings?.highContrast ? 0.86 : 0.4 + (lane % 3) * 0.12) * pourMix;
-    ctx.fillRect(Math.round(x), Math.round(y), lane % 4 === 0 ? 3 : 2, 26 + (lane * 7) % 34);
-    ctx.fillRect(Math.round(x - 2), Math.round(y + 38 + lane % 5), 1, 12 + lane % 9);
+    ctx.globalAlpha = (settings?.highContrast ? 0.86 : 0.34 + (lane % 3) * 0.1) * pourMix;
+    for (let segment = 0; segment < 3; segment += 1) {
+      const progress = clamp(startProgress + segment * (0.12 + lane % 2 * 0.018), 0, 0.96);
+      const segmentPoint = curtainEdgePoint(g, progress);
+      const inset = backOffset * (1 - progress * 0.34);
+      ctx.fillRect(
+        Math.round(segmentPoint.x - inset),
+        Math.round(segmentPoint.y),
+        lane % 4 === 0 ? 3 : 2,
+        7 + (lane * 3 + segment * 5) % 10,
+      );
+    }
   }
   ctx.restore();
 }
@@ -492,30 +520,27 @@ function drawCurtainLeadingEdge(ctx, g, p, settings, clock) {
   const c = g.curtain;
   const phase = settings?.reducedMotion ? 0 : Math.floor(Math.max(0, clock) * 0.84) % 13;
   ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
 
-  ctx.strokeStyle = p.foamShade;
-  ctx.globalAlpha = settings?.highContrast ? 1 : 0.76;
-  ctx.lineWidth = settings?.highContrast ? 8 : 6;
-  traceCurtainEdge(ctx, g, phase * 0.18);
-  ctx.stroke();
-  ctx.strokeStyle = p.foam;
-  ctx.globalAlpha = settings?.highContrast ? 0.92 : 0.34;
-  ctx.lineWidth = settings?.highContrast ? 3 : 2;
-  traceCurtainEdge(ctx, g, 0);
-  ctx.stroke();
-
-  // Broken foam clusters keep the edge bright without turning it into one
-  // perfectly straight white cable.
-  ctx.fillStyle = p.foam;
-  ctx.globalAlpha = settings?.highContrast ? 1 : 0.86;
-  for (let index = 0; index < 8; index += 1) {
-    const t = 0.08 + index * 0.115;
+  // The visible edge is a chain of falling water packets, never a continuous
+  // stroke. Gaps, alternating widths, and downward-only phase keep it reading
+  // as a torn waterfall instead of a bright glass pipe.
+  for (let index = 0; index < 13; index += 1) {
+    const t = 0.055 + index * 0.072;
     const point = curtainEdgePoint(g, t);
-    const width = 3 + (index * 5 + phase) % 5;
-    ctx.fillRect(Math.round(point.x - width * 0.55), Math.round(point.y), width, 2 + index % 3);
-    if (index % 2 === 0) ctx.fillRect(Math.round(point.x - 2), Math.round(point.y + 4), 2, 3);
+    const width = 2 + (index * 5 + phase) % 6;
+    const fall = (index * 3 + phase) % 6;
+    ctx.fillStyle = index % 3 === 0 ? p.foam : p.foamShade;
+    ctx.globalAlpha = settings?.highContrast ? 1 : index % 3 === 0 ? 0.82 : 0.58;
+    ctx.fillRect(
+      Math.round(point.x - width * 0.55),
+      Math.round(point.y + fall),
+      width,
+      2 + index % 4,
+    );
+    if (index % 2 === 0) {
+      ctx.globalAlpha *= 0.72;
+      ctx.fillRect(Math.round(point.x - 2), Math.round(point.y + fall + 5), 1 + index % 2, 3);
+    }
   }
 
   // Detached droplets may cross the collision edge; opaque water never does.
@@ -523,10 +548,61 @@ function drawCurtainLeadingEdge(ctx, g, p, settings, clock) {
   ctx.globalAlpha = settings?.highContrast ? 0.94 : 0.72;
   const dropCount = 7 + Math.round(g.foamEnergy * 5);
   for (let index = 0; index < dropCount; index += 1) {
-    const x = c.edgeX + 3 + ((index * 11 + phase * 3) % 22);
-    const y = c.topY + 14 + ((index * 17 + phase * 5) % 71);
+    const progress = 0.08 + ((index * 17 + phase * 3) % 78) / 100;
+    const point = curtainEdgePoint(g, progress);
+    const x = point.x + 3 + (index * 7 + phase) % 9;
+    const y = point.y + (index * 5 + phase) % 8;
     ctx.fillRect(x, y, index % 5 === 0 ? 2 : 1, index % 4 === 0 ? 3 : 2);
   }
+  ctx.restore();
+}
+
+function drawTubeRiderForeground(ctx, simulation, g, p, settings, clock) {
+  const player = simulation?.player;
+  const tube = player?.tubeRide;
+  const tubeId = String(tube?.id || player?.maneuver?.id || "");
+  if (!tube?.active && Number(tube?.visualExit ?? 0) <= 0
+    && tubeId !== "tubeTuck" && tubeId !== "soulArch") return;
+  if (player.state !== "riding" && player.state !== "lip") return;
+
+  const c = g.curtain;
+  const riderX = clamp(Number(player.x) || g.focusX, c.edgeX + 5, LOGICAL_WIDTH - 12);
+  const riderY = clamp(
+    Number(simulation.wave.ridingY(riderX, player.face ?? g.powerFace)) || g.focusY,
+    126,
+    180,
+  );
+  const entry = tube?.active
+    ? smoothstep(0, 0.18, Number(tube?.time ?? player.maneuverTime ?? 0))
+    : smoothstep(0, 0.18, Number(tube?.visualExit ?? 0));
+  const phase = settings?.reducedMotion ? 0 : Math.floor(Math.max(0, clock) * 0.82) % 11;
+  ctx.save();
+
+  // The authored back lip already forms the roof. Sparse front droplets and
+  // low rail foam put Kaki between layers without drawing a second pipe-like
+  // arc across the opening. Their clock moves down only.
+  ctx.fillStyle = p.foamShade;
+  ctx.globalAlpha = (settings?.highContrast ? 0.32 : 0.16) * entry;
+  for (let lane = 0; lane < 6; lane += 1) {
+    const x = Math.round(riderX - 10 + lane * 7);
+    const top = Math.round(Math.min(riderY - 25, c.lipTipY + 12) + ((lane * 5 + phase) % 8));
+    const height = 7 + (lane * 3 + phase) % 11;
+    ctx.fillRect(x, top, lane % 3 === 0 ? 2 : 1, height);
+  }
+
+  // Low foreground foam occludes only the board's lower rail, welding it to
+  // the trough rather than making Kaki look pasted above the wave.
+  ctx.strokeStyle = p.foamShade;
+  ctx.globalAlpha = (settings?.highContrast ? 0.9 : 0.58) * entry;
+  ctx.lineWidth = settings?.highContrast ? 6 : 4;
+  ctx.beginPath();
+  ctx.moveTo(c.edgeX + 3, g.aperture.bottom - 2);
+  ctx.quadraticCurveTo(riderX - 7, riderY + 7, riderX + 25, riderY + 4);
+  ctx.stroke();
+  ctx.strokeStyle = p.foam;
+  ctx.globalAlpha = (settings?.highContrast ? 0.94 : 0.68) * entry;
+  ctx.lineWidth = 1;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -628,33 +704,33 @@ function traceAheadFace(ctx, g) {
 
 function traceCurtainSheet(ctx, g) {
   const c = g.curtain;
-  const thickness = 26 + g.foamEnergy * 16;
+  const thickness = 22 + g.foamEnergy * 13;
   ctx.beginPath();
-  ctx.moveTo(c.topX - thickness, c.topY + 1);
-  ctx.bezierCurveTo(c.topX - thickness + 9, c.topY + 28, c.baseX - thickness * 0.35, c.baseY - 34, c.baseX - thickness * 0.18, c.baseY);
-  ctx.bezierCurveTo(c.baseX + 12, c.baseY + 2, c.baseX + 15, c.baseY - 21, c.edgeX, c.topY + 2);
-  ctx.closePath();
-}
-
-function traceCurtainEdge(ctx, g, offset = 0) {
-  const c = g.curtain;
-  ctx.beginPath();
-  ctx.moveTo(c.edgeX + offset, c.topY + 1);
+  ctx.moveTo(c.lipTipX - thickness * 0.76, c.lipTipY - 3);
   ctx.bezierCurveTo(
-    c.edgeX + 5 - offset,
-    c.topY + 30,
-    c.baseX + 16 + offset,
-    c.baseY - 35,
-    c.baseX + offset,
+    c.lipTipX - thickness * 0.62,
+    c.lipTipY + 30,
+    c.baseX - thickness * 0.46,
+    c.baseY - 36,
+    c.baseX - thickness * 0.24,
     c.baseY,
   );
+  ctx.bezierCurveTo(
+    c.baseX + 13,
+    c.baseY + 2,
+    c.baseX + 18,
+    c.baseY - 27,
+    c.lipTipX + 1,
+    c.lipTipY + 2,
+  );
+  ctx.closePath();
 }
 
 function curtainEdgePoint(g, progress) {
   const c = g.curtain;
   return cubicPoint(
-    { x: c.edgeX, y: c.topY + 1 },
-    { x: c.edgeX + 5, y: c.topY + 30 },
+    { x: c.lipTipX, y: c.lipTipY + 1 },
+    { x: c.lipTipX - 5, y: c.lipTipY + 32 },
     { x: c.baseX + 16, y: c.baseY - 35 },
     { x: c.baseX, y: c.baseY },
     progress,

@@ -2,6 +2,25 @@
   "version": 2,
   "generator": "tools/art/build-grok-assets.py",
   "families": {
+    "twilight-long-barrel-back-atlas": {
+      "image": "twilight-long-barrel-back-atlas.png",
+      "width": 352,
+      "height": 198,
+      "frames": {
+        "longBarrelBack": {
+          "x": 0,
+          "y": 0,
+          "width": 352,
+          "height": 198,
+          "anchor": [
+            0.48,
+            0.92
+          ]
+        }
+      },
+      "source": "docs/art-source/grok/twilight-long-barrel-back-edit-v1.png",
+      "sourceSha256": "269800eda215821d40c9bbf24eaf7fa77f47e3a2159e36b9221720892975e05b"
+    },
     "twilight-hero-barrel-atlas": {
       "image": "twilight-hero-barrel-atlas.png",
       "width": 256,

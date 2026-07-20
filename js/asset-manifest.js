@@ -22,6 +22,9 @@ function atlas(filename, columns, rows, cellWidth, cellHeight, names, {
 }
 
 export const GENERATED_ASSET_MANIFEST = Object.freeze({
+  twilightLongBarrelBack: atlas("twilight-long-barrel-back-atlas.png", 1, 1, 352, 198, [
+    "longBarrelBack",
+  ], { anchor: [0.48, 0.92] }),
   twilightHeroBarrel: atlas("twilight-hero-barrel-atlas.png", 1, 1, 256, 144, [
     "heroBarrel",
   ], { anchor: [0, 0] }),

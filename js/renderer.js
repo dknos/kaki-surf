@@ -100,7 +100,9 @@ export class KakiRenderer {
     const ridingY = simulation.wave.ridingY(player.x, player.face);
     switch (event.type) {
       case "callout":
-        this.pushCallout(payload.text ?? "", payload.subtext ?? "", payload.tone);
+        this.pushCallout(payload.text ?? "", payload.subtext ?? "", payload.tone, {
+          channel: payload.channel,
+        });
         break;
       case "pump":
         this.spawnSpray(player.x - 6, ridingY, 6 + Math.round((payload.strength ?? 0.5) * 8), 0.8 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.75);
@@ -127,11 +129,24 @@ export class KakiRenderer {
       case "floater":
       case "tubeTuck": {
         const id = payload.id ?? event.type;
-        const force = id === "floater" ? 1.15 : id === "tubeTuck" ? 0.65 : 1.35;
-        this.spawnSpray(player.x, ridingY, id === "tubeTuck" ? 5 : 13, force);
+        const tube = isTubeId(id);
+        const force = id === "floater" ? 1.15 : tube ? 0.65 : 1.35;
+        this.spawnSpray(player.x, ridingY, tube ? 5 : 13, force);
         this.shake = Math.max(this.shake, id === "snap" || id === "cutback" ? 0.95 : 0.45);
         break;
       }
+      case "tubeExit":
+        if (payload.reason === "complete") break;
+        this.spawnSeamGlints(player.x, ridingY, 9);
+        this.spawnSpray(player.x, ridingY, 8, 0.82);
+        if ((payload.duration ?? 0) >= TUNING.tubeCleanExitTime) {
+          this.freeze = this.settings.reducedMotion ? 0 : 0.022;
+        }
+        break;
+      case "tubeFail":
+        this.spawnSpray(player.x, ridingY, 14, 1.4);
+        this.impact = Math.max(this.impact, 1.1);
+        break;
       case "trickStarted":
       case "trickStart":
         this.spawnTrickMarks(player.airX ?? player.x, player.airY ?? ridingY, payload.id, 5);
@@ -770,6 +785,8 @@ export class KakiRenderer {
     if (player.state === "airborne") {
       this.drawAerialHud(simulation);
       this.drawLandingHud(simulation);
+    } else if (player.tubeRide?.active) {
+      this.drawTubeHud(player.tubeRide);
     } else if ((player.charge ?? 0) > 0.02) {
       panel(ctx, 144, 190, 96, 20, p.deepInk, p.waterDeep);
       drawPixelText(ctx, "PUMP", 150, 195, { color: p.foamShade, shadow: p.ink });
@@ -783,6 +800,21 @@ export class KakiRenderer {
       drawPixelText(ctx, "ASSIST", 270, 198, { align: "center", color: p.foamShade, shadow: p.ink });
     }
     this.drawTeachingOverlay(simulation);
+  }
+
+  drawTubeHud(tube) {
+    const ctx = this.ctx;
+    const p = this.palette;
+    panel(ctx, 136, 190, 116, 20, p.deepInk, p.waterDeep, 0.94);
+    drawPixelText(ctx, `TUBE ${Number(tube.time ?? 0).toFixed(1)}S`, 142, 195, {
+      color: p.gold,
+      shadow: p.ink,
+    });
+    drawPixelText(ctx, `+${Math.round(Number(tube.score) || 0)}`, 245, 195, {
+      align: "right",
+      color: p.white,
+      shadow: p.ink,
+    });
   }
 
   drawSpeedMeter(player, speedCap) {
@@ -880,7 +912,7 @@ export class KakiRenderer {
     }
   }
 
-  pushCallout(text, subtext = "", tone = "flow") {
+  pushCallout(text, subtext = "", tone = "flow", options = {}) {
     const nextText = String(text).trim();
     if (!nextText) return;
     const nextSubtext = String(subtext).trim();
@@ -895,6 +927,7 @@ export class KakiRenderer {
     callout.text = nextText;
     callout.subtext = nextSubtext;
     callout.tone = tone;
+    callout.channel = String(options.channel ?? "").trim();
     callout.priority = calloutPriority(tone);
     callout.sequence = this.calloutSequence;
     callout.enqueuedAt = this.time;
@@ -905,15 +938,43 @@ export class KakiRenderer {
         ? 2.5
         : 2.25;
     callout.life = callout.duration;
+
+    // A mechanic channel represents one evolving state machine. Remove its
+    // queued predecessor even when another mechanic currently owns the active
+    // slot, otherwise OPEN -> TUCK -> EXIT can replay after it is already over.
+    if (callout.channel) {
+      for (let index = this.calloutQueue.length - 1; index >= 0; index -= 1) {
+        if (this.calloutQueue[index].channel === callout.channel) this.calloutQueue.splice(index, 1);
+      }
+    }
     if (this.activeCallout.life <= 0 && this.calloutGap <= 0) {
+      callout.activatedAt = this.time;
       this.activeCallout = callout;
+      return;
+    }
+
+    // State changes from one mechanic replace that mechanic's queued copy.
+    // Preserve a single readable beat for the current state, then show the
+    // newest truth instead of replaying stale entry/hold/exit messages.
+    if (callout.channel && this.activeCallout.channel === callout.channel) {
+      const activeAge = Math.max(0, this.time - this.activeCallout.activatedAt);
+      if (activeAge >= CALLOUT_MIN_READ_TIME) {
+        callout.activatedAt = this.time;
+        this.activeCallout = callout;
+      } else {
+        this.activeCallout.life = Math.min(
+          this.activeCallout.life,
+          Math.max(0.28, CALLOUT_MIN_READ_TIME - activeAge),
+        );
+        this.calloutQueue.unshift(callout);
+      }
       return;
     }
 
     // Urgent feedback may shorten an old low-priority hint, but never before
     // that hint has had a full readable beat. Only one callout is rendered.
     if (callout.priority >= 4 && callout.priority > this.activeCallout.priority) {
-      const activeAge = this.activeCallout.duration - this.activeCallout.life;
+      const activeAge = Math.max(0, this.time - this.activeCallout.activatedAt);
       const requiredLife = Math.max(0, CALLOUT_MIN_READ_TIME - activeAge);
       this.activeCallout.life = Math.min(this.activeCallout.life, Math.max(0.28, requiredLife));
     }
@@ -927,6 +988,7 @@ export class KakiRenderer {
     this.pruneStaleCallouts();
     const next = this.calloutQueue.shift();
     if (!next) return;
+    next.activatedAt = this.time;
     this.activeCallout = next;
   }
 
@@ -1327,6 +1389,11 @@ function conditionIdFor(simulation, settings) {
   return candidate === "twilightGlass" || candidate === "stormbreak" ? candidate : "goldenCoast";
 }
 
+function isTubeId(id) {
+  const value = String(id ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return value.includes("tube") || value.includes("soularch");
+}
+
 function paletteForCondition(conditionId) {
   if (conditionId === "twilightGlass") return PALETTES.twilightGlass ?? PALETTES.standard;
   if (conditionId === "stormbreak") return PALETTES.stormbreak ?? PALETTES.standard;
@@ -1422,6 +1489,8 @@ function createCallout() {
     priority: 0,
     sequence: 0,
     enqueuedAt: 0,
+    activatedAt: 0,
+    channel: "",
   };
 }
 

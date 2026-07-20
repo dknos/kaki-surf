@@ -127,6 +127,23 @@ test("banner traffic, carrier phases, Fleet Airshow, and landing grades stay eve
   assert.ok(calls.some((call) => call.method === "noiseBurst" && call.filter === "lowpass"));
 });
 
+test("tube success and failure use distinct rising and low impact cues", () => {
+  const { audio, calls } = createAudioProbe();
+
+  audio.onEvent({ type: "tubeExit", payload: { duration: 0.8, score: 220 } });
+  assert.ok(firstTone(calls).end > firstTone(calls).start);
+  assert.ok(calls.some((call) => call.method === "noiseTick"));
+
+  calls.length = 0;
+  audio.onEvent({ type: "tubeExit", payload: { reason: "complete", duration: 0.8, score: 220 } });
+  assert.equal(calls.length, 0, "timer completion cannot play the clean tube-exit cue");
+
+  calls.length = 0;
+  audio.onEvent({ type: "tubeFail", payload: { reason: "curl" } });
+  assert.ok(calls.some((call) => call.method === "noiseBurst" && call.filter === "lowpass"));
+  assert.ok(firstTone(calls).end < firstTone(calls).start);
+});
+
 test("effect bursts reuse one noise buffer instead of regenerating samples per event", () => {
   const audio = new SurfAudio();
   let bufferCreations = 0;

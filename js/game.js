@@ -435,6 +435,12 @@ export class KakiSurfGame {
     if (highlights.switchBonuses > 0) rows.push(["Switch", String(highlights.switchBonuses)]);
     if (highlights.animalBonuses > 0) rows.push(["Animal", String(highlights.animalBonuses)]);
     if (highlights.nearMisses > 0) rows.push(["Near Miss", String(highlights.nearMisses)]);
+    if (highlights.longestTube > 0) {
+      rows.push([
+        "Best Tube",
+        `${Number(highlights.bestTubeDuration ?? 0).toFixed(1)} S / ${Math.round(highlights.bestTubeScore ?? 0)}`,
+      ]);
+    }
     this.elements.breakdown.innerHTML = rows
       .map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`)
       .join("");
@@ -1177,6 +1183,17 @@ export class KakiSurfGame {
           curlTimer: 0,
           maneuver: { id: "tubeTuck", progress: 0.66 },
           trickPose: "tubeTuck",
+          tubeRide: {
+            active: true,
+            id: "tubeTuck",
+            time: 1.2,
+            score: 175,
+            exitGrace: TUNING.tubeExitGrace,
+            releaseRequired: false,
+            visualExit: 0,
+            hintShown: true,
+            wasReady: false,
+          },
         });
         break;
       }
