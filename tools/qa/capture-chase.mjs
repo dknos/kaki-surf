@@ -6,6 +6,8 @@ const baseUrl = process.env.KAKI_SURF_QA_URL ?? "http://127.0.0.1:9876/index.htm
 const outputDir = process.env.KAKI_SURF_CHASE_DIR
   ?? path.resolve("docs/images/qa-chase");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const captureUrl = new URL(baseUrl);
+captureUrl.searchParams.set("capture", "chase");
 
 const pages = await fetch(`${cdpHost}/json/list`).then((response) => response.json());
 const page = pages.find((entry) => entry.type === "page");
@@ -76,6 +78,7 @@ async function waitForSnapshot(predicate, timeout, label) {
         lifecycle: value.lifecycle,
         state: value.state,
         elapsed: value.elapsed,
+        wipeouts: value.wipeouts,
         travelDirection: value.travelDirection,
         playerX: value.playerX,
         cameraWorldX: value.cameraWorldX,
@@ -91,6 +94,7 @@ async function waitForSnapshot(predicate, timeout, label) {
       lifecycle: value.lifecycle,
       state: value.state,
       elapsed: value.elapsed,
+      wipeouts: value.wipeouts,
       travelDirection: value.travelDirection,
       playerX: value.playerX,
       cameraWorldX: value.cameraWorldX,
@@ -122,15 +126,28 @@ await call("Emulation.setDeviceMetricsOverride", {
   deviceScaleFactor: 1,
   mobile: false,
 });
-await call("Page.navigate", { url: `${baseUrl}?capture=chase` });
+await call("Page.navigate", { url: captureUrl.toString() });
 await waitForReady();
 await call("Page.bringToFront");
 await evaluate("(() => { globalThis.kakiSurf.start({ immediate: true, board: 'mangoFish', condition: 'twilightGlass', mode: 'endless' }); return true; })()");
 await waitForSnapshot((snapshot) => snapshot.lifecycle === "running", 5_000, "run start");
 
+const openingStart = await waitForSnapshot(
+  (snapshot) => snapshot.state === "riding",
+  5_000,
+  "opening ride",
+);
+await capture("00a-opening-start");
+const openingMove = await waitForSnapshot(
+  (snapshot) => snapshot.elapsed >= 3 && snapshot.wipeouts === 0,
+  6_000,
+  "opening motion",
+);
+await capture("00b-opening-moving");
+
 await key("ArrowRight", true);
 const lead = await waitForSnapshot(
-  (snapshot) => snapshot.cameraWorldX > 70 && snapshot.breakX < 0,
+  (snapshot) => snapshot.cameraWorldX > 110 && snapshot.breakX < -58,
   18_000,
   "offscreen lead",
 );
@@ -153,8 +170,11 @@ const returning = await waitForSnapshot(
 await capture("03-barrel-pursuit-return");
 await key("ArrowLeft", false);
 
-const metrics = { lead, cutback, return: returning };
-if (!(lead.breakX < 0)) throw new Error(`Lead did not clear barrel: ${lead.breakX}`);
+const metrics = { openingStart, openingMove, lead, cutback, return: returning };
+if (!(openingMove.breakX > openingStart.breakX + 8 && openingMove.wipeouts === 0)) {
+  throw new Error(`Barrel froze during the protected opening: ${JSON.stringify(metrics)}`);
+}
+if (!(lead.breakX < -58)) throw new Error(`Lead did not clear the complete barrel: ${lead.breakX}`);
 if (!(cutback.playerX < 220 && cutback.travelDirection === -1)) {
   throw new Error(`Cutback did not cross the face: ${JSON.stringify(cutback)}`);
 }

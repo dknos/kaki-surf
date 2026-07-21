@@ -15,7 +15,7 @@ scenes=(
   frontRail tailGrab varial kakiTwist snap cutback floater tubeTuck combo360 combo540 switchLanding
   perfectLanding wobble wipeout dolphinApproach dolphinRide dolphinDismount
   sharkApproach sharkNearMiss sharkCollision whaleDistant whaleBreach whaleRamp
-  whaleRide whaleSplash dolphinGates dolphinReduced sharkHighContrast whaleReduced
+  whaleRide whaleRideLeft whaleSplash dolphinGates dolphinReduced sharkHighContrast whaleReduced
   ambientBusy ambientReverse twilightTraffic-twilightGlass stormTraffic-stormbreak
   gullFlock pelican ternFlock cormorantFlock flockScatter featherThread
   pelicanCourier gullCourier bannerPlane bannerBigAir bannerDolphins bannerShark

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { BOARDS, FIXED_STEP } from "../js/config.js";
-import { KakiRenderer, verticalCameraTarget } from "../js/renderer.js";
+import { backgroundParallaxPhase, KakiRenderer, verticalCameraTarget } from "../js/renderer.js";
 import { SurfSimulation } from "../js/simulation.js";
 import { resolveKakiPose } from "../js/sprites.js";
 
@@ -272,4 +272,14 @@ test("large aerials pan the world down to reveal sky and Reduced Motion stays fi
   assert.ok(verticalCameraTarget({ ...highAir, airY: -60 }) <= 62, "camera motion remains clamped");
   assert.equal(verticalCameraTarget(highAir, true), 0);
   assert.equal(verticalCameraTarget({ state: "riding", airY: 18, maxAirHeight: 94 }), 0);
+});
+
+test("distant coast parallax always moves forward instead of following rider reversals", () => {
+  const forward = { travel: 420, worldTravel: 420 };
+  const cutback = { travel: 420, worldTravel: -180 };
+  const later = { travel: 620, worldTravel: -380 };
+
+  assert.equal(backgroundParallaxPhase(forward), backgroundParallaxPhase(cutback));
+  assert.ok(backgroundParallaxPhase(later) > backgroundParallaxPhase(cutback));
+  assert.equal(backgroundParallaxPhase(later, true), 0);
 });

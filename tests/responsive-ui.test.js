@@ -101,6 +101,11 @@ test("dedicated far-boat QA fixtures clear both the breaker and rider exclusion 
   }
 });
 
+test("whale ride QA fixtures preserve distinct right- and left-going mount art", () => {
+  assert.equal(qaWorldOverride("whaleRide").wildlife.direction, 1);
+  assert.equal(qaWorldOverride("whaleRideLeft").wildlife.direction, -1);
+});
+
 test("direct game construction degrades safely when the global storage getter is denied", () => {
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const reachedDomBoundary = new Error("reached DOM initialization");

@@ -1403,6 +1403,10 @@ export class WorldSimulation {
       if (entity.phase === "mounted") {
         entity.worldX = worldXForScreenX(this.context.player.x, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
         entity.y = this.context.player.y + (entity.kind === "whale" ? 9 : 5);
+        // Once mounted, the animal belongs to Kaki's current line rather than
+        // its original encounter path. Update only after the rider's stable
+        // direction commit so whale and dolphin art flip with real steering.
+        entity.direction = signOr(this.context.direction, entity.direction);
       } else if (entity.phase !== "telegraph" && entity.phase !== "distant" && entity.phase !== "blow") {
         entity.worldX += entity.vx * dt;
         entity.y += entity.vy * dt;

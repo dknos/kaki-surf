@@ -1314,9 +1314,16 @@ export class KakiSurfGame {
         this.renderer.onEvent({ type: "dolphinMounted", payload: { kind: "dolphin" } }, this.simulation);
         break;
       case "whaleRide":
+      case "whaleRideLeft":
         player.animalMount = "whale";
         player.animalSpecialReady = true;
         player.speed = 124;
+        if (scene === "whaleRideLeft") {
+          player.travelDirection = -1;
+          player.travelVelocity = -44;
+          player.lateralVelocity = -44;
+          player.directionIntent = -1;
+        }
         this.renderer.onEvent({ type: "whaleMounted", payload: { kind: "whale" } }, this.simulation);
         break;
       case "sharkNearMiss":
@@ -1593,6 +1600,7 @@ export function qaWorldOverride(scene) {
     whaleBreach: { kind: "whale", phase: "breach", screenX: 270, y: 112, direction: -1 },
     whaleRamp: { kind: "whale", phase: "ramp", screenX: 244, y: 126, direction: -1 },
     whaleRide: { kind: "whale", phase: "mounted", screenX: 232, y: 137, direction: 1 },
+    whaleRideLeft: { kind: "whale", phase: "mounted", screenX: 232, y: 137, direction: -1 },
     whaleSplash: { kind: "whale", phase: "splash", screenX: 248, y: 126, direction: 1 },
     dolphinReduced: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
     sharkHighContrast: { kind: "shark", phase: "telegraph", screenX: 190, y: 133, direction: 1 },

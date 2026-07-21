@@ -203,6 +203,26 @@ test("Twilight's passing curtain advances right without following rider directio
   assert.equal(new Set(samples).size, samples.length, "each advancing contact reveals more horizon");
 });
 
+test("Twilight's protected opening visibly advances before any wipeout", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  const initial = wave.curlX;
+  const threat = { playerX: 260, speed: 84, skillMomentum: 0, active: true };
+  const steps = Math.floor(4 / (1 / 120));
+  for (let step = 0; step < steps; step += 1) {
+    wave.update(1 / 120, 84, TUNING.curlSpeed, 84, threat);
+  }
+
+  assert.ok(wave.time < TUNING.curlGrace);
+  assert.ok(wave.curlX > initial + 12, `opening break moved only ${wave.curlX - initial}`);
+
+  const classic = new GameplayWave(0x54574c47, "classic");
+  const classicInitial = classic.curlX;
+  for (let step = 0; step < steps; step += 1) {
+    classic.update(1 / 120, 84, TUNING.curlSpeed, 84, threat);
+  }
+  assert.equal(classic.curlX, classicInitial, "legacy grace behavior remains profile-owned");
+});
+
 test("the hero barrel may leave the viewport instead of sticking to a minimum screen x", () => {
   const wave = new GameplayWave(0x54574c47, "heroBarrel");
   wave.curlX = -230;

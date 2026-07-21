@@ -69,6 +69,7 @@ SCENES = (
     ("whaleBreach", "Whale breach"),
     ("whaleRamp", "Whale swell ramp"),
     ("whaleRide", "Whale Ride"),
+    ("whaleRideLeft", "Whale Ride / Left"),
     ("whaleSplash", "Whale impact splash"),
     ("dolphinGates", "Dolphin foam gates"),
     ("dolphinReduced", "Dolphin / Reduced Motion"),

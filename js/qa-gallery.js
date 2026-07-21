@@ -55,6 +55,7 @@ const SCENES = [
   ["whaleBreach", "Whale breach", "", "perfect"],
   ["whaleRamp", "Whale swell ramp"],
   ["whaleRide", "Whale Ride", "", "perfect"],
+  ["whaleRideLeft", "Whale Ride / Left", "", "perfect"],
   ["whaleSplash", "Whale impact splash"],
   ["dolphinGates", "Dolphin foam gates", "", "perfect"],
   ["dolphinReduced", "Dolphin / Reduced Motion", "", "access"],

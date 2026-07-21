@@ -24,6 +24,7 @@ The current code and assets are structured to address those points:
 - fixed contrail packets, a broad broken crest, a collision-registered foamy leading ridge, and live churn create downward-only motion while pressure advances the same edge left-to-right;
 - Twilight removes the full-screen speed-line field. Its crest is a connected irregular pixel edge rather than a repeating row of horizontal dashes; sparse depth marks and seven accumulated presentation clocks never reverse when the rider turns, while the waterfall clock is driven by fixed-step wave time so its motion always reads top-to-bottom;
 - Twilight's rider owns nearly the full screen and a forward-only camera dead zone. Fast right travel can send the break completely offscreen; cutting left moves Kaki across the face without pulling scenery backward, while the barrel continues its own escalating pursuit;
+- the Twilight barrel now travels visibly during its collision-safe opening grace, while mirrored edge-joined background strips and diagonal face flecks provide layered leftward parallax from the first ride frames without introducing horizontal speed rails or reversal ping-pong;
 - rider, board, wake, and air carry use signed travel direction; wildlife, pickups, and parallax keep their authored trajectories under Twilight's forward-only camera instead of flipping when Kaki turns;
 - far/mid/near boats, birds, aircraft, banners, wildlife, powerups, and a festival carrier fill the coast with bounded simulation state; every catalogued hull renders in a horizon/water-back band behind the wave, race craft stay small and distant, and intended screen travel survives camera reversals;
 - Speed has physical tiers and redundant motion/audio cues, while Flow owns the style/combo presentation;
@@ -52,7 +53,7 @@ Exact provenance and prompts are in [Grok asset provenance](./GROK-ASSET-PROVENA
 
 ## Final visual status
 
-The completed production matrix contains 120 deterministic 1280 x 720 Chromium captures, including six locked Twilight travelling-break stages plus dedicated tube-pocket and big-air-camera fixtures. The refreshed 1200 x 10674 [production contact sheet](./images/qa-contact-sheet.png) contains the full set. Six additional focused responsive captures cover those two fixtures at 1280 x 720, 844 x 390, and 390 x 844.
+The completed production matrix contains 121 deterministic 1280 x 720 Chromium captures, including six locked Twilight travelling-break stages, separate right/left whale rides, and dedicated tube-pocket and big-air-camera fixtures. The refreshed 1200 x 10938 [production contact sheet](./images/qa-contact-sheet.png) contains the full set. Six additional focused responsive captures cover those two fixtures at 1280 x 720, 844 x 390, and 390 x 844.
 
 The final review confirmed:
 
@@ -61,6 +62,7 @@ The final review confirmed:
 - desktop, landscape-phone, and portrait-phone fixtures keep the tube rider, big-air rider, horizon, and landing guide visible; portrait preserves the complete 16:9 shot with deliberate letterboxing;
 - dolphin, shark, whale, boards, carrier, pickups, boats, birds, and aircraft retain readable silhouettes at 384 x 216;
 - whales forced during big air remain ocean-registered and receive a surface shadow, wake, and state-specific foam instead of inheriting the rider's sky position;
+- mounted whales and Kaki now flip together after stable left/right direction commits, and the animal-assisted dismount inherits that active direction;
 - left/right travel, reversal, switch landing, wake, monotonic water contours, stable traffic travel, and reverse-parallax scenes remain directionally coherent;
 - wildlife and pickup telegraphs stay readable in normal, High Contrast, and Reduced Motion scenes;
 - the normal HUD says Speed and Flow, with no stale POWER meter or seam-required teaching;

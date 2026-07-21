@@ -140,13 +140,19 @@ export class GameplayWave {
         1,
       );
 
-      if (threat.active !== false && this.time > TUNING.curlGrace) {
-        const escalation = smoothstep(TUNING.curlGrace, TUNING.curlRampEnd, this.time);
+      if (threat.active !== false) {
         const paceScale = clamp(
           (Number.isFinite(curlSpeed) ? curlSpeed : TUNING.curlSpeed) / TUNING.curlSpeed,
           0.25,
           2.5,
         );
+        if (this.time <= TUNING.curlGrace) {
+          const openingSpeed = Math.max(0, Number(threatProfile.openingSpeed) || 0);
+          const openingRamp = smoothstep(0.35, 1.5, this.time);
+          this.curlX += openingSpeed * paceScale * openingRamp * dt;
+          return;
+        }
+        const escalation = smoothstep(TUNING.curlGrace, TUNING.curlRampEnd, this.time);
         const skill = clamp(Number(threat.skillMomentum) || 0, 0, 1);
         const speedRelief = smoothstep(
           TUNING.curlReliefSpeedStart,

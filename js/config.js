@@ -158,6 +158,10 @@ export const WAVE_STYLES = Object.freeze({
       proximityFarGap: 100,
       temporalPressureScale: 0.84,
       contactOrigin: true,
+      // The barrel must visibly travel during the protected opening. Curl
+      // collision remains disabled by `curlGrace`, but the shot no longer
+      // appears frozen until the first wipeout consumes that clock.
+      openingSpeed: 6.2,
       // Screen-space pursuit is faster than the classic fixed-frame threat,
       // because a fast rider can now advance the camera and push the barrel
       // completely offscreen. Escalation eventually closes that earned lead.

@@ -320,7 +320,7 @@ test("Twilight lets a fast rider scroll the barrel fully offscreen before it pur
   for (let step = 0; step < 480; step += 1) simulation.update(FIXED_STEP, { x: 1 });
   assert.equal(player.x, WAVE_STYLES.heroBarrel.bounds.cameraX[1], "the rider settles into the forward camera dead zone");
   assert.ok(simulation.cameraWorldX > 70, `camera advanced only ${simulation.cameraWorldX}`);
-  assert.ok(simulation.wave.contactX() < 0, `barrel remained visible at ${simulation.wave.contactX()}`);
+  assert.ok(simulation.wave.contactX() < -58, `complete barrel remained visible at ${simulation.wave.contactX()}`);
 
   const leadCamera = simulation.cameraWorldX;
   for (let step = 0; step < 600 && player.x > 190; step += 1) {
@@ -1167,6 +1167,40 @@ test("simulation-owned wildlife mounts, steers, and creates a deterministic dism
   assert.ok(player.airVY <= -186);
   assert.equal(simulation.aerialSession.manifest.launchData.animalAssist, "dolphin");
   assert.ok(events.some((event) => event.type === "animalDismount"));
+});
+
+test("a mounted whale follows both committed directions and dismounts into the active line", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, { condition: CONDITIONS.twilightGlass });
+  const player = simulation.player;
+  simulation.wave.curlX = -1_000;
+  const whale = simulation.world.forceWildlife("whale", {
+    phase: "mounted",
+    screenX: player.x,
+    y: simulation.wave.ridingY(player.x, player.face),
+    speed: 0,
+    direction: 1,
+  });
+  simulation.mountAnimal("whale");
+
+  for (let step = 0; step < 240 && player.travelDirection > 0; step += 1) {
+    simulation.update(FIXED_STEP, { x: -1 });
+  }
+  assert.equal(player.travelDirection, -1, "whale ride accepts a left-going cutback");
+  assert.equal(whale.direction, -1, "mounted whale art follows the committed left line");
+
+  for (let step = 0; step < 240 && player.travelDirection < 0; step += 1) {
+    simulation.update(FIXED_STEP, { x: 1 });
+  }
+  assert.equal(player.travelDirection, 1, "whale ride can steer back to the right");
+  assert.equal(whale.direction, 1, "mounted whale art returns with the rider");
+
+  for (let step = 0; step < 240 && player.travelDirection > 0; step += 1) {
+    simulation.update(FIXED_STEP, { x: -1 });
+  }
+  simulation.launchAnimalDismount("whale");
+  assert.equal(player.state, "airborne");
+  assert.equal(player.takeoffDirection, -1);
+  assert.ok(player.airVX < 0, `left whale dismount carried airVX=${player.airVX}`);
 });
 
 test("Star Foam saves one shark collision and Moon Pop is consumed by the next launch", () => {

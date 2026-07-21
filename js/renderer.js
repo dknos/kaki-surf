@@ -41,6 +41,14 @@ export function verticalCameraTarget(player, reducedMotion = false) {
   return clamp(Math.max(0, 68 - airY) * 0.72 + height * 10, 0, 62);
 }
 
+/** Distant coast travel is monotonic and therefore cannot flip on a cutback. */
+export function backgroundParallaxPhase(wave, reducedMotion = false) {
+  if (reducedMotion) return 0;
+  const cycle = LOGICAL_WIDTH * 2;
+  const raw = Math.floor(waveSurfaceTravel(wave) * 0.045);
+  return ((raw % cycle) + cycle) % cycle;
+}
+
 export class KakiRenderer {
   constructor(canvas, settings, visualAssets = null) {
     this.canvas = canvas;
@@ -379,7 +387,7 @@ export class KakiRenderer {
   drawSky(simulation) {
     const ctx = this.ctx;
     const p = this.palette;
-    if (this.drawBackgroundAsset()) return;
+    if (this.drawBackgroundAsset(simulation)) return;
     if (this.conditionId === "twilightGlass") {
       this.drawTwilightSky(simulation);
       return;
@@ -429,11 +437,28 @@ export class KakiRenderer {
     ctx.restore();
   }
 
-  drawBackgroundAsset() {
+  drawBackgroundAsset(simulation) {
     if (this.settings.highContrast) return false;
     const image = this.visualAssets?.backgrounds?.[this.conditionId];
     if (!image?.complete || !(image.naturalWidth > 0)) return false;
-    this.ctx.drawImage(image, 0, 0, LOGICAL_WIDTH, 80);
+    const phase = backgroundParallaxPhase(simulation?.wave, this.settings.reducedMotion);
+    if (phase === 0) {
+      this.ctx.drawImage(image, 0, 0, LOGICAL_WIDTH, 80);
+      return true;
+    }
+
+    // The 384px source strip was not authored as a tile. Alternate normal and
+    // mirrored copies so matching source edges meet without a white seam while
+    // the distant coast moves steadily left beneath Kaki's forward progress.
+    const cycle = LOGICAL_WIDTH * 2;
+    for (let x = -phase; x < LOGICAL_WIDTH; x += cycle) {
+      this.ctx.drawImage(image, x, 0, LOGICAL_WIDTH, 80);
+      this.ctx.save();
+      this.ctx.translate(x + LOGICAL_WIDTH * 2, 0);
+      this.ctx.scale(-1, 1);
+      this.ctx.drawImage(image, 0, 0, LOGICAL_WIDTH, 80);
+      this.ctx.restore();
+    }
     return true;
   }
 

@@ -1,29 +1,52 @@
 {
+  "openingStart": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 0.7249999999999999,
+    "wipeouts": 0,
+    "travelDirection": 1,
+    "playerX": 212,
+    "cameraWorldX": 0,
+    "breakX": 30
+  },
+  "openingMove": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 3.0083333333333253,
+    "wipeouts": 0,
+    "travelDirection": 1,
+    "playerX": 248.33125337852297,
+    "cameraWorldX": 0,
+    "breakX": 40.43785724637667
+  },
   "lead": {
     "lifecycle": "running",
     "state": "riding",
-    "elapsed": 1.5583333333333302,
+    "elapsed": 7.291666666666819,
+    "wipeouts": 0,
     "travelDirection": 1,
     "playerX": 316,
-    "cameraWorldX": 70.89080164142302,
-    "breakX": -40.890801641423025
+    "cameraWorldX": 120.71819506001333,
+    "breakX": -58.50387114696912
   },
   "cutback": {
     "lifecycle": "running",
     "state": "riding",
-    "elapsed": 4.441666666666677,
+    "elapsed": 10.125000000000066,
+    "wipeouts": 0,
     "travelDirection": -1,
-    "playerX": 199.33577224808116,
-    "cameraWorldX": 75.2884536601249,
-    "breakX": -45.2884536601249
+    "playerX": 199.44040293785991,
+    "cameraWorldX": 125.35413572844215,
+    "breakX": -59.509659627040094
   },
   "return": {
     "lifecycle": "running",
     "state": "riding",
-    "elapsed": 30.174999999998928,
+    "elapsed": 31.774999999998837,
+    "wipeouts": 0,
     "travelDirection": 1,
     "playerX": 50,
-    "cameraWorldX": 75.2884536601249,
-    "breakX": 20.090736255623654
+    "cameraWorldX": 125.35413572844215,
+    "breakX": 20.45993585697829
   }
 }

@@ -336,6 +336,22 @@ test("whales stay registered to the ocean even when requested during big air", (
   assert.ok(whale.y <= 151, `whale anchor sank below the encounter band at y=${whale.y}`);
 });
 
+test("mounted animal direction follows the rider's stable world direction", () => {
+  const world = new WorldSimulation({ seed: 0xb1d1, condition: "twilightGlass" });
+  const whale = world.forceWildlife("whale", {
+    phase: "mounted",
+    screenX: 232,
+    y: 128,
+    speed: 0,
+    direction: 1,
+  });
+
+  world.update(STEP, context({ direction: -1 }));
+  assert.equal(whale.direction, -1);
+  world.update(STEP, context({ direction: 1 }));
+  assert.equal(whale.direction, 1);
+});
+
 test("Mango Rush, Moon Pop, and Star Foam collect, modify, consume, expire, and reset independently", () => {
   for (const kind of Object.keys(POWERUP_CATALOG)) {
     const world = new WorldSimulation({ seed: 100 + kind.length });

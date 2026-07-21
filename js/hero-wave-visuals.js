@@ -170,13 +170,15 @@ export function drawHeroBackWater(ctx, simulation, palette, settings, presentati
   ctx.fillStyle = palette.waterDeep;
   ctx.fillRect(0, HORIZON_Y - 1, LOGICAL_WIDTH, LOGICAL_HEIGHT - HORIZON_Y + 1);
   ctx.save();
-  // Sparse diagonal depth flecks fall down-face. They do not change direction
-  // when the rider reverses and stay subordinate to the breaker silhouette.
+  // Sparse diagonal depth flecks slide left and fall down-face. They do not
+  // change direction when the rider reverses and stay subordinate to the
+  // breaker silhouette.
   ctx.fillStyle = palette.waterLight;
   ctx.globalAlpha = settings?.highContrast ? 0.26 : 0.12;
   const fall = Math.floor(clock * 0.24) % 17;
+  const forwardDrift = Math.floor(clock * 0.7);
   for (let index = 0; index < 18; index += 1) {
-    const x = 18 + (index * 47) % 366;
+    const x = positiveModulo(18 + index * 47 - forwardDrift, LOGICAL_WIDTH + 36) - 18;
     const y = 96 + ((index * 19 + fall) % 88);
     const length = 3 + index % 5;
     for (let step = 0; step < length; step += 1) {
