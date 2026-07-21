@@ -1,5 +1,33 @@
 # Vertical aerial source selection
 
+## 2.0.1 continuity repair
+
+The first 2.0.0 runtime masters were rejected after live review. They combined
+different provider images across altitude bands and then pasted the original
+384 x 80 coast strip into the center of the result. Once horizontal parallax
+moved beyond that strip, the browser exposed hard rectangular joins, duplicate
+horizons, and mismatched coast scale.
+
+Version 2.0.1 uses one reviewed continuous source per condition:
+
+| Condition | Continuous production source | Source lock |
+| --- | --- | --- |
+| Golden Coast | `imagegen/golden-continuous.png` | `nano/golden-2.png` |
+| Twilight Glass | `imagegen/twilight-continuous.png` | `nano/twilight-2.png` |
+| Stormbreak | `imagegen/storm-continuous.png` | `nano/storm-1.png` |
+
+Each repair source was generated as an edit of the strongest coherent Nano
+candidate after the Grok/Nano composites were compared in-game. The production
+step now performs only a continuous vertical reframe, palette reduction, and
+sharpening. It does not paste the old coast strip, splice providers, blur a
+section boundary, or weld the outer columns into a grey band. The authored
+horizon is placed at master y=500, which is screen y=76 for normal riding.
+
+The exact repair prompt set is checked in beside the sources in
+[`imagegen/README.md`](./imagegen/README.md).
+
+## Original competing candidates
+
 The browser never calls either generator. These are reviewed offline candidates; `tools/art/build-aerial-panoramas.py` is the deterministic production step that publishes the three 1536 x 640 indexed PNGs in `assets/backgrounds`.
 
 ## Candidate matrix
@@ -10,7 +38,8 @@ The browser never calls either generator. These are reviewed offline candidates;
 | Twilight Glass | `grok/twilight-1.jpg`, `grok/twilight-2.jpg` | `nano/twilight-1.png`, `nano/twilight-2.png` | Grok 2 upper aurora/moon/nebula; Nano 2 violet cloud and coast continuity |
 | Stormbreak | `grok/storm-1.png`, `grok/storm-2.png` | `nano/storm-1.png`, `nano/storm-2.png` | Grok 2 stars and above-storm crown; Nano 1 storm interior, coast, and ocean continuity |
 
-The original condition strip is retained at the initial 384 x 80 camera crop. Provider sections meet through a 96-pixel ordered-dither overlap rather than a blurred crossfade. Runtime masters are palette-quantized to 36 colors and their left/right borders are welded without mirroring.
+These candidates remain checked in as the provider comparison record. They are
+not directly spliced into the repaired runtime masters.
 
 ## Grok prompts
 
