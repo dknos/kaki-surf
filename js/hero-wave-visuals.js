@@ -169,6 +169,7 @@ export function drawHeroBackWater(ctx, simulation, palette, settings, presentati
   // structural crest provide depth without any scrolling rails or hard bands.
   ctx.fillStyle = palette.waterDeep;
   ctx.fillRect(0, HORIZON_Y - 1, LOGICAL_WIDTH, LOGICAL_HEIGHT - HORIZON_Y + 1);
+  drawCanonicalFaceStructure(ctx, simulation.wave, palette, settings, clock);
   ctx.save();
   // Sparse diagonal depth flecks slide left and fall down-face. They do not
   // change direction when the rider reverses and stay subordinate to the
@@ -185,6 +186,59 @@ export function drawHeroBackWater(ctx, simulation, palette, settings, presentati
       ctx.fillRect(x - Math.floor(step * 0.5), y + step, 1, index % 5 === 0 ? 2 : 1);
     }
     if (index % 4 === 0) ctx.fillRect(x - 3, y + length + 1, 1, 2);
+  }
+  ctx.restore();
+}
+
+function drawCanonicalFaceStructure(ctx, wave, p, settings, clock) {
+  const highContrast = Boolean(settings?.highContrast);
+  ctx.save();
+
+  // A genuinely darker trough and broad face-depth tint make steepness legible
+  // without inventing a second collision surface.
+  ctx.beginPath();
+  ctx.moveTo(0, wave.ridingY(0, 0.76));
+  for (let x = 0; x <= LOGICAL_WIDTH; x += 6) ctx.lineTo(x, wave.ridingY(x, 0.76));
+  ctx.lineTo(LOGICAL_WIDTH, LOGICAL_HEIGHT);
+  ctx.lineTo(0, LOGICAL_HEIGHT);
+  ctx.closePath();
+  ctx.fillStyle = p.deepInk;
+  ctx.globalAlpha = highContrast ? 0.34 : 0.2;
+  ctx.fill();
+
+  // Five collision-aligned contour seams teach lip, upper face, pocket,
+  // lower face, and trough. They are broken water texture, never glow lanes.
+  const faces = [0.08, 0.24, 0.43, 0.62, 0.82];
+  for (let lane = 0; lane < faces.length; lane += 1) {
+    const face = faces[lane];
+    ctx.strokeStyle = lane === 0 ? p.foamShade : lane >= 3 ? p.water : p.waterLight;
+    ctx.lineWidth = lane === 0 ? 2 : 1;
+    ctx.globalAlpha = highContrast ? 0.58 : lane === 0 ? 0.42 : 0.2;
+    const phase = settings?.reducedMotion ? 0 : Math.floor(clock * (0.22 + lane * 0.035));
+    for (let segment = 0; segment < 8; segment += 1) {
+      const x = positiveModulo(segment * 61 + lane * 19 - phase, LOGICAL_WIDTH + 72) - 36;
+      const length = 20 + positiveModulo(segment * 11 + lane * 7, 23);
+      ctx.beginPath();
+      for (let step = 0; step <= length; step += 4) {
+        const sampleX = x + step;
+        const y = wave.ridingY(sampleX, face);
+        if (step === 0) ctx.moveTo(sampleX, y);
+        else ctx.lineTo(sampleX, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // The power seam is visible as denser flecks in moving water, not a rule.
+  ctx.fillStyle = p.crest;
+  ctx.globalAlpha = highContrast ? 0.76 : 0.34;
+  const drift = settings?.reducedMotion ? 0 : Math.floor(clock * 0.46);
+  for (let index = 0; index < 15; index += 1) {
+    const x = positiveModulo(17 + index * 41 - drift, LOGICAL_WIDTH + 30) - 15;
+    const face = wave.powerFaceAt(x);
+    const y = Math.round(wave.ridingY(x, face));
+    ctx.fillRect(x, y - 1, 3 + index % 4, 1);
+    if (index % 3 === 0) ctx.fillRect(x + 2, y - 3, 2, 1);
   }
   ctx.restore();
 }
@@ -425,7 +479,6 @@ export function drawHeroBarrelFront(
     drawImpactChurn(ctx, geometry, palette, settings, assets, clock, true);
   }
   drawTubeRiderForeground(ctx, simulation, geometry, palette, settings, clock);
-  drawBoardContactSpray(ctx, simulation, palette, settings, assets, Math.floor(clock * 0.42));
 }
 
 function drawPassedSky(ctx, g, repaintTrailingSky) {
@@ -589,35 +642,6 @@ function drawImpactChurn(ctx, g, p, settings, assets, clock, front) {
     const top = Math.round(y - lift * 0.42);
     ctx.fillRect(Math.round(x - width * 0.5), top, width, 3 + index % 2);
     if (width > 6) ctx.fillRect(Math.round(x - width * 0.34), top - 2, Math.max(2, width - 4), 2);
-  }
-  ctx.restore();
-}
-
-function drawBoardContactSpray(ctx, simulation, p, settings, assets, phase) {
-  const player = simulation.player;
-  if (!player || player.state === "airborne" || player.state === "wipeout" || player.state === "complete") return;
-  const x = Number(player.x ?? 208);
-  const y = Number(simulation.wave.ridingY(x, player.face ?? 0.58));
-  const speedRatio = clamp(Number(player.speed ?? 0) / Math.max(1, Number(simulation.currentRideSpeedCap?.() ?? 138)), 0, 1);
-  if (speedRatio < 0.34) return;
-
-  if (!settings?.highContrast && assets?.generated?.twilightHeroWave) {
-    const direction = Math.sign(player.travelDirection ?? 1) || 1;
-    drawAtlasFrame(ctx, assets, "twilightHeroWave", "contactSpray", x - 10, y - 2, {
-      scale: 0.42 + speedRatio * 0.18,
-      flipX: direction < 0,
-      alpha: 0.22 + speedRatio * 0.23,
-    });
-  }
-
-  ctx.save();
-  ctx.fillStyle = p.foam;
-  ctx.globalAlpha = settings?.highContrast ? 0.95 : 0.58;
-  for (let index = 0; index < 7; index += 1) {
-    const direction = Math.sign(player.travelDirection ?? 1) || 1;
-    const dx = direction * (-5 - index * 3);
-    const dy = -2 - ((index * 5 + phase) % 9);
-    ctx.fillRect(Math.round(x + dx), Math.round(y + dy), index % 3 === 0 ? 2 : 1, index % 4 === 0 ? 2 : 1);
   }
   ctx.restore();
 }

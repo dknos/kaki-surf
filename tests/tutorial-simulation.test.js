@@ -52,6 +52,11 @@ function advancePhysicalBasics(simulation, events = []) {
   for (let step = 0; step < 180 && simulation.tutorial.snapshot().id === "carve"; step += 1) {
     update(simulation, { y: -1 }, events);
   }
+  assert.equal(simulation.tutorial.snapshot().id, "cutback");
+
+  for (let step = 0; step < 120 && simulation.tutorial.snapshot().id === "cutback"; step += 1) {
+    update(simulation, { x: -1 }, events);
+  }
   assert.equal(simulation.tutorial.snapshot().id, "launch");
   return events;
 }
@@ -104,18 +109,13 @@ test("physical play and real semantic events complete Surf School exactly once",
   });
   update(simulation, {}, events);
   assert.equal(player.state, "airborne");
-  assert.equal(simulation.tutorial.snapshot().id, "rotate");
+  assert.equal(simulation.tutorial.snapshot().id, "trick");
   assert.ok(events.some((event) => event.type === "launch"));
 
   const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace);
   player.airY = surfaceY - 140;
   player.previousAirY = player.airY;
   player.airVY = -20;
-  for (let step = 0; step < 360 && simulation.tutorial.snapshot().id === "rotate"; step += 1) {
-    update(simulation, { x: 1 }, events);
-  }
-  assert.equal(simulation.tutorial.snapshot().id, "trick");
-  assert.ok(Math.abs(player.rotationAccum) >= Math.PI);
 
   update(simulation, { trick1: true, trick1Pressed: true }, events);
   assert.equal(simulation.tutorial.snapshot().id, "land");
@@ -141,8 +141,8 @@ test("physical play and real semantic events complete Surf School exactly once",
   assert.deepEqual(steps.map((event) => event.payload.id), [
     "drop",
     "carve",
+    "cutback",
     "launch",
-    "rotate",
     "trick",
     "land",
   ]);

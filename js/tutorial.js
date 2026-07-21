@@ -3,39 +3,38 @@ import { clamp } from "./math.js";
 export const SURF_SCHOOL_STEPS = Object.freeze([
   Object.freeze({
     id: "drop",
-    title: "DROP DOWNHILL",
-    hint: "HOLD DOWN / STICK DOWN",
+    title: "DROP FOR SPEED",
+    hint: "DOWN",
   }),
   Object.freeze({
     id: "carve",
-    title: "CARVE BACK UP",
-    hint: "HOLD UP / STICK UP",
+    title: "CLIMB WITH CARRIED SPEED",
+    hint: "UP",
+  }),
+  Object.freeze({
+    id: "cutback",
+    title: "CUT BACK",
+    hint: "REVERSE YOUR LINE",
   }),
   Object.freeze({
     id: "launch",
-    title: "LOAD BOARD + HIT LIP",
-    hint: "HOLD ACTION / RELEASE UP HIGH",
-  }),
-  Object.freeze({
-    id: "rotate",
-    title: "ROTATE IN THE AIR",
-    hint: "HOLD LEFT OR RIGHT",
+    title: "HIT THE LIP",
+    hint: "ACTION AT THE CREST",
   }),
   Object.freeze({
     id: "trick",
-    title: "ADD A TRICK",
-    hint: "TAP OR HOLD TRICK",
+    title: "TRICK",
+    hint: "F OR X",
   }),
   Object.freeze({
     id: "land",
-    title: "LAND BOARD-FIRST",
-    hint: "MATCH THE LAND GUIDE",
+    title: "MATCH THE LANDING",
+    hint: "FOLLOW THE TANGENT",
   }),
 ]);
 
 const DROP_HOLD = 0.28;
 const CARVE_HOLD = 0.24;
-const ROTATION_TARGET = Math.PI;
 
 /**
  * Renderer-independent first-run lesson. Progress comes from physical state
@@ -127,13 +126,13 @@ export class SurfSchool {
         satisfied = this.progress >= 1;
         break;
       }
+      case "cutback":
+        this.progress = clamp(Number(player?.turnForce) || 0, 0, 1);
+        satisfied = (Number(player?.reversalCount) || 0) > 0;
+        break;
       case "launch":
         this.progress = this.launchSeen ? 1 : clamp(Number(player?.charge) || 0, 0, 0.92);
         satisfied = this.launchSeen;
-        break;
-      case "rotate":
-        this.progress = clamp(Math.abs(Number(player?.rotationAccum) || 0) / ROTATION_TARGET, 0, 1);
-        satisfied = this.progress >= 1;
         break;
       case "trick":
         this.progress = this.trickSeen ? 1 : 0;

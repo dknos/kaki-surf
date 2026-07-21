@@ -1,6 +1,6 @@
 # Responsive QA
 
-Date: 2026-07-20.
+Date: 2026-07-21.
 
 The responsive browser matrix is separate from the canonical 1280 × 720 renderer gallery. It covers shell layout and lifecycle UI at these CSS viewports:
 
@@ -37,14 +37,14 @@ Use `KAKI_SURF_QA_URL` to point the capture pass at another local static server 
 - Pause, settings, results, menu, visibility loss, blur, and stable portrait/landscape transitions clear active touch pointers before hiding and making the cluster inert.
 - Page/dialog surfaces use `touch-action: pan-y` while the Canvas and gameplay clusters retain `touch-action: none`; an emulated touch drag at 844 x 390 traversed the full 383 px Settings overflow range.
 - Resuming restores the cluster only when Touch Controls remains enabled.
-- At 390 × 844, the D-pad ends at x = 152 and the action cluster starts at x = 176, leaving a 24 px gutter. Optional spin controls and Turbo occupy the upper band without overlapping the right direction button; Trick and Action retain the lower primary positions.
+- At 390 × 844, the D-pad ends at x = 152 and the action cluster starts at x = 176, leaving a 24 px gutter. Simple shows only Trick and Action; Advanced restores the upper Q/E/Turbo band and the T/Twist button without overlapping the right direction button.
 - The explicit in-run **II** control, all top controls, and every directional target retain at least a 44 px physical hit area. On short landscape screens the top controls stack in the right letterbox instead of covering the FANS panel, and the D-pad remains unscaled at 45 px.
 
 ## Current measured pass
 
-A Chrome DevTools Protocol audit applied real device metrics rather than relying on the headless browser's minimum window width. At 390 × 844 and DPR 2, the Canvas measured x = 3..387; every touch target remained inside x = 12..378. The D-pad ended at x = 151, spin controls occupied x = 176..266, Turbo x = 266..318, Special x = 320..378 when ready, Trick x = 228..296, and Action x = 302..378. At 844 × 390, both control clusters move above the in-canvas FAST and FLOW panels with a visible gutter; the six action targets use a non-overlapping 3-by-2 grid and the 44 px top controls occupy the right letterbox. A held Action pointer was then carried through a real emulated orientation change: play paused, the active class cleared, and the touch layer became hidden/inert. Settings made the entire touch layer `display: none`, `hidden`, and inert.
+A Chrome DevTools Protocol audit applied real device metrics rather than relying on the headless browser's minimum window width. At 390 × 844 and DPR 2, the Canvas measured x = 3..387; every touch target remained inside x = 12..378. Simple mode exposes only the D-pad, Trick, and Action. Advanced retains its non-overlapping upper Q/E/Turbo row and lower Trick/T/Action row. At 844 × 390, both clusters retain a visible gutter and the 44 px top controls occupy the right letterbox. A held Action pointer was then carried through a real emulated orientation change: play paused, the active class cleared, and the touch layer became hidden/inert. Settings made the entire touch layer `display: none`, `hidden`, and inert.
 
-A supplemental 320 × 700 pass covered menu, Settings, Simple touch, and Advanced touch. It keeps a 24 px gap between clusters, preserves 44–45 px essential targets without transform scaling, and uses a non-overlapping 3-by-2 action grid: Q/E/Turbo above Trick/Special/Action. The compact Settings value column remains wide enough to show the complete control-mode label.
+A supplemental 320 × 700 pass covered menu, Settings, Simple touch, and Advanced touch. It keeps a 24 px gap between clusters, preserves 44–45 px essential targets without transform scaling, and keeps Advanced's Q/E/Turbo and Trick/T/Action grid distinct from the two-button Simple surface. The compact Settings value column remains wide enough to show the complete control-mode label.
 
 The 2026-07-20 hero-tube rerun captured 25 shell states to a temporary review directory and passed at 1280 x 720, 844 x 390, and 390 x 844. The crest clears the top HUD, Kaki/board remain centered inside the pocket, the bottom Tube panel clears Speed/Flow, the gravity front stays readable, and neither the whitewater edge nor the playfield clips. Because the active-scene override replaces the ordinary mobile fixture, this focused rerun validates composition only; the separate lifecycle matrix above remains the touch-control evidence.
 

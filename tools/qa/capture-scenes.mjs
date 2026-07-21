@@ -65,19 +65,27 @@ async function evaluate(expression) {
   return result.result?.value;
 }
 
-async function waitForReady(timeout = 10_000) {
+async function waitForReady(expectedScene, previousDocumentToken, timeout = 10_000) {
   const started = Date.now();
   while (Date.now() - started < timeout) {
-    if (await evaluate("Boolean(globalThis.kakiSurf && document.readyState === 'complete')")) return;
+    const scene = JSON.stringify(expectedScene);
+    const token = JSON.stringify(previousDocumentToken);
+    if (await evaluate(`Boolean(
+      globalThis.kakiSurf
+      && document.readyState === 'complete'
+      && new URLSearchParams(location.search).get('qa') === ${scene}
+      && globalThis.__kakiCaptureDocument !== ${token}
+    )`)) return;
     await sleep(50);
   }
-  throw new Error("Timed out waiting for Kaki Surf");
+  throw new Error(`Timed out waiting for Kaki Surf scene ${expectedScene}`);
 }
 
 await mkdir(outputDir, { recursive: true });
 await call("Runtime.enable");
 await call("Log.enable");
 await call("Network.enable");
+await call("Network.setCacheDisabled", { cacheDisabled: true });
 await call("Page.enable");
 await call("Emulation.setDeviceMetricsOverride", {
   width: 1280,
@@ -89,11 +97,14 @@ await call("Emulation.setDeviceMetricsOverride", {
 });
 
 for (const scene of scenes) {
+  const documentToken = `${scene}-${Date.now()}-${sequence}`;
+  await evaluate(`globalThis.__kakiCaptureDocument = ${JSON.stringify(documentToken)}`);
   const url = new URL(baseUrl);
   url.searchParams.set("qa", scene);
   url.searchParams.set("capture", "canonical-cdp");
   await call("Page.navigate", { url: url.toString() });
-  await waitForReady();
+  await waitForReady(scene, documentToken);
+  await evaluate("document.activeElement?.blur()");
   await sleep(180);
   const viewport = await evaluate("({ width: innerWidth, height: innerHeight })");
   if (viewport.width !== 1280 || viewport.height !== 720) {

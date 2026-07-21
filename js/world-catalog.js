@@ -193,7 +193,7 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
       mid: Object.freeze(["gullFlock", "pelican", "sailboat", "speedboat", "fishingBoat", "bannerPlane", "seaplane"]),
       near: Object.freeze(["pelican", "gullFlock", "fishSchool", "bannerPlane"]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0.62, shark: 0.3, whale: 0.08 }),
+    wildlifeWeights: Object.freeze({ dolphin: 0.7, shark: 0.3, whale: 0 }),
   }),
   twilightGlass: Object.freeze({
     id: "twilightGlass",
@@ -210,7 +210,7 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
       mid: Object.freeze(["fishingBoat", "ternFlock", "gullFlock", "helicopter", "bannerPlane", "seaplane"]),
       near: Object.freeze(["ternFlock", "pelican", "fishSchool", "bannerPlane"]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0.52, shark: 0.34, whale: 0.14 }),
+    wildlifeWeights: Object.freeze({ dolphin: 0.62, shark: 0.38, whale: 0 }),
   }),
   stormbreak: Object.freeze({
     id: "stormbreak",
@@ -224,7 +224,7 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
       mid: Object.freeze(["gullFlock", "rescueCraft", "tugboat", "helicopter", "bannerPlane"]),
       near: Object.freeze(["gullFlock", "pelican", "bannerPlane"]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0.38, shark: 0.48, whale: 0.14 }),
+    wildlifeWeights: Object.freeze({ dolphin: 0.44, shark: 0.56, whale: 0 }),
   }),
 });
 

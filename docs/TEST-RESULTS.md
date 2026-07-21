@@ -1,6 +1,6 @@
 # Validation checklist and results
 
-Date: 2026-07-20.
+Date: 2026-07-21.
 
 ## Automated checkpoint
 
@@ -12,28 +12,28 @@ npm run check
 git diff --check
 ```
 
-The current native Node run passed **187 tests with 0 failures**. `npm run check` parsed **30 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
+The current native Node run passed **200 tests with 0 failures**. `npm run check` parsed **33 JavaScript modules** successfully.
 
 The current suite covers:
 
-- Simple and Advanced control-mode selection, common Shift/L3/touch Turbo input, Twilight travelling-break fresh-save default with returning-profile preservation, migration of older saves to Advanced, mode-switch clearing, keyboard aliases, 120 ms action edges, active-second-gamepad selection, dead zone, and independent touch pointers.
+- Simple line/Action/Trick-only input and HUD contracts, Advanced Turbo plus Q/E/F/T, mode-switch clearing, aliases, edge buffering, gamepad selection, dead zone, and independent touch pointers.
 - Controller UI confirm/back edges, dominant-axis navigation, deliberate hold repeat, spatial focus selection, in-place range/select adjustment, and an allocation-free no-pad poll/consume path.
 - Native slider/select/checkbox/button keyboard behavior while Settings is open, modal gameplay-input suppression, safe Escape cleanup, and scrollable touch surfaces outside the Canvas control zone.
 - Simple context-Trick buffering, tap/hold interpretation, scored held Tube Tuck/Soul Arch in the eligible pocket, entry/hold hysteresis, pocket-exit grace, release-required re-arm, exclusive tube maneuver ownership, coherent best-ride duration/score records, finish-run grading, short foreground exit tail, pose cleanup, gated aerial fallback, spin impulses, board-specific auto-level, and nearest regular/opposite landing alignment.
 - Advanced Q/E/F/T on-wave context, direct aerial actions, ordered multi-trick manifests, rotation naming, trick gates, provisional scoring, exact-repeat decay, landing bank, and wipeout loss.
-- Committed bidirectional reversals, nearly full-screen held-input side-scroller traversal, visible protected-opening barrel advance, monotonic distant-coast/face-fleck parallax, forward-only Twilight camera advance, an earned fully offscreen barrel gap, independent break pursuit, signed `travelDirection` and legacy `worldTravel`, velocity scrubbing, switch takeoff/landing data, score/Flow response, and sprite/wake direction contracts.
+- Canonical screen/world velocity, exact board/path heading, mirrored left/right wakes, no front-facing wake, 0.35–0.5 second cutbacks, speed scrub, full-face traversal, airborne wake suppression, and signed landing/mount direction.
 - Signed scenic parallax, seven accumulated nonnegative decorative-water clocks, a pause-safe fall clock driven by simulation wave time rather than rider speed/direction, bounded camera influence that prevents traffic ping-pong, and boat-only far/mid waterline bands.
 - Prioritized gameplay callouts with duplicate suppression, stale-message expiry, a bounded queue, readable minimum display beats, mechanic-channel replacement for Tube Open/Tuck/Clean Exit, and no simultaneous text overlap; the polite live region independently queues 1.25-second announcements and promotes danger instead of replacing speech mid-phrase.
-- Six-step Surf School progression driven by real drop, carve, launch, rotation, trick, and landing outcomes; wipeout recovery, one-time completion, save handoff, and replay reset.
+- Six-step Surf School progression driven by real drop, climb, cutback, lip, trick, and landing outcomes.
 - Event-led Flow integrity: idle and rapid input flicks cannot farm combo, while sustained arcs and rhythmically valid pumps beat spam.
 - Escalating monotonic curl pressure, eight-second opening grace, skilled relief, bounded respawn recovery, deterministic idle/skilled threat windows, and collision-aligned profile-specific contact.
 - Condition-first wave-profile installation, shared long-face rendering across `classic` and `heroBarrel` physics, x=30 opening contact, expanded ride/air bounds, six staged travelling-break sections, a monotonically growing passed-sky window, fixed-grid gravity columns with persistent contrails, one nonmirroring collision edge, and canonical aerial collision at the visible pitching lip.
-- Surface-gradient downhill acceleration, uphill cost, traverse drive, board hard caps, pump enhancement, speed-derived big air, landing carry, and separation of Speed from Flow.
+- Carried-energy downhill acceleration, low-drag traverse, uphill cost without instant momentum erasure, reversal scrub, pump enhancement, and landing carry.
 - Finite face-only Turbo drain, real acceleration and 14% overdrive headroom, release decay, wipeout preservation/loss, and clean/perfect landed-trick refill scaling by completed entries, rotation, grade, and exact-repeat decay; empty pops and wobble returns stay at zero.
 - Board-specific steering, pop, air correction, landing windows, Simple correction strengths, and the 18% scoring reduction for explicit Steering/Landing assists.
 - Seeded `WorldSimulation` traffic pools, layer capacity and culling, stable stream isolation, quiet periods, wildlife phase machines, swept collision/reachability, powerup collection/consumption, carrier/airshow state, and bounded signal queues.
 - Bird reactions and harmless final-moment dodge, one-shot Feather Thread, courier and aircraft drops, no-penalty speedboat/jet-ski races, Dolphin/Fleet foam gates, and deterministic style-score integration.
-- Dolphin/whale mount and dismount interactions, right/left mounted-animal facing and directional dismount carry, ocean-registered whale spawn anchors during big air, shark telegraph/contact/near-miss behavior, Mango Rush, Moon Pop, Star Foam, and semantic event/audio wiring.
+- Whale per-phase draw/water/collision/foam metadata, deterministic breach endpoints, foreground masking, zero production spawn weights, plus forced QA ramp/mount/splash coverage.
 - Lifecycle-owned audio transport with bounded scheduling after long pauses, finite saved gain values, separate board-contact and airborne-wind layers, priority ducking, a dynamics limiter, suspended-context resume, and persistent master mute.
 - Asset-manifest paths for all 13 runtime atlas families, generated-atlas dimensions, four-second optional-image timeout/fallback behavior, preserved offline wave-source hashing and conversion, local-only static imports, 384 x 216 backing Canvas, and no runtime remote generation dependency.
 - Capability-aware touch lifecycle gating, explicit 44 px Pause/top controls, unscaled 45 px short-landscape D-pad, a measured 24 px portrait gutter, accessible Settings name, and rotation-safe held-pointer neutralization.
@@ -42,12 +42,10 @@ The current suite covers:
 
 ## Browser QA status
 
-The canonical local-browser matrix contains 122 completed deterministic captures, including six locked Twilight travelling-break stages, separate right/left whale rides, and the rideable-tube, big-air-camera, and active-Turbo fixtures:
+The canonical local-browser matrix contains 128 deterministic captures.
 
-- The gallery, capture script, and contact-sheet source contain the same **122 scene identifiers**.
-- The checked-in capture directory contains all **122 normalized 1280 x 720 renders**. `docs/images/qa-contact-sheet.png` is the complete assembly and includes Gather, Pitch, Pour, Deep, Maximum, Collapse, Tube, Air, Turbo, and both whale-ride directions.
-- The persistent-CDP gallery pass completed all 122 scenes with no reported page exception, console error, or HTTP-error response. The Turbo fixture remains visually distinct from ordinary max speed and exposes the compact tank plus signed boost wake.
-- A real-browser Shift probe started an ordinary Twilight Endless run, reached riding with a full tank, held Shift for 650 ms, and observed Turbo active at 0.766 charge; releasing Shift left the same charge and cleared the active state. The probe reported zero browser errors. Native simulation coverage separately verifies the overdrive speed delta and landed-trick refill path.
+- The gallery, capture script, contact-sheet source, and checked-in directory contain the same **128 scene identifiers**.
+- A focused persistent-CDP pass recaptured 18 changed scenes with no page, runtime, console, or HTTP error: Core Surf Lab, Simple input/HUD, mirror wakes, uphill/reversal, launch/landing, and whale breach/ramp/splash states.
 - The current CDP play probe exercised menu, native Settings slider input, modal Space suppression, native dialog close, start, pause, resume, corrupt-save reload, and a 100-restart stress loop with a stable 436-node DOM. It completed with **0 console errors, 0 uncaught exceptions, and 0 failed runtime loads**; the checked-in SVG favicon also removes the previous optional 404.
 - A fresh five-scene CDP release scan loaded menu, maximum-break, active-tube, big-air, and results states from the final local tree with **0 console errors, 0 uncaught exceptions, and 0 failed or HTTP-error runtime loads**.
 - Fresh Chromium interaction probes selected and started both modes. Score Attack exposed `START SCORE ATTACK`, `78 SECONDS`, a finite 78-second snapshot, and the `78 SEC BEST` record; Endless exposed `CHASE THE HORIZON`, `3 PAWS / NO CLOCK`, a null public timer, Set 1, and the `ENDLESS BEST` record. Both probes reported **0 page errors**.

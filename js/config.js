@@ -225,10 +225,13 @@ export const TUNING = {
   faceEdgeBounce: 0.28,
   downhillAcceleration: 104,
   uphillSpeedCost: 40,
+  rideEnergyDrag: 2.4,
   traverseDrive: 3.2,
-  reversalCommitTime: 0.085,
+  // A committed cutback should draw a readable arc instead of snapping the
+  // presentation direction as soon as the velocity crosses zero.
+  reversalCommitTime: 0.3,
   reversalCommitSpeed: 7,
-  reversalScrub: 13.5,
+  reversalScrub: 22,
   wavePush: 15.5,
   // Turbo is an earned overdrive: one full tank lasts just under three
   // seconds, raises the board envelope by 14%, and is refilled only when an
@@ -299,7 +302,7 @@ export const TUNING = {
   lateralCoast: 3,
   sideScrollGlideBase: 9,
   sideScrollGlideSpeed: 0.09,
-  sideScrollSteerBase: 18,
+  sideScrollSteerBase: 20,
   sideScrollSteerSpeed: 0.1,
   sideScrollMaxSpeed: 52,
   launchForce: 112,

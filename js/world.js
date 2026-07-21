@@ -28,6 +28,7 @@ import {
   sweptCircleDistanceSquared,
   worldXForScreenX,
 } from "./world-collision.js";
+import { whaleFrameMetadata } from "./whale-contract.js";
 
 const STREAM_SALTS = Object.freeze({
   far: 0x0f41a7c1,
@@ -90,6 +91,7 @@ export class WorldSimulation {
     this.lastInteractiveSpawn = -Infinity;
     this.lastCameraWorldX = 0;
     this.wipeoutReactionLatched = false;
+    this.qaQuiet = Boolean(qa?.quiet);
     this.streams = createStreams(this.seed, this.conditionId);
     resetStepContext(this.context);
 
@@ -125,6 +127,12 @@ export class WorldSimulation {
     copyStepContext(this.context, context, this.lastCameraWorldX);
     this.lastCameraWorldX = this.context.cameraWorldX;
     this.elapsed += seconds;
+
+    if (this.qaQuiet) {
+      this.updateBonuses(seconds);
+      this.refreshModifiers();
+      return this;
+    }
 
     this.updateBonuses(seconds);
     this.updateReactiveBirdBeat();
@@ -1359,7 +1367,7 @@ export class WorldSimulation {
     entity.active = true;
     entity.phase = phase;
     entity.previousPhase = phase;
-    entity.phaseTime = 0;
+    entity.phaseTime = clamp(finite(options.phaseTime), 0, finite(definition.phases[phase], 1));
     entity.spawnTime = this.elapsed;
     entity.worldX = worldXForScreenX(screenX, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
     entity.previousWorldX = entity.worldX;
@@ -1375,6 +1383,12 @@ export class WorldSimulation {
     entity.nearAwarded = false;
     entity.nearCandidate = false;
     entity.collidable = phase === "catchable" || phase === "crossing" || phase === "ramp";
+    entity.phaseDuration = finite(definition.phases[phase], 1);
+    entity.waterAnchorY = screenY;
+    entity.previousWaterAnchorY = screenY;
+    entity.collisionY = screenY;
+    entity.previousCollisionY = screenY;
+    if (kind === "whale") this.syncWhaleMetadata(entity);
     entity.cooldownUntil = Math.max(entity.cooldownUntil, this.elapsed + definition.cooldown);
     this.lastInteractiveSpawn = this.elapsed;
     this.interactiveQuietUntil = Math.max(
@@ -1397,12 +1411,15 @@ export class WorldSimulation {
       const definition = WILDLIFE_CATALOG[entity.kind];
       entity.previousWorldX = entity.worldX;
       entity.previousY = entity.y;
+      entity.previousWaterAnchorY = entity.waterAnchorY;
+      entity.previousCollisionY = entity.collisionY;
       entity.previousPhase = entity.phase;
       entity.phaseTime += dt;
 
       if (entity.phase === "mounted") {
         entity.worldX = worldXForScreenX(this.context.player.x, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
         entity.y = this.context.player.y + (entity.kind === "whale" ? 9 : 5);
+        if (entity.kind === "whale") entity.waterAnchorY = this.context.player.y + 7;
         // Once mounted, the animal belongs to Kaki's current line rather than
         // its original encounter path. Update only after the rider's stable
         // direction commit so whale and dolphin art flip with real steering.
@@ -1410,7 +1427,10 @@ export class WorldSimulation {
       } else if (entity.phase !== "telegraph" && entity.phase !== "distant" && entity.phase !== "blow") {
         entity.worldX += entity.vx * dt;
         entity.y += entity.vy * dt;
+        if (entity.kind === "whale") entity.waterAnchorY += entity.vy * dt;
       }
+
+      if (entity.kind === "whale") this.syncWhaleMetadata(entity);
 
       if (entity.kind === "dolphin") this.updateDolphin(entity, definition);
       else if (entity.kind === "shark") this.updateShark(entity, definition);
@@ -1502,10 +1522,25 @@ export class WorldSimulation {
     }
   }
 
+  syncWhaleMetadata(entity) {
+    const metadata = whaleFrameMetadata(entity);
+    entity.drawAnchorX = metadata.drawAnchor.x;
+    entity.drawAnchorY = metadata.drawAnchor.y;
+    entity.waterContactY = metadata.waterContactAnchor.y;
+    entity.collisionY = metadata.collision.y;
+    entity.collisionRadius = entity.radius * metadata.collision.radiusScale;
+    entity.phaseScale = metadata.phaseScale;
+    entity.phaseRotation = metadata.rotation;
+    entity.occlusionDepth = metadata.occlusionDepth;
+    entity.foamOriginX = metadata.foamOrigin.x;
+    entity.foamOriginY = metadata.foamOrigin.y;
+  }
+
   setWildlifePhase(entity, phase) {
     entity.previousPhase = entity.phase;
     entity.phase = phase;
     entity.phaseTime = 0;
+    entity.phaseDuration = finite(WILDLIFE_CATALOG[entity.kind]?.phases?.[phase], 1);
     entity.collidable = phase === "catchable" || phase === "crossing" || phase === "ramp";
     this.emitEvent("wildlifePhase", entity);
     if (entity.kind === "dolphin" && phase === "mounted") {
@@ -1534,7 +1569,7 @@ export class WorldSimulation {
       this.context.player.radius,
       entityPrevious,
       entityCurrent,
-      entity.radius,
+      entity.kind === "whale" ? entity.collisionRadius : entity.radius,
     );
   }
 
@@ -1731,14 +1766,18 @@ export class WorldSimulation {
       1,
       WORLD_LIMITS.centerX,
     );
-    scratch.entityPrevious.y = entity.previousY;
+    scratch.entityPrevious.y = Number.isFinite(entity.previousCollisionY)
+      ? entity.previousCollisionY
+      : entity.previousY;
     scratch.entityCurrent.x = projectWorldX(
       entity.worldX,
       this.context.cameraWorldX,
       1,
       WORLD_LIMITS.centerX,
     );
-    scratch.entityCurrent.y = entity.y;
+    scratch.entityCurrent.y = Number.isFinite(entity.collisionY)
+      ? entity.collisionY
+      : entity.y;
     return scratch;
   }
 
@@ -1905,6 +1944,20 @@ function createWildlifeEntity(kind, index) {
     previousWorldX: 0,
     y: 0,
     previousY: 0,
+    waterAnchorY: 0,
+    previousWaterAnchorY: 0,
+    waterContactY: 0,
+    collisionY: 0,
+    previousCollisionY: 0,
+    collisionRadius: 0,
+    phaseDuration: 1,
+    phaseScale: 1,
+    phaseRotation: 0,
+    drawAnchorX: 0,
+    drawAnchorY: 0,
+    occlusionDepth: 0,
+    foamOriginX: 0,
+    foamOriginY: 0,
     vx: 0,
     vy: 0,
     direction: 1,
@@ -1929,6 +1982,20 @@ function resetWildlifeEntity(entity, resetCooldown = true) {
   entity.previousWorldX = 0;
   entity.y = 0;
   entity.previousY = 0;
+  entity.waterAnchorY = 0;
+  entity.previousWaterAnchorY = 0;
+  entity.waterContactY = 0;
+  entity.collisionY = 0;
+  entity.previousCollisionY = 0;
+  entity.collisionRadius = 0;
+  entity.phaseDuration = 1;
+  entity.phaseScale = 1;
+  entity.phaseRotation = 0;
+  entity.drawAnchorX = 0;
+  entity.drawAnchorY = 0;
+  entity.occlusionDepth = 0;
+  entity.foamOriginX = 0;
+  entity.foamOriginY = 0;
   entity.vx = 0;
   entity.vy = 0;
   entity.direction = 1;
@@ -2368,6 +2435,18 @@ function snapshotEntity(entity) {
     previousWorldX: entity.previousWorldX,
     y: entity.y,
     previousY: entity.previousY,
+    waterAnchorY: entity.waterAnchorY,
+    waterContactY: entity.waterContactY,
+    collisionY: entity.collisionY,
+    collisionRadius: entity.collisionRadius,
+    phaseDuration: entity.phaseDuration,
+    phaseScale: entity.phaseScale,
+    phaseRotation: entity.phaseRotation,
+    drawAnchorX: entity.drawAnchorX,
+    drawAnchorY: entity.drawAnchorY,
+    occlusionDepth: entity.occlusionDepth,
+    foamOriginX: entity.foamOriginX,
+    foamOriginY: entity.foamOriginY,
     vx: entity.vx,
     vy: entity.vy,
     direction: entity.direction,

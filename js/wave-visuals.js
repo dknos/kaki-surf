@@ -101,7 +101,7 @@ export function advanceWavePresentationClocks(
   if (deltaTravel <= 0) return clocks;
 
   const safeCap = Math.max(1, Number(speedCap) || 138);
-  const speedRatio = clamp(Math.abs(Number(player?.speed ?? 0)) / safeCap, 0, 1);
+  const speedRatio = clamp(Math.abs(Number(player?.motionSpeed ?? player?.speed ?? 0)) / safeCap, 0, 1);
   const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
   const speedIntensity = smoothstep(0.68, 0.98, speedRatio);
   clocks.backWater += deltaTravel * (0.18 + speedRatio * 0.12);
@@ -179,7 +179,7 @@ export function drawLayeredWave(
   const wave = simulation.wave;
   const player = simulation.player;
   const speedCap = publishedSpeedCap(simulation);
-  const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
+  const speedRatio = clamp(Number(player?.motionSpeed ?? player?.speed ?? 0) / speedCap, 0, 1);
   const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
   traceWaveFace(ctx, wave, 0, 1.36);
   ctx.fillStyle = palette.waterDeep;

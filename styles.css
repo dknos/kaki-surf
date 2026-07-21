@@ -1500,6 +1500,16 @@ input[type="range"]::-moz-range-thumb {
 .touch-actions .touch-spin--left { left: 0; top: auto; }
 .touch-actions .touch-spin--right { left: 42px; top: auto; }
 
+#kaki-surf-root[data-control-mode="simple"] .touch-actions .touch-spin,
+#kaki-surf-root[data-control-mode="simple"] .touch-actions .touch-turbo,
+#kaki-surf-root[data-control-mode="simple"] .touch-actions .touch-special {
+  display: none !important;
+}
+
+#kaki-surf-root[data-control-mode="simple"] .touch-actions {
+  width: 158px;
+}
+
 #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin span::after {
   content: " TRICK";
 }
@@ -1596,7 +1606,7 @@ input[type="range"]::-moz-range-thumb {
 
   .touch-dpad,
   .touch-actions {
-    /* Clear the in-canvas FAST and FLOW panels at the lower corners. */
+    /* Clear the contextual combo panel and preserve the playfield read. */
     bottom: max(62px, calc(env(safe-area-inset-bottom) + 52px));
   }
 
