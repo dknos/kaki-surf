@@ -12,7 +12,7 @@ npm run check
 git diff --check
 ```
 
-The current native Node run passed **200 tests with 0 failures**. `npm run check` parsed **33 JavaScript modules** successfully.
+The current native Node run passed **201 tests with 0 failures**. `npm run check` parsed **33 JavaScript modules** successfully.
 
 The current suite covers:
 

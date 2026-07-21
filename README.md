@@ -97,7 +97,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **200/200 tests** and the syntax gate checks **33 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, and the reduced Simple HUD. The local gallery contains **128 deterministic 1280 x 720 captures**, including Core Surf Lab, both travel directions, downhill mirror pairs, uphill carry, reversal, launch/landing, and whale takeoff/apex/return. This checkpoint is local and does not claim that GitHub Pages has refreshed.
+The native suite passes **201/201 tests** and the syntax gate checks **33 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, the reduced Simple HUD, and the visible package-version contract. The local gallery contains **128 deterministic 1280 x 720 captures**, including Core Surf Lab, both travel directions, downhill mirror pairs, uphill carry, reversal, launch/landing, and whale takeoff/apex/return. This checkpoint is local and does not claim that GitHub Pages has refreshed.
 
 ## Static deployment and integration
 

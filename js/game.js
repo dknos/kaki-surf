@@ -3,6 +3,7 @@ import {
   CONDITIONS,
   DEFAULT_RUN_MODE_ID,
   FIXED_STEP,
+  GAME_VERSION,
   LOGICAL_HEIGHT,
   LOGICAL_WIDTH,
   MAX_FRAME_DELTA,
@@ -1569,7 +1570,7 @@ function gameMarkup() {
         <div class="game-layer title-layer" data-layer="menu">
           <div class="title-lockup" aria-label="Kaki Surf">
             <span class="pixel-sun" aria-hidden="true"></span>
-            <p>PLUSH POCKET ARCADE</p>
+            <p>PLUSH POCKET ARCADE <span class="build-version" aria-label="version ${GAME_VERSION}">v${GAME_VERSION}</span></p>
             <h1>KAKI <i>SURF</i></h1>
             <span class="title-wave" aria-hidden="true"></span>
           </div>
