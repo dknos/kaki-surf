@@ -243,7 +243,7 @@ test("production scheduling disables whales until the repaired contract is delib
   }
 });
 
-test("Simple persistent HUD contains only score, run resource, and contextual combo", () => {
+test("persistent HUD contains score, run resource, Turbo, and contextual combo", () => {
   const base = {
     coreSurfLab: false,
     mode: { timed: false },
@@ -251,16 +251,16 @@ test("Simple persistent HUD contains only score, run resource, and contextual co
     score: { comboHeat: 0 },
     currentMultiplier: () => 1,
   };
-  assert.deepEqual(persistentHudContract(base).fields, ["score", "paws"]);
+  assert.deepEqual(persistentHudContract(base).fields, ["score", "paws", "turbo"]);
   const timed = { ...base, mode: { timed: true } };
-  assert.deepEqual(persistentHudContract(timed).fields, ["score", "time"]);
+  assert.deepEqual(persistentHudContract(timed).fields, ["score", "time", "turbo"]);
   const combo = {
     ...base,
     score: { comboHeat: 0.6 },
     currentMultiplier: () => 1.8,
   };
-  assert.deepEqual(persistentHudContract(combo).fields, ["score", "paws", "combo"]);
-  for (const forbidden of ["speed", "turbo", "flow", "set", "pump", "special"]) {
+  assert.deepEqual(persistentHudContract(combo).fields, ["score", "paws", "turbo", "combo"]);
+  for (const forbidden of ["speed", "flow", "set", "pump", "special"]) {
     assert.equal(persistentHudContract(combo).fields.includes(forbidden), false);
   }
   assert.deepEqual(

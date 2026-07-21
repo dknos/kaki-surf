@@ -200,6 +200,10 @@ export class KakiRenderer {
       case "launch":
         this.spawnSpray(player.tailX, player.tailY, 17, 1.6);
         this.shake = Math.max(this.shake, 0.22);
+        if (payload.wingedLaunch) {
+          this.spawnSparkles(player.airX, player.airY, 12);
+          this.impact = Math.max(this.impact, 0.9);
+        }
         break;
       case "apex":
         this.spawnSparkles(player.airX, player.airY, 6);
@@ -1022,6 +1026,35 @@ export class KakiRenderer {
       drawPixelText(ctx, "PAWS", 305, 9, { color: p.foamShade, shadow: p.ink });
       for (let index = 0; index < simulation.tuning.maxWipeouts; index += 1) {
         drawPaw(ctx, 338 + index * 12, 10, index < simulation.tuning.maxWipeouts - simulation.wipeouts ? p.gold : p.danger, p.ink);
+      }
+    }
+
+    if (contract.fields.includes("turbo")) {
+      const turbo = clamp(Number(player.turbo) || 0, 0, 1);
+      const meterX = 143;
+      const meterY = 11;
+      const meterWidth = 140;
+      panel(ctx, 101, 5, 190, 19, p.deepInk, p.waterDeep);
+      drawPixelText(ctx, "TURBO", 106, 9, {
+        color: player.turboActive ? p.gold : p.foamShade,
+        shadow: p.ink,
+      });
+      ctx.fillStyle = p.ink;
+      ctx.fillRect(meterX, meterY, meterWidth, 7);
+      ctx.fillStyle = p.water;
+      ctx.fillRect(meterX + 2, meterY + 2, meterWidth - 4, 3);
+      const fillWidth = Math.round((meterWidth - 4) * turbo);
+      if (fillWidth > 0) {
+        ctx.fillStyle = player.turboActive ? p.gold : turbo < 0.2 ? p.danger : p.sun;
+        ctx.fillRect(meterX + 2, meterY + 2, fillWidth, 3);
+        if (player.turboActive && fillWidth > 4) {
+          ctx.fillStyle = p.white;
+          ctx.fillRect(meterX + 2, meterY + 2, Math.max(2, Math.round(fillWidth * 0.2)), 1);
+        }
+      }
+      ctx.fillStyle = p.deepInk;
+      for (let segment = 1; segment < 8; segment += 1) {
+        ctx.fillRect(meterX + Math.round(segment * meterWidth / 8), meterY + 1, 1, 5);
       }
     }
 

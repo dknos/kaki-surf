@@ -11,6 +11,7 @@ export function persistentHudContract(simulation = {}) {
     });
   }
   const fields = ["score", simulation.mode?.timed === false ? "paws" : "time"];
+  fields.push("turbo");
   const multiplier = Number(simulation.currentMultiplier?.() ?? 1);
   const player = simulation.player ?? {};
   const combo = multiplier > 1.15 && (

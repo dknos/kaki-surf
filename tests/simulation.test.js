@@ -1136,7 +1136,7 @@ test("a launched aerial banks only after a perfect landing and returns to riding
   assert.equal(landing?.payload.quality, "perfect");
   assert.equal(simulation.player.state, "landing");
   assert.equal(simulation.player.landingQuality, "perfect");
-  assert.equal(simulation.player.speed, landingSpeedCap);
+  assert.equal(simulation.player.speed, landingSpeedCap * TUNING.landingBoostHeadroom);
   assert.equal(simulation.player.landingCarryDuration, TUNING.perfectLandingCarry);
   assert.equal(simulation.player.landingCarryTimer, TUNING.perfectLandingCarry);
   assert.ok(simulation.score.total > preLandingTotal);
@@ -1149,6 +1149,44 @@ test("a launched aerial banks only after a perfect landing and returns to riding
   for (let step = 0; step < 40; step += 1) simulation.update(FIXED_STEP, {});
   assert.equal(simulation.player.state, "riding");
   assert.equal(simulation.aerialSession, null);
+});
+
+test("a correctly aligned landing produces a temporary speed burst above the normal cap", () => {
+  const simulation = prepareLaunch(BOARDS.mangoFish);
+  const normalCap = simulation.baseRideSpeedCap();
+  simulation.player.speed = normalCap * 0.9;
+  forceContact(simulation, 0);
+  simulation.update(FIXED_STEP, {});
+
+  assert.equal(simulation.player.landingQuality, "perfect");
+  assert.ok(simulation.player.speed > normalCap, `landing speed ${simulation.player.speed} did not clear ${normalCap}`);
+  assert.ok(simulation.player.landingCarrySpeed > normalCap);
+  for (let step = 0; step < 12; step += 1) simulation.update(FIXED_STEP, {});
+  assert.ok(simulation.player.speed > normalCap, "the landing burst should be readable after contact");
+});
+
+test("a recent committed curl at a forty-five degree lip approach wings the initial spin", () => {
+  const winged = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
+  const plain = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
+  for (const simulation of [winged, plain]) {
+    Object.assign(simulation.player, {
+      state: "lip",
+      face: 0.02,
+      boardAngle: Math.PI / 4,
+      faceVelocity: -0.7,
+      slopeDrive: -0.7,
+      speed: 126,
+    });
+  }
+  winged.player.lastQualifiedCarveAt = winged.elapsed - 0.2;
+  plain.player.lastQualifiedCarveAt = -Infinity;
+  winged.launch({ x: 1 });
+  plain.launch({ x: 1 });
+
+  assert.equal(winged.player.aerialWingedLaunch, true);
+  assert.equal(plain.player.aerialWingedLaunch, false);
+  assert.ok(winged.player.angularVelocity > plain.player.angularVelocity * 2);
+  assert.equal(winged.aerialSession.manifest.launchData.wingedLaunch, true);
 });
 
 test("the opposite surface tangent is a valid switch landing with signed carry and bonus", () => {

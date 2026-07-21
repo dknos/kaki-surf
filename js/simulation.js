@@ -1066,7 +1066,7 @@ export class SurfSimulation {
         : 0;
       player.speed = Math.max(player.speed, player.landingCarrySpeed * (0.9 + carryRatio * 0.1));
     }
-    player.speed = clamp(player.speed, 34, this.currentRideSpeedCap());
+    player.speed = clamp(player.speed, 34, this.currentSpeedCapWithLandingCarry());
 
     player.lateralVelocity = player.travelVelocity;
     player.x += player.travelVelocity * dt;
@@ -1162,6 +1162,8 @@ export class SurfSimulation {
     beginCarveArc(player, sign);
     if (!qualified) return;
 
+    player.lastQualifiedCarveAt = this.elapsed;
+
     const carveCallout = this.score.registerCarve(completedSign, multiplier);
     if (!carveCallout) return;
     player.skillMomentum = clamp(
@@ -1196,6 +1198,12 @@ export class SurfSimulation {
     const launchCharge = clamp(Number(player.charge) || 0, 0, 1);
     const turboAtLaunch = Boolean(player.turboActive);
     const turboOverdriveAtLaunch = clamp(Number(player.turboOverdrive) || 0, 0, 1);
+    const lipAngle = Math.abs(Number(player.boardAngle) || 0);
+    const wingedLaunch = this.controlMode === "advanced"
+      && Math.abs(Number(input.x) || 0) >= 0.25
+      && this.elapsed - player.lastQualifiedCarveAt <= TUNING.wingedCurlWindow
+      && Math.abs(lipAngle - TUNING.wingedLipAngle) <= TUNING.wingedLipAngleTolerance
+      && uphillApproach >= 0.38;
     const launchEnergy = clamp(
       0.68
         + speedRatio * 0.42
@@ -1244,11 +1252,14 @@ export class SurfSimulation {
     player.aerialSpaceQualified = aerialProfile.spaceQualified;
     player.aerialMilestoneTier = 0;
     player.aerialReentryFired = false;
+    player.aerialWingedLaunch = wingedLaunch;
     player.rotationAccum = 0;
     // In Simple Controls the directional axis steers the line in the air; it
     // must not also spin the board. Deliberate body rotation remains available
     // in Advanced Controls, while Simple's single Trick action owns its pose.
-    player.angularVelocity = this.controlMode === "advanced" ? input.x * 1.6 : 0;
+    player.angularVelocity = this.controlMode === "advanced"
+      ? input.x * (wingedLaunch ? TUNING.wingedInitialSpin : 1.6)
+      : 0;
     player.takeoffDirection = player.travelDirection;
     player.landingDirection = player.travelDirection;
     player.bodyAngle = player.boardAngle;
@@ -1284,6 +1295,7 @@ export class SurfSimulation {
         aerialLineQuality: aerialProfile.lineQuality,
         turboLaunch: aerialProfile.turbo,
         spaceQualified: aerialProfile.spaceQualified,
+        wingedLaunch,
         pocketRisk: launchRisk,
         multiplier: launchMultiplier,
         boardStyle: this.board.style,
@@ -1311,7 +1323,15 @@ export class SurfSimulation {
       aerialZone: aerialProfile.zone,
       aerialCeiling: aerialProfile.ceiling,
       spaceQualified: aerialProfile.spaceQualified,
+      wingedLaunch,
     });
+    if (wingedLaunch) {
+      this.emit("callout", {
+        text: "WING IT!",
+        subtext: "45 DEGREE CURL",
+        tone: "perfect",
+      });
+    }
   }
 
   updateAirborne(dt, input) {
@@ -1328,6 +1348,7 @@ export class SurfSimulation {
       player.angularVelocity += input.x
         * this.tuning.rotationAcceleration
         * this.board.rotation
+        * (player.aerialWingedLaunch ? TUNING.wingedAirRotationScale : 1)
         * dt;
     } else {
       player.angularVelocity = damp(player.angularVelocity, 0, 12, dt);
@@ -1512,6 +1533,7 @@ export class SurfSimulation {
 
   land(quality, error, surfaceAngle, landingDirection = this.player.takeoffDirection) {
     const player = this.player;
+    const approachSpeed = player.speed;
     if (quality === "wobble" && this.world.getModifiers().protectsFlow) {
       quality = "clean";
       this.world.consumePowerup("starFoam", "landingSave");
@@ -1558,8 +1580,17 @@ export class SurfSimulation {
     player.lateralVelocity = player.travelVelocity;
     player.landingDirection = player.travelDirection;
     player.switchStance = player.travelDirection !== player.runStartDirection;
-    const preservation = quality === "perfect" ? 1.035 : quality === "clean" ? 0.94 : 0.74;
-    player.speed = clamp(player.speed * preservation, 38, this.currentRideSpeedCap());
+    const normalCap = this.currentRideSpeedCap();
+    const boostMultiplier = quality === "perfect"
+      ? TUNING.perfectLandingSpeedBoost
+      : quality === "clean"
+        ? TUNING.cleanLandingSpeedBoost
+        : 0.74;
+    const boostKick = quality === "perfect" ? 8 : quality === "clean" ? 4 : 0;
+    const landingCap = quality === "wobble"
+      ? normalCap
+      : normalCap * TUNING.landingBoostHeadroom;
+    player.speed = clamp(player.speed * boostMultiplier + boostKick, 38, landingCap);
     player.landingCarryDuration = quality === "perfect"
       ? finiteTuning(this.tuning.perfectLandingCarry, TUNING.perfectLandingCarry)
       : quality === "clean"
@@ -1599,6 +1630,7 @@ export class SurfSimulation {
       trick: result.trick,
       signature: result.signature,
       banked: result.total,
+      speedBoost: Math.max(0, player.speed - approachSpeed),
       landingDirection,
       switch: Boolean(manifest?.switchLanding),
     });
@@ -1621,7 +1653,7 @@ export class SurfSimulation {
     player.speed = clamp(
       player.speed - (player.state === "wobble" ? 8 : -2) * dt,
       36,
-      this.currentRideSpeedCap(),
+      this.currentSpeedCapWithLandingCarry(),
     );
     if (player.landingCarryTimer > 0) {
       player.landingCarryTimer = Math.max(0, player.landingCarryTimer - dt);
@@ -1752,6 +1784,12 @@ export class SurfSimulation {
       TUNING.turboSpeedCapMultiplier,
     );
     return base * (1 + envelope * (multiplier - 1));
+  }
+
+  currentSpeedCapWithLandingCarry() {
+    const normalCap = this.currentRideSpeedCap();
+    if (!(this.player.landingCarryTimer > 0)) return normalCap;
+    return Math.max(normalCap, Number(this.player.landingCarrySpeed) || 0);
   }
 
   constrainRidingX() {
@@ -2522,6 +2560,7 @@ function createPlayer() {
     compression: 0,
     charge: 0,
     lastPumpAt: -1e6,
+    lastQualifiedCarveAt: -1e6,
     carveArcSign: 0,
     carveArcStartFace: 0.48,
     carveArcDuration: 0,
@@ -2556,6 +2595,7 @@ function createPlayer() {
     aerialSpaceQualified: false,
     aerialMilestoneTier: 0,
     aerialReentryFired: false,
+    aerialWingedLaunch: false,
     wobble: 0,
     wipeoutCause: "",
     wipeoutSpin: 0,
@@ -2672,6 +2712,7 @@ function resetPlayer(
   player.compression = 0;
   player.charge = 0;
   player.lastPumpAt = -1e6;
+  player.lastQualifiedCarveAt = -1e6;
   resetCarveArcState(player);
   resetContextTrick(player.contextTrick);
   player.lipMemory = 0;
@@ -2703,6 +2744,7 @@ function resetPlayer(
   player.aerialSpaceQualified = false;
   player.aerialMilestoneTier = 0;
   player.aerialReentryFired = false;
+  player.aerialWingedLaunch = false;
   player.wobble = 0;
   player.wipeoutCause = "";
   player.wipeoutSpin = 0;

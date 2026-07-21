@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.0.4";
+export const GAME_VERSION = "2.0.5";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -329,6 +329,14 @@ export const TUNING = {
   perfectLandingCarry: 0.58,
   cleanLandingCarry: 0.4,
   wobbleLandingCarry: 0.18,
+  perfectLandingSpeedBoost: 1.18,
+  cleanLandingSpeedBoost: 1.1,
+  landingBoostHeadroom: 1.12,
+  wingedCurlWindow: 1.25,
+  wingedLipAngle: Math.PI / 4,
+  wingedLipAngleTolerance: Math.PI / 12,
+  wingedInitialSpin: 4.8,
+  wingedAirRotationScale: 1.45,
   wipeoutThreshold: 1.18,
   cameraResponse: 5.8,
   juiceIntensity: 1,
