@@ -111,7 +111,6 @@ A riding Tube Tuck enters when the local zone is `critical` or risk is at least 
 | `simpleAutoLevelStart` | 18 | Downward velocity at which Simple auto-level starts |
 | `simpleTrickBuffer` | 0.34 s | Context Trick request lifetime |
 | `simpleGrabHold` | 0.115 s | Hold threshold that selects a grab |
-| `simpleSpinImpulse` | 1.8 | Q/E or bumper spin impulse in Simple mode |
 | `perfectLandingCarry` | 0.58 s | Speed-preservation window after a perfect landing |
 | `cleanLandingCarry` | 0.40 s | Speed-preservation window after a clean landing |
 | `wobbleLandingCarry` | 0.18 s | Reduced carry after a wobble |
@@ -137,13 +136,13 @@ landingTolerance * board.landing * assistScale * (1 - trickRisk * 0.18)
 
 `assistScale` is 1.4 with Landing Assist and 1 otherwise. The recovery limit is the smaller of `wipeoutThreshold` and 1.7 times the resolved clean tolerance. Perfect ignores board and trick-risk modifiers. A landing more than 2.25 radians out of line receives the `BOARD FIRST!` wipeout language after the contact window.
 
-Simple mode begins board-specific auto-level after downward velocity exceeds 18. It chooses the nearer of the surface tangent and that tangent plus π, allowing a real opposite-facing landing without guaranteeing it. Landing direction commits to signed travel on contact. Perfect, clean, and wobble speed preservation factors are 1.035, 0.94, and 0.74, followed by their short carry windows.
+Simple mode uses horizontal input for air steering without also accumulating body rotation. It begins board-specific auto-level after downward velocity exceeds 18 and chooses the nearer of the surface tangent and that tangent plus π, allowing a real opposite-facing landing without guaranteeing it. Advanced mode retains directional body rotation. Landing direction commits to signed travel on contact. Perfect, clean, and wobble speed preservation factors are 1.035, 0.94, and 0.74, followed by their short carry windows.
 
 ## World envelope
 
 `js/world-catalog.js` keeps world tuning separate from rider tuning. Far, mid, and near traffic pools have capacities 8, 8, and 3 with parallax 0.08, 0.32, and 0.88. Wildlife and powerup pools each have capacity 3; at most two bonuses can be active. Interactions and presentation events use fixed 16- and 32-record arrays. A 7-second initial grace and 3.5-second minimum interactive quiet period prevent immediate or stacked hazards.
 
-Condition profiles change wind, density, traffic lists, dolphin/shark/whale weights, and the selected wave style. Golden Coast and Stormbreak use `classic`; Twilight Glass uses `heroBarrel`. Each style owns deterministic ride/air bounds and collision geometry through the shared wave-query API. Spawn streams are separately seeded so adding cosmetic traffic does not perturb interactive wildlife or powerup timing.
+Condition profiles change wind, density, traffic lists, dolphin/shark/whale weights, and the selected wave style. Golden Coast and Stormbreak use `classic`; Twilight Glass uses `heroBarrel`. Each style owns deterministic ride/air bounds and collision geometry through the shared wave-query API. Both production styles use a broad forward camera dead zone: x=76..324 for `classic` and x=74..316 for `heroBarrel`. Forward overflow scrolls instead of killing horizontal velocity at the right edge, while the classic x=76 pocket boundary preserves its opening safety gap. Spawn streams are separately seeded so adding cosmetic traffic does not perturb interactive wildlife or powerup timing.
 
 ## Aerial trick gates
 
@@ -215,4 +214,4 @@ Exact signatures retain direction, rotation size, ordered trick IDs, grab hold b
 
 ## Presentation and access defaults
 
-`cameraResponse` is 5.8 and `juiceIntensity` is 1; both are presentation-only. While airborne, the vertical camera target combines distance above logical y = 68 with up to 10 pixels of max-height contribution and clamps the result to 0..62. It eases back to zero outside air; Reduced Motion forces the target to zero. New saves use Simple Controls, Wave Read Assist `full`, Reduced Flash on, 70% screen shake, touch controls on, and steering/landing assists off. Saves created before `controlMode` existed migrate to Advanced so their learned mapping remains intact; fresh and malformed saves use Simple. Either steering or landing assistance multiplies the score by 0.82. Reduced Motion, Reduced Flash, High Contrast, and Wave Read modes do not change physics or scoring.
+`cameraResponse` is 5.8 and `juiceIntensity` is 1; both are presentation-only. Canonical aerial altitude drives nonlinear 0..174 framing shelves, but the wave/water world receives no vertical translation. Only an airborne board whose real `airY` would cross the logical y=52 safe band receives enough of the eased framing offset to remain readable; small airs therefore do not move the stage. Reduced Motion scales the framing target to 72% rather than disabling required visibility. New saves use Simple Controls, Wave Read Assist `full`, Reduced Flash on, 70% screen shake, touch controls on, and steering/landing assists off. Saves created before `controlMode` existed migrate to Advanced so their learned mapping remains intact; fresh and malformed saves use Simple. Either steering or landing assistance multiplies the score by 0.82. Reduced Motion, Reduced Flash, High Contrast, and Wave Read modes do not change physics or scoring.

@@ -1231,7 +1231,10 @@ export class SurfSimulation {
     player.aerialMilestoneTier = 0;
     player.aerialReentryFired = false;
     player.rotationAccum = 0;
-    player.angularVelocity = input.x * 1.6;
+    // In Simple Controls the directional axis steers the line in the air; it
+    // must not also spin the board. Deliberate body rotation remains available
+    // in Advanced Controls, while Simple's single Trick action owns its pose.
+    player.angularVelocity = this.controlMode === "advanced" ? input.x * 1.6 : 0;
     player.takeoffDirection = player.travelDirection;
     player.landingDirection = player.travelDirection;
     player.bodyAngle = player.boardAngle;
@@ -1307,17 +1310,14 @@ export class SurfSimulation {
     const apex = Math.abs(player.airVY) < 14;
     const gravityScale = apex ? 0.42 : 1;
 
-    if (this.controlMode === "simple") {
-      if (input.spinLeftPressed) player.angularVelocity -= finiteTuning(
-        this.tuning.simpleSpinImpulse,
-        TUNING.simpleSpinImpulse,
-      );
-      if (input.spinRightPressed) player.angularVelocity += finiteTuning(
-        this.tuning.simpleSpinImpulse,
-        TUNING.simpleSpinImpulse,
-      );
+    if (this.controlMode === "advanced") {
+      player.angularVelocity += input.x
+        * this.tuning.rotationAcceleration
+        * this.board.rotation
+        * dt;
+    } else {
+      player.angularVelocity = damp(player.angularVelocity, 0, 12, dt);
     }
-    player.angularVelocity += input.x * this.tuning.rotationAcceleration * this.board.rotation * dt;
     player.angularVelocity -= player.angularVelocity * this.tuning.angularDrag * dt;
     player.bodyAngle += player.angularVelocity * dt;
     player.rotationAccum += player.angularVelocity * dt;
@@ -1772,10 +1772,11 @@ export class SurfSimulation {
     const previousKey = positionKey === "airX" ? "previousAirX" : "previousX";
     this.player[previousKey] = Math.min(Number(this.player[previousKey]) || maxX, maxX);
     this.cameraWorldX += shift;
-    // curlX is the break's projected screen coordinate. Moving the camera
-    // forward pushes the world-space barrel left and can take it fully out of
-    // frame; GameplayWave's own update keeps pursuing to screen-right.
-    this.wave.curlX -= shift;
+    // Twilight's authored travelling barrel is world-coupled and may leave
+    // frame when Kaki earns a lead. The classic California-style stage keeps
+    // its breaking edge screen-authored while scenery scrolls behind it, so an
+    // idle rider cannot escape the threat merely by reaching the dead zone.
+    if (this.wave.profile.threat?.cameraCoupled) this.wave.curlX -= shift;
     return shift;
   }
 

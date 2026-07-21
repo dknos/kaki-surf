@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.0.1";
+export const GAME_VERSION = "2.0.2";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -44,8 +44,12 @@ export const WAVE_STYLES = Object.freeze({
     // renderer prevents the retired mini-curl/white-shelf path from returning.
     renderer: "heroBarrel",
     bounds: Object.freeze({
-      ridingX: Object.freeze([76, 338]),
-      airX: Object.freeze([58, 350]),
+      // Every production condition uses the same California Games-style
+      // forward dead zone. Kaki crosses the face before forward overflow
+      // scrolls the break; the right edge never hard-stops board motion.
+      ridingX: Object.freeze([76, 350]),
+      airX: Object.freeze([58, 352]),
+      cameraX: Object.freeze([76, 324]),
     }),
     surface: Object.freeze({
       crestBase: 75,
@@ -163,6 +167,7 @@ export const WAVE_STYLES = Object.freeze({
       // collision remains disabled by `curlGrace`, but the shot no longer
       // appears frozen until the first wipeout consumes that clock.
       openingSpeed: 6.2,
+      cameraCoupled: true,
       // Screen-space pursuit is faster than the classic fixed-frame threat,
       // because a fast rider can now advance the camera and push the barrel
       // completely offscreen. Escalation eventually closes that earned lead.
@@ -318,7 +323,6 @@ export const TUNING = {
   simpleAutoLevelStart: 18,
   simpleTrickBuffer: 0.34,
   simpleGrabHold: 0.115,
-  simpleSpinImpulse: 1.8,
   perfectLandingCarry: 0.58,
   cleanLandingCarry: 0.4,
   wobbleLandingCarry: 0.18,

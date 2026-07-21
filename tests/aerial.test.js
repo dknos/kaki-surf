@@ -8,6 +8,7 @@ import {
   aerialCameraTarget,
   aerialPanoramaCropX,
   aerialPanoramaCropY,
+  aerialRiderFrameOffset,
   aerialZoneForAltitude,
   qualifyAerialLaunch,
 } from "../js/aerial.js";
@@ -123,6 +124,18 @@ test("camera shelves and zone thresholds escalate without a hard image swap", ()
     "STRATOSPHERE KAKI",
     "KAKI IN ORBIT",
   ]);
+});
+
+test("high-air framing moves only the rider after the real path leaves the safe band", () => {
+  assert.equal(aerialRiderFrameOffset({ state: "riding", airY: -84 }, 170), 0);
+  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: 68 }, 42), 0);
+  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: 24 }, 80), 28);
+  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: -84 }, 170), 136);
+  assert.equal(
+    -84 + aerialRiderFrameOffset({ state: "airborne", airY: -84 }, 170),
+    52,
+    "an orbital rider is framed without translating the wave shelf",
+  );
 });
 
 test("only a strong Turbo lip launch reaches orbit in the fixed-step simulation", () => {

@@ -8,7 +8,11 @@ import { GameplayWave } from "../js/wave.js";
 function beginRiding({ curlX = -1_000 } = {}) {
   const simulation = new SurfSimulation({ seed: 0x4b414b49 });
   simulation.tutorialEnabled = false;
-  simulation.reset({ board: BOARDS.mangoFish, controlMode: "advanced" });
+  simulation.reset({
+    board: BOARDS.mangoFish,
+    controlMode: "advanced",
+    worldQa: { quiet: true },
+  });
   simulation.begin();
   Object.assign(simulation.player, {
     state: "riding",

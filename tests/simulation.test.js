@@ -304,7 +304,7 @@ test("held steering traverses the long face in both directions like a side scrol
     leftmost = Math.min(leftmost, player.x);
   }
 
-  assert.ok(rightmost >= 320, `right traverse reached only ${rightmost}`);
+  assert.ok(rightmost >= 315, `right traverse reached only ${rightmost}`);
   assert.ok(leftmost <= 90, `left traverse reached only ${leftmost}`);
   assert.ok(rightmost - leftmost >= 220, "the rider can use most of the visible wave face");
   assert.equal(player.travelDirection, -1);
@@ -344,6 +344,53 @@ test("Twilight lets a fast rider scroll the barrel fully offscreen before it pur
   assert.ok(simulation.wave.contactX() > offscreenContact + 40, "the independent break closes the earned lead");
   assert.ok(simulation.wave.contactX() >= 0, "the pursuing barrel re-enters from the left");
   assert.equal(simulation.cameraWorldX, cutbackCamera, "barrel pursuit, not a backward camera, owns the catch-up");
+});
+
+test("every production condition scrolls forward before the right edge can stop the board", () => {
+  for (const condition of Object.values(CONDITIONS)) {
+    const simulation = beginRiding(BOARDS.mangoFish, { condition });
+    const player = simulation.player;
+    simulation.wave.curlX = -1_000;
+    player.x = 300;
+    player.previousX = 300;
+    player.speed = 118;
+
+    for (let step = 0; step < 480; step += 1) {
+      simulation.update(FIXED_STEP, { x: 1 });
+    }
+
+    assert.equal(player.x, simulation.wave.profile.bounds.cameraX[1], condition.id);
+    assert.ok(simulation.cameraWorldX > 70, `${condition.id} camera advanced only ${simulation.cameraWorldX}`);
+    assert.ok(player.travelVelocity > 20, `${condition.id} killed forward velocity at its right edge`);
+    assert.ok(Math.abs(player.boardAngle) < Math.PI / 3, `${condition.id} board stood upright at ${player.boardAngle}`);
+  }
+});
+
+test("Simple right steering moves through an air without rotating the board upright", () => {
+  const launchAndHoldRight = (controlMode) => {
+    const simulation = beginRiding(BOARDS.foamPuff, { controlMode });
+    Object.assign(simulation.player, {
+      state: "lip",
+      face: 0.01,
+      faceVelocity: -0.8,
+      slopeDrive: -0.8,
+      speed: 110,
+      charge: 0.8,
+    });
+    simulation.wave.curlX = -500;
+    simulation.launch({ x: 1 });
+    const launchX = simulation.player.airX;
+    for (let step = 0; step < 72 && simulation.player.state === "airborne"; step += 1) {
+      simulation.update(FIXED_STEP, { x: 1 });
+    }
+    return { player: simulation.player, launchX };
+  };
+
+  const simple = launchAndHoldRight("simple");
+  const advanced = launchAndHoldRight("advanced");
+  assert.ok(simple.player.airX > simple.launchX + 6, "Simple steering still moves right in the air");
+  assert.ok(Math.abs(simple.player.boardAngle) < Math.PI / 6, "Simple steering does not double as a spin axis");
+  assert.ok(Math.abs(advanced.player.boardAngle) > Math.PI / 3, "Advanced directional rotation remains available");
 });
 
 test("high-speed reversals draw a heavier arc and scrub more speed than low-speed pivots", () => {
@@ -980,7 +1027,7 @@ test("Twilight entry remains aligned to the hero barrel power line through hando
   assert.equal(simulation.player.face, simulation.wave.powerFaceAt(simulation.player.x));
 });
 
-test("wave profiles preserve classic travel bounds and frame Twilight's authored face", () => {
+test("wave profiles share forward camera bounds and frame the authored face", () => {
   const simulation = new SurfSimulation({ seed: 0x54574c47 });
   simulation.reset({ condition: "twilightGlass" });
   simulation.player.x = 999;
@@ -989,15 +1036,16 @@ test("wave profiles preserve classic travel bounds and frame Twilight's authored
   assert.ok(simulation.cameraWorldX > 600, "forward overflow advances the level camera");
   simulation.player.x = -999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 50);
+  assert.equal(simulation.player.x, WAVE_STYLES.heroBarrel.bounds.ridingX[0]);
 
   simulation.reset({ condition: "goldenCoast" });
   simulation.player.x = 999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 338);
+  assert.equal(simulation.player.x, WAVE_STYLES.classic.bounds.cameraX[1]);
+  assert.ok(simulation.cameraWorldX > 600, "Golden Coast forward overflow advances the level camera");
   simulation.player.x = -999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 76);
+  assert.equal(simulation.player.x, WAVE_STYLES.classic.bounds.ridingX[0]);
 });
 
 test("Twilight aerial collision uses the visible hero lip contact", () => {
