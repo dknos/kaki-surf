@@ -151,6 +151,23 @@ export function aerialCameraTarget(altitude = 0, reducedMotion = false) {
   return target * (reducedMotion ? 0.72 : 1);
 }
 
+/**
+ * High airs use a rider-only framing offset. The physical wave stays locked to
+ * its authored screen shelf, while Kaki is held inside the readable top band
+ * only after the real flight path would otherwise leave the frame.
+ */
+export function aerialRiderFrameOffset(
+  player,
+  cameraOffset = 0,
+  safeBoardY = 52,
+) {
+  if (player?.state !== "airborne") return 0;
+  const airY = Number(player.airY);
+  if (!Number.isFinite(airY)) return 0;
+  const required = Math.max(0, Number(safeBoardY) - airY);
+  return Math.min(required, Math.max(0, Number(cameraOffset) || 0));
+}
+
 export function aerialPanoramaCropY(
   altitude = 0,
   height = AERIAL_PANORAMA.height,

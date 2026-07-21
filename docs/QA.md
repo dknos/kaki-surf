@@ -14,15 +14,15 @@ npm run check
 git diff --check
 ```
 
-Current result: **209/209 tests pass** and **34 JavaScript modules pass syntax checking**.
+Current result: **212/212 tests pass** and **34 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
 | Group | Required scenes | What must be visible | Status |
 | --- | --- | --- | --- |
 | Entry/UI | Endless/Score Attack selector, menu, settings Simple, settings Advanced, six-step Surf School, results | Immediate start action before customization on portrait; mode-specific labels and records; Twilight travelling break and Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or overlapping long result rows | Pass |
-| Core ride | Core Surf Lab, right/left travel, downhill-right/downhill-left, uphill, reversal, launch, landing | One canonical path vector owns board, rider, wake, spray, camera, and audio; trajectory foam always trails; the drop/climb/cutback line reads without rewards or wildlife | Pass |
-| Air/landing | Small/medium/huge air, Coastal Sky/Cloud Layer/Upper Atmosphere/Kaki Space in all conditions, re-entry, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Canonical nonlinear altitude samples a seamless tall panorama; only a qualified Turbo lip launch reaches space; signed horizontal travel, foreground cloud depth, altitude audio, early camera return, landing guide, board/body separation, and landing tangent remain legible | Pass |
+| Core ride | Core Surf Lab, right/left travel, downhill-right/downhill-left, uphill, reversal, launch, landing | One canonical path vector owns board, rider, wake, spray, camera, and audio; every condition scrolls at the forward dead zone; trajectory foam always trails; the drop/climb/cutback line reads without rewards or wildlife | Pass |
+| Air/landing | Small/medium/huge air, Coastal Sky/Cloud Layer/Upper Atmosphere/Kaki Space in all conditions, re-entry, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Canonical nonlinear altitude samples a seamless tall panorama behind a vertically fixed wave; only a qualified Turbo lip launch reaches space; Simple steering does not rotate the board; rider-only framing, signed horizontal travel, cloud depth, altitude audio, landing guide, and landing tangent remain legible | Pass |
 | Wildlife | Dolphin and shark phases; whale distant, breach start/apex/return, ramp, rides, and splash | Whale art, collision, foam, and foreground mask share one water anchor; production whale weights remain zero | Pass |
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, expiration, consumption, protected event, plane drop | Unique silhouettes and temporary callouts; no persistent powerup meter; consumption and harmless misses remain visible | Pass |
 | Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation without traffic ping-pong, stable facing, breaker-aware occlusion, readable reactive text, and watercraft grounded in waterline bands | Pass |
@@ -54,7 +54,7 @@ Current result: **209/209 tests pass** and **34 JavaScript modules pass syntax c
 - In every condition, verify the broad broken crest, diagonal gravity front, long face, and impact churn read as one connected break; new column heads must fall top-to-bottom while older foam tiles remain fixed and the registered edge advances left-to-right, independent of rider reversal.
 - Verify the passed-left region restores real level sky/backwater rather than a white slab, the rear whitewater fades without a vertical source seam, and no boats, aircraft, carrier art, or horizontal rail intrudes into the wave composition.
 - Hold Simple Trick in the critical pocket, confirm Tube Tuck/Soul Arch scores continuously with reduced steering authority, then confirm release or leaving the pocket clears the pose.
-- For large air, confirm the coast drops continuously, each authored altitude tier enters without blank exposure or a hard swap, signed horizontal parallax survives reversal, the rider remains visible, and the landing guide appears before the dangerous descent.
+- For large air, confirm the authored panorama advances continuously behind a vertically fixed wave shelf, each altitude tier enters without blank exposure or a hard swap, signed horizontal parallax survives reversal, only the rider receives top-of-frame assistance, and the landing guide remains visible before descent.
 
 ## Contact-sheet result
 

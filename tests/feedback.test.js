@@ -274,6 +274,13 @@ test("canonical aerial altitude reveals authored sky while Reduced Motion keeps 
   assert.ok(verticalCameraTarget(highAir, true) > 0, "Reduced Motion still keeps exceptional air on-screen");
   assert.ok(verticalCameraTarget(highAir, true) < verticalCameraTarget(highAir));
   assert.equal(verticalCameraTarget({ state: "riding", airY: 18, maxAirHeight: 94 }), 0);
+
+  const rendererSource = readFileSync(new URL("../js/renderer.js", import.meta.url), "utf8");
+  assert.doesNotMatch(
+    rendererSource,
+    /ctx\.translate\(0,\s*cameraY\)/,
+    "the aerial camera must not translate the complete wave/water world",
+  );
 });
 
 test("aerial panorama parallax preserves signed travel and freezes to the center crop", () => {

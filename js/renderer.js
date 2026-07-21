@@ -3,6 +3,7 @@ import {
   aerialCameraTarget,
   aerialPanoramaCropX,
   aerialPanoramaCropY,
+  aerialRiderFrameOffset,
 } from "./aerial.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
@@ -372,7 +373,6 @@ export class KakiRenderer {
     const motionScale = this.settings.reducedMotion ? 0 : this.settings.screenShake * TUNING.juiceIntensity;
     const shakeX = Math.round(Math.sin(this.time * 71) * this.shake * motionScale);
     const shakeY = Math.round(Math.cos(this.time * 53) * this.shake * motionScale * 0.55);
-    const cameraY = Math.round(this.cameraY);
     const heroBarrel = isHeroBarrelWave(simulation.wave);
     const allowsBackgroundTraffic = this.conditionId !== "twilightGlass";
     ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
@@ -382,10 +382,10 @@ export class KakiRenderer {
     this.drawSky(simulation);
     this.drawAerialDepthLayer(simulation, false);
 
-    // Water, wave, traffic, and rider share one world camera. The tall sky is
-    // sampled independently from canonical altitude so no blank band can open.
+    // Keep the wave on its authored shelf. High-air framing is applied only to
+    // Kaki below; translating the whole water world makes the wave appear to
+    // jump with the rider and destroys the readable California Games stage.
     ctx.save();
-    ctx.translate(0, cameraY);
     // Twilight keeps a pristine hero-wave sky. Other conditions retain only
     // correctly depth-sorted traffic behind the break: no craft is allowed to
     // paste across the barrel, rider, or falling-water curtain.
@@ -396,7 +396,6 @@ export class KakiRenderer {
     }
     ctx.restore();
     ctx.save();
-    ctx.translate(0, cameraY);
     this.drawBackWater(simulation);
     if (allowsBackgroundTraffic) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
     this.drawWave(simulation);
@@ -547,7 +546,8 @@ export class KakiRenderer {
     const pass = 0.5 + Math.sin(this.time * 0.72 + signedTravel * 0.014 + altitude * 7) * 0.5;
     if (pass < 0.6) return;
     const riderX = Number(player.airX) || 192;
-    const riderY = (Number(player.airY) || 60) + this.cameraY;
+    const riderY = (Number(player.airY) || 60)
+      + aerialRiderFrameOffset(player, this.cameraY);
     const frontX = riderX - 44 + (pass - 0.6) * 42;
     const frontY = clamp(riderY + 8, 22, 174);
     ctx.save();
@@ -608,8 +608,8 @@ export class KakiRenderer {
   drawLandingIndicator(simulation) {
     const player = simulation?.player;
     if (player?.state !== "airborne" || (Number(player.airVY) || 0) <= 16) return;
-    const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace) + this.cameraY;
-    if (this.cameraY < 72 && surfaceY < LOGICAL_HEIGHT - 20) return;
+    const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace);
+    if (surfaceY < LOGICAL_HEIGHT - 20) return;
     const ctx = this.ctx;
     const x = clamp(Math.round(Number(player.airX) || LOGICAL_WIDTH / 2), 24, LOGICAL_WIDTH - 24);
     ctx.save();
@@ -784,7 +784,6 @@ export class KakiRenderer {
     // the already-rendered backwater remains visible through the passed wave,
     // so the opening can never turn into the old white/haze shelf.
     ctx.save();
-    ctx.translate(0, -Math.round(this.cameraY));
     this.drawSky(simulation);
     ctx.restore();
     if (bottom <= 80) return;
@@ -891,6 +890,9 @@ export class KakiRenderer {
     if (player.state === "airborne" || player.state === "wipeout") {
       x = lerp(player.previousAirX, player.airX, alpha);
       y = lerp(player.previousAirY, player.airY, alpha);
+      if (player.state === "airborne") {
+        y += aerialRiderFrameOffset(player, this.cameraY);
+      }
     } else {
       x = lerp(player.previousX, player.x, alpha);
       const face = lerp(player.previousFace, player.face, alpha);
