@@ -1,4 +1,9 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
+import {
+  aerialCameraTarget,
+  aerialPanoramaCropX,
+  aerialPanoramaCropY,
+} from "./aerial.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
 import { persistentHudContract } from "./hud-contract.js";
@@ -37,18 +42,18 @@ const CALLOUT_MIN_READ_TIME = 1.05;
  * offset pushed high jumps farther offscreen.
  */
 export function verticalCameraTarget(player, reducedMotion = false) {
-  if (reducedMotion || player?.state !== "airborne") return 0;
-  const airY = Number.isFinite(Number(player.airY)) ? Number(player.airY) : 74;
-  const height = clamp(Number(player.maxAirHeight ?? 0) / 110, 0, 1);
-  return clamp(Math.max(0, 68 - airY) * 0.72 + height * 10, 0, 62);
+  if (player?.state !== "airborne") return 0;
+  const altitude = Number.isFinite(Number(player.aerialAltitude))
+    ? Number(player.aerialAltitude)
+    : clamp(Number(player.maxAirHeight ?? 0) / 132, 0, 0.75);
+  return aerialCameraTarget(altitude, reducedMotion);
 }
 
-/** Distant coast travel is monotonic and therefore cannot flip on a cutback. */
-export function backgroundParallaxPhase(wave, reducedMotion = false) {
-  if (reducedMotion) return 0;
-  const cycle = LOGICAL_WIDTH * 2;
-  const raw = Math.floor(waveSurfaceTravel(wave) * 0.045);
-  return ((raw % cycle) + cycle) % cycle;
+/** Signed panoramic travel remains coherent through either aerial direction. */
+export function backgroundParallaxPhase(source, reducedMotion = false) {
+  if (reducedMotion) return aerialPanoramaCropX(0);
+  const cameraWorldX = Number(source?.cameraWorldX ?? source?.worldTravel ?? source?.travel ?? 0);
+  return aerialPanoramaCropX(cameraWorldX);
 }
 
 export class KakiRenderer {
@@ -201,6 +206,15 @@ export class KakiRenderer {
         this.spawnSparkles(player.airX, player.airY, 6);
         this.freeze = this.settings.reducedMotion ? 0 : 0.025;
         break;
+      case "aerialMilestone":
+        this.spawnSparkles(player.airX, player.airY, 5 + (Number(payload.index) || 1) * 2);
+        if ((Number(payload.index) || 0) >= 4 && !this.settings.reducedFlash) {
+          this.flash = Math.max(this.flash, 0.045);
+        }
+        break;
+      case "aerialReentry":
+        this.shake = Math.max(this.shake, 0.72);
+        break;
       case "land": {
         this.lastLandingQuality = payload.quality ?? "clean";
         const strength = payload.quality === "perfect" ? 2.3 : payload.quality === "wobble" || payload.quality === "sketchy" ? 1.3 : 1.8;
@@ -307,7 +321,10 @@ export class KakiRenderer {
       this.settings.reducedMotion,
     );
     const cameraTarget = verticalCameraTarget(player, this.settings.reducedMotion);
-    this.cameraY = damp(this.cameraY, cameraTarget, TUNING.cameraResponse, dt);
+    const cameraResponse = player.state === "airborne" && player.airVY > 0
+      ? TUNING.cameraResponse * 1.48
+      : TUNING.cameraResponse;
+    this.cameraY = damp(this.cameraY, cameraTarget, cameraResponse, dt);
 
     for (const particle of this.particles) {
       if (particle.life <= 0) continue;
@@ -362,14 +379,13 @@ export class KakiRenderer {
     ctx.globalAlpha = 1;
     ctx.fillStyle = palette.skyTop;
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
-    this.drawSkyExtension(cameraY);
+    this.drawSky(simulation);
+    this.drawAerialDepthLayer(simulation, false);
 
-    // The sky and horizon are part of the same camera world as the wave. Moving
-    // only the water created an empty color band during big air; translating
-    // both exposes additional sky above the scene with no horizon seam.
+    // Water, wave, traffic, and rider share one world camera. The tall sky is
+    // sampled independently from canonical altitude so no blank band can open.
     ctx.save();
     ctx.translate(0, cameraY);
-    this.drawSky(simulation);
     // Twilight keeps a pristine hero-wave sky. Other conditions retain only
     // correctly depth-sorted traffic behind the break: no craft is allowed to
     // paste across the barrel, rider, or falling-water curtain.
@@ -400,6 +416,8 @@ export class KakiRenderer {
     drawWorldWildlifeContact(ctx, simulation, palette, alpha, this.settings);
     this.drawParticles(true);
     ctx.restore();
+    this.drawAerialDepthLayer(simulation, true);
+    this.drawLandingIndicator(simulation);
     this.drawHud(simulation);
     if (!simulation.coreSurfLab) this.drawCallouts();
 
@@ -413,81 +431,205 @@ export class KakiRenderer {
   }
 
   drawSky(simulation) {
-    const ctx = this.ctx;
-    const p = this.palette;
     if (this.drawBackgroundAsset(simulation)) return;
-    if (this.conditionId === "twilightGlass") {
-      this.drawTwilightSky(simulation);
-      return;
-    }
-    if (this.conditionId === "stormbreak") {
-      this.drawStormSky(simulation);
-      return;
-    }
-    ctx.fillStyle = p.skyTop;
-    ctx.fillRect(0, 0, LOGICAL_WIDTH, 26);
-    ctx.fillStyle = p.sky;
-    ctx.fillRect(0, 26, LOGICAL_WIDTH, 40);
-    ctx.fillStyle = p.haze;
-    ctx.fillRect(0, 66, LOGICAL_WIDTH, 15);
-
-    drawPixelSun(ctx, 318, 28, 16, p.sun, p.gold);
-    const visualTravel = waveSurfaceTravel(simulation.wave);
-    const cloudShift = Math.floor((visualTravel * 0.018) % 440);
-    drawCloud(ctx, 58 - cloudShift * 0.12, 29, p.white, p.haze);
-    drawCloud(ctx, 212 - cloudShift * 0.06, 18, p.white, p.haze);
-    drawCloud(ctx, 430 - cloudShift * 0.1, 42, p.white, p.haze);
-
-    const islandShift = Math.floor((visualTravel * 0.035) % 450);
-    ctx.fillStyle = p.distant;
-    drawSteppedHill(ctx, -24 - islandShift * 0.06, 71, 120, 15);
-    drawSteppedHill(ctx, 250 - islandShift * 0.04, 73, 152, 12);
-    drawPalm(ctx, 42 - islandShift * 0.08, 61, p.deepInk, p.distant);
-    drawBirds(ctx, 116 - islandShift * 0.025, 31, p.deepInk, 3);
-  }
-
-  drawSkyExtension(cameraY) {
-    const height = clamp(Math.ceil(Number(cameraY) || 0) + 2, 0, 68);
-    if (height <= 2) return;
-    const ctx = this.ctx;
-    const p = this.palette;
-    ctx.save();
-    ctx.fillStyle = p.skyTop;
-    ctx.fillRect(0, 0, LOGICAL_WIDTH, height);
-    ctx.fillStyle = this.conditionId === "stormbreak" ? p.foamShade : p.white;
-    ctx.globalAlpha = this.settings.highContrast ? 0.75 : 0.34;
-    const count = this.conditionId === "twilightGlass" ? 12 : 7;
-    for (let index = 0; index < count; index += 1) {
-      const x = (17 + index * 53) % LOGICAL_WIDTH;
-      const y = 4 + (index * 17) % Math.max(5, height - 4);
-      ctx.fillRect(x, y, index % 5 === 0 ? 2 : 1, 1);
-    }
-    ctx.restore();
+    this.drawAerialFallback(simulation);
   }
 
   drawBackgroundAsset(simulation) {
     if (this.settings.highContrast) return false;
     const image = this.visualAssets?.backgrounds?.[this.conditionId];
     if (!image?.complete || !(image.naturalWidth > 0)) return false;
-    const phase = backgroundParallaxPhase(simulation?.wave, this.settings.reducedMotion);
-    if (phase === 0) {
-      this.ctx.drawImage(image, 0, 0, LOGICAL_WIDTH, 80);
-      return true;
-    }
-
-    // The 384px source strip was not authored as a tile. Alternate normal and
-    // mirrored copies so matching source edges meet without a white seam while
-    // the distant coast moves steadily left beneath Kaki's forward progress.
-    const cycle = LOGICAL_WIDTH * 2;
-    for (let x = -phase; x < LOGICAL_WIDTH; x += cycle) {
-      this.ctx.drawImage(image, x, 0, LOGICAL_WIDTH, 80);
-      this.ctx.save();
-      this.ctx.translate(x + LOGICAL_WIDTH * 2, 0);
-      this.ctx.scale(-1, 1);
-      this.ctx.drawImage(image, 0, 0, LOGICAL_WIDTH, 80);
-      this.ctx.restore();
+    const altitude = clamp(Number(simulation?.player?.aerialAltitude) || 0, 0, 1);
+    const sourceY = aerialPanoramaCropY(altitude, image.naturalHeight, LOGICAL_HEIGHT);
+    const sourceX = backgroundParallaxPhase(simulation, this.settings.reducedMotion);
+    const firstWidth = Math.min(LOGICAL_WIDTH, image.naturalWidth - sourceX);
+    this.ctx.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      firstWidth,
+      LOGICAL_HEIGHT,
+      0,
+      0,
+      firstWidth,
+      LOGICAL_HEIGHT,
+    );
+    if (firstWidth < LOGICAL_WIDTH) {
+      const remaining = LOGICAL_WIDTH - firstWidth;
+      this.ctx.drawImage(
+        image,
+        0,
+        sourceY,
+        remaining,
+        LOGICAL_HEIGHT,
+        firstWidth,
+        0,
+        remaining,
+        LOGICAL_HEIGHT,
+      );
     }
     return true;
+  }
+
+  drawAerialFallback(simulation) {
+    const ctx = this.ctx;
+    const p = this.palette;
+    const altitude = clamp(Number(simulation?.player?.aerialAltitude) || 0, 0, 1);
+    const space = smoothstep(0.68, 0.96, altitude);
+    const cloud = smoothstep(0.1, 0.3, altitude) * (1 - smoothstep(0.58, 0.82, altitude));
+    const bands = this.conditionId === "twilightGlass"
+      ? [p.deepInk, p.ink, p.violet, p.skyTop, p.sky]
+      : this.conditionId === "stormbreak"
+        ? [p.deepInk, p.ink, p.skyTop, p.distant, p.sky]
+        : [p.deepInk, p.skyTop, p.sky, p.distant, p.haze];
+    for (let index = 0; index < bands.length; index += 1) {
+      ctx.fillStyle = bands[index];
+      ctx.fillRect(0, index * 44 - Math.round(space * 14), LOGICAL_WIDTH, 46);
+    }
+    ctx.fillStyle = p.white;
+    ctx.globalAlpha = 0.2 + space * 0.68;
+    for (let index = 0; index < 24; index += 1) {
+      const x = (17 + index * 71) % LOGICAL_WIDTH;
+      const y = 7 + (index * 29) % 118;
+      ctx.fillRect(x, y, index % 7 === 0 ? 2 : 1, 1);
+    }
+    ctx.globalAlpha = 0.18 + cloud * 0.42;
+    drawCloud(ctx, 28, 92, p.foam, p.foamShade);
+    drawCloud(ctx, 194, 116, p.foam, p.foamShade);
+    ctx.globalAlpha = 1;
+    if (altitude < 0.08) {
+      if (this.conditionId === "twilightGlass") this.drawTwilightSky(simulation);
+      else if (this.conditionId === "stormbreak") this.drawStormSky(simulation);
+      else {
+        ctx.fillStyle = p.haze;
+        ctx.fillRect(0, 62, LOGICAL_WIDTH, 18);
+        drawPixelSun(ctx, 318, 28, 16, p.sun, p.gold);
+        ctx.fillStyle = p.distant;
+        drawSteppedHill(ctx, -24, 71, 120, 15);
+        drawPalm(ctx, 42, 61, p.deepInk, p.distant);
+      }
+    }
+  }
+
+  drawAerialDepthLayer(simulation, foreground = false) {
+    const player = simulation?.player;
+    const altitude = clamp(Number(player?.aerialAltitude) || 0, 0, 1);
+    const cloudPresence = smoothstep(0.13, 0.3, altitude)
+      * (1 - smoothstep(0.58, 0.8, altitude));
+    if (cloudPresence <= 0.015) {
+      if (!foreground) this.drawConditionSpaceDetails(simulation, altitude);
+      return;
+    }
+    const ctx = this.ctx;
+    const p = this.palette;
+    const signedTravel = this.settings.reducedMotion ? 0 : Number(simulation.cameraWorldX) || 0;
+    const drift = this.settings.reducedMotion ? 0 : this.time * 2.4;
+    const cloudLight = this.conditionId === "stormbreak" ? p.foamShade : p.foam;
+    const cloudShade = this.conditionId === "twilightGlass" ? p.violet : p.haze;
+
+    if (!foreground) {
+      ctx.save();
+      ctx.globalAlpha = (0.12 + cloudPresence * 0.26) * (this.settings.highContrast ? 1.25 : 1);
+      const slow = wrapVisual(38 - signedTravel * 0.08 - drift * 0.2, 492) - 54;
+      const middle = wrapVisual(256 - signedTravel * 0.2 - drift * 0.55, 536) - 70;
+      drawCloud(ctx, slow, 34 + Math.round(altitude * 28), cloudLight, cloudShade);
+      drawCloud(ctx, middle, 102 - Math.round(altitude * 36), cloudLight, cloudShade);
+      drawCloud(ctx, middle + 198, 66, cloudLight, cloudShade);
+      ctx.restore();
+      this.drawConditionSpaceDetails(simulation, altitude);
+      return;
+    }
+
+    const importantTrick = Boolean(player?.provisionalTrickName)
+      || Boolean(player?.grabbed)
+      || (Number(player?.airVY) || 0) > 13;
+    if (importantTrick || this.settings.reducedMotion || player?.state !== "airborne") return;
+    const pass = 0.5 + Math.sin(this.time * 0.72 + signedTravel * 0.014 + altitude * 7) * 0.5;
+    if (pass < 0.6) return;
+    const riderX = Number(player.airX) || 192;
+    const riderY = (Number(player.airY) || 60) + this.cameraY;
+    const frontX = riderX - 44 + (pass - 0.6) * 42;
+    const frontY = clamp(riderY + 8, 22, 174);
+    ctx.save();
+    ctx.globalAlpha = cloudPresence * 0.32;
+    drawCloud(ctx, frontX, frontY, cloudLight, cloudShade);
+    ctx.globalAlpha = cloudPresence * 0.62;
+    ctx.strokeStyle = p.white;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(Math.round(riderX - 7), Math.round(riderY - 9), 14, 16);
+    ctx.restore();
+  }
+
+  drawConditionSpaceDetails(simulation, altitude) {
+    if (altitude < 0.48) return;
+    const ctx = this.ctx;
+    const p = this.palette;
+    const travel = this.settings.reducedMotion ? 0 : Number(simulation?.cameraWorldX) || 0;
+    const reveal = smoothstep(0.48, 0.84, altitude);
+    ctx.save();
+    if (this.conditionId === "twilightGlass") {
+      ctx.strokeStyle = p.waterLight;
+      ctx.globalAlpha = reveal * 0.18;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-12, 28);
+      ctx.quadraticCurveTo(92, 4, 188, 31);
+      ctx.quadraticCurveTo(286, 54, 402, 14);
+      ctx.stroke();
+      ctx.strokeStyle = p.violet;
+      ctx.beginPath();
+      ctx.moveTo(-18, 38);
+      ctx.quadraticCurveTo(108, 18, 226, 43);
+      ctx.quadraticCurveTo(318, 62, 408, 28);
+      ctx.stroke();
+    } else if (this.conditionId === "stormbreak") {
+      ctx.fillStyle = p.foamShade;
+      ctx.globalAlpha = reveal * 0.2;
+      ctx.fillRect(0, 154, LOGICAL_WIDTH, 2);
+      if (!this.settings.reducedFlash && Math.floor(this.time * 1.4) % 7 === 3) {
+        ctx.globalAlpha = reveal * 0.28;
+        drawPixelLightning(ctx, 82, 148, p.white);
+        drawPixelLightning(ctx, 302, 166, p.waterLight);
+      }
+    } else {
+      const satelliteX = wrapVisual(316 - travel * 0.035 - this.time * 2.2, 460) - 36;
+      ctx.globalAlpha = reveal * 0.72;
+      ctx.fillStyle = p.foam;
+      ctx.fillRect(Math.round(satelliteX), 29, 5, 2);
+      ctx.fillStyle = p.gold;
+      ctx.fillRect(Math.round(satelliteX - 3), 28, 3, 4);
+      ctx.fillRect(Math.round(satelliteX + 5), 28, 3, 4);
+      ctx.fillStyle = p.white;
+      ctx.fillRect(Math.round(satelliteX + 2), 27, 1, 1);
+    }
+    ctx.restore();
+  }
+
+  drawLandingIndicator(simulation) {
+    const player = simulation?.player;
+    if (player?.state !== "airborne" || (Number(player.airVY) || 0) <= 16) return;
+    const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace) + this.cameraY;
+    if (this.cameraY < 72 && surfaceY < LOGICAL_HEIGHT - 20) return;
+    const ctx = this.ctx;
+    const x = clamp(Math.round(Number(player.airX) || LOGICAL_WIDTH / 2), 24, LOGICAL_WIDTH - 24);
+    ctx.save();
+    ctx.fillStyle = this.palette.deepInk;
+    ctx.globalAlpha = 0.76;
+    ctx.fillRect(x - 18, 160, 36, 13);
+    ctx.fillStyle = this.palette.gold;
+    ctx.globalAlpha = 0.94;
+    ctx.beginPath();
+    ctx.moveTo(x, 175);
+    ctx.lineTo(x - 4, 169);
+    ctx.lineTo(x + 4, 169);
+    ctx.closePath();
+    ctx.fill();
+    drawPixelText(ctx, "WAVE", x, 161, {
+      align: "center",
+      color: this.palette.foam,
+      shadow: this.palette.ink,
+    });
+    ctx.restore();
   }
 
   drawTwilightSky(simulation) {
@@ -641,7 +783,10 @@ export class KakiRenderer {
     // The sky painter owns only the authored strip above the horizon. Below it
     // the already-rendered backwater remains visible through the passed wave,
     // so the opening can never turn into the old white/haze shelf.
+    ctx.save();
+    ctx.translate(0, -Math.round(this.cameraY));
     this.drawSky(simulation);
+    ctx.restore();
     if (bottom <= 80) return;
     ctx.fillStyle = this.palette.water;
     ctx.globalAlpha = this.settings.highContrast ? 0.32 : 0.1;
@@ -917,8 +1062,11 @@ export class KakiRenderer {
     const outAlpha = smoothstep(0, 0.34, callout.life);
     const alpha = outAlpha;
     const rise = Math.round(smoothstep(0, 1.1, age) * 2);
+    const aerial = callout.channel === "aerial";
+    const textY = (aerial ? 27 : 42) - rise;
+    const subtextY = (aerial ? 41 : 56) - rise;
     const toneColor = callout.tone === "wipeout" ? p.danger : callout.tone === "perfect" ? p.gold : callout.tone === "risk" ? p.sun : p.white;
-    drawPixelText(ctx, callout.text, 192, 42 - rise, {
+    drawPixelText(ctx, callout.text, 192, textY, {
       scale: 2,
       spacing: 2,
       align: "center",
@@ -927,7 +1075,7 @@ export class KakiRenderer {
       alpha,
     });
     if (callout.subtext) {
-      drawPixelText(ctx, callout.subtext, 192, 56 - rise, {
+      drawPixelText(ctx, callout.subtext, 192, subtextY, {
         align: "center",
         color: p.foam,
         shadow: p.ink,
@@ -1414,6 +1562,19 @@ function drawCloud(ctx, x, y, color, shade) {
   ctx.fillRect(px + 2, y + 3, 27, 6);
   ctx.fillRect(px + 8, y, 9, 5);
   ctx.fillRect(px + 19, y + 1, 6, 4);
+}
+
+function drawPixelLightning(ctx, x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x), Math.round(y), 2, 5);
+  ctx.fillRect(Math.round(x - 2), Math.round(y + 4), 3, 5);
+  ctx.fillRect(Math.round(x - 4), Math.round(y + 8), 3, 6);
+  ctx.fillRect(Math.round(x - 6), Math.round(y + 13), 4, 2);
+}
+
+function wrapVisual(value, span) {
+  const range = Math.max(1, Number(span) || 1);
+  return ((Number(value) % range) + range) % range;
 }
 
 function drawSteppedHill(ctx, x, y, width, height) {

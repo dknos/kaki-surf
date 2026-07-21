@@ -16,8 +16,8 @@ sprites.js + wave-visuals.js + hero-wave-visuals.js + world-visuals.js
                          |
                          +-------------------------------> renderer.js
 
-condition strips --> asset-loader.js --> optional background layer
-                                      --> code-authored sky fallback
+condition aerial panoramas --> asset-loader.js --> optional background layer
+                                              --> code-authored sky fallback
 
 all layers --> 384 x 216 Canvas --> nearest-neighbor CSS scaling
 ```
@@ -28,10 +28,11 @@ all layers --> 384 x 216 Canvas --> nearest-neighbor CSS scaling
 
 | Family | Files | Dimensions | Fallback |
 | --- | --- | --- | --- |
-| Gameplay strips | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-strip.png` | 384 x 80 each | Condition-specific Canvas sky and horizon |
+| Gameplay aerial panoramas | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-aerial.png` | 1536 x 640 each | Condition-specific Canvas coast/cloud/space bands |
+| Preserved coast sources | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-strip.png` | 384 x 80 each | Build inputs locked into the initial aerial crop |
 | Menu art | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-menu.png` | 768 x 432 each | CSS color treatment and readable menu shell |
 
-The three full-resolution environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. Their prompts and source hashes are in [Offline art pipeline](./ART-PIPELINE.md).
+The lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. The vertical masters mix reviewed Grok and reference-controlled Vertex/Nano components through `tools/art/build-aerial-panoramas.py`; prompts and selection decisions are in [Vertical aerial source selection](./art-source/aerial/README.md).
 
 ## Generated runtime atlases
 

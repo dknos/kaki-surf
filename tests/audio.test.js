@@ -360,6 +360,29 @@ test("lifecycle transitions fade physical layers and resume from a fresh music c
   assert.equal(resumeCalls, 1, "a direct resume gesture revives a browser-suspended context");
 });
 
+test("altitude filters surf at the apex and opens a stronger re-entry rush", () => {
+  const audio = createReactiveAudioProbe();
+  const beachAir = createAudioSimulation("airborne", { aerialAltitude: 0.08, airVY: -62 });
+  audio.update(beachAir);
+  const beachWaveFrequency = audio.waveFilter.frequency.value;
+  const beachWaveGain = audio.waveGain.gain.value;
+  const beachWind = audio.windGain.gain.value;
+
+  audio.context.currentTime += 0.016;
+  audio.update(createAudioSimulation("airborne", { aerialAltitude: 0.94, airVY: 0 }));
+  const orbitWaveFrequency = audio.waveFilter.frequency.value;
+  const orbitWaveGain = audio.waveGain.gain.value;
+  const orbitWind = audio.windGain.gain.value;
+  assert.ok(orbitWaveFrequency < beachWaveFrequency * 0.45);
+  assert.ok(orbitWaveGain < beachWaveGain * 0.3);
+  assert.ok(orbitWind < beachWind, "the orbital apex creates a brief quiet pocket");
+
+  audio.context.currentTime += 0.016;
+  audio.update(createAudioSimulation("airborne", { aerialAltitude: 0.7, airVY: 96 }));
+  assert.ok(audio.windGain.gain.value > beachWind * 1.5, "descent restores a powerful wind rush");
+  assert.ok(audio.windFilter.frequency.value > 3000);
+});
+
 test("audio levels remain finite and bounded when settings are corrupted", () => {
   assert.equal(safeLevel(Number.NaN, 0.58), 0.58);
   assert.equal(safeLevel("not-a-level", 0.78), 0.78);
@@ -397,7 +420,7 @@ function createReactiveAudioProbe() {
   return audio;
 }
 
-function createAudioSimulation(state) {
+function createAudioSimulation(state, playerOverrides = {}) {
   return {
     player: {
       state,
@@ -405,6 +428,9 @@ function createAudioSimulation(state) {
       x: 230,
       faceVelocity: state === "riding" ? 0.9 : 0,
       speedPotential: { risk: 0.62, potential: 0.78 },
+      aerialAltitude: 0,
+      airVY: 0,
+      ...playerOverrides,
     },
     wave: { pocketRisk: () => 0.62 },
     score: { combo: 2.4 },

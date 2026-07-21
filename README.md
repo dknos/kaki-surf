@@ -85,7 +85,7 @@ Audio follows the game lifecycle instead of free-running behind it. Ocean body, 
 
 ## Local art pipeline
 
-The static game loads six condition backgrounds and 13 compact generated atlas families. The active wave remains code-native and collision-aligned, with a crisp crest, darker trough, five queried contour/foam seams, a readable pocket and power seam, moving projected flecks, foreground water, and shared tube/whitewater contact. The board-contact effect is one sampled trajectory wake rather than overlapping sprite-local systems.
+The static game loads three 1536 x 640 condition-specific coast-to-space panoramas plus the preserved lower condition sources and 13 compact generated atlas families. A canonical nonlinear aerial altitude reveals Coastal Sky, Cloud Layer, Upper Atmosphere, and earned Turbo-only Kaki Space while signed horizontal parallax continues through the full flight. The active wave remains code-native and collision-aligned, with a crisp crest, darker trough, five queried contour/foam seams, a readable pocket and power seam, moving projected flecks, foreground water, and shared tube/whitewater contact. The board-contact effect is one sampled trajectory wake rather than overlapping sprite-local systems.
 
 Every atlas is optional. `js/asset-loader.js` validates each family independently, and the Canvas renderer keeps a local code-authored fallback when one is absent or invalid. The browser never calls Grok, Blender, an image API, a CDN, or a remote asset host. Exact prompts, selections, source hashes, and output dimensions are recorded in [Grok asset provenance](docs/GROK-ASSET-PROVENANCE.md).
 
@@ -97,7 +97,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **201/201 tests** and the syntax gate checks **33 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, the reduced Simple HUD, and the visible package-version contract. The local gallery contains **128 deterministic 1280 x 720 captures**, including Core Surf Lab, both travel directions, downhill mirror pairs, uphill carry, reversal, launch/landing, and whale takeoff/apex/return. This checkpoint is local and does not claim that GitHub Pages has refreshed.
+The native suite passes **209/209 tests** and the syntax gate checks **34 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, qualified aerial tiers, continuous orbital ascent/descent, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, the reduced Simple HUD, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide. This checkpoint is local and does not claim that GitHub Pages has refreshed.
 
 ## Static deployment and integration
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -161,6 +162,26 @@ test("every generated production atlas is local, dimension-checked, and compact"
       : 8;
     assert.ok(Object.keys(descriptor.frames).length >= minimumFrames, `${family} publishes reusable frame metadata`);
   }
+});
+
+test("condition aerial panoramas are tall local masters with unique art direction", () => {
+  const hashes = new Set();
+  for (const conditionId of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+    const file = path.join(ROOT, "assets", "backgrounds", `${conditionId}-aerial.png`);
+    assert.ok(isFile(file), `${conditionId} aerial panorama should be checked in locally`);
+    const bytes = readFileSync(file);
+    assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(bytes.readUInt32BE(16), 1536, `${conditionId} panorama width`);
+    assert.equal(bytes.readUInt32BE(20), 640, `${conditionId} panorama height`);
+    assert.ok(bytes.byteLength < 512 * 1024, `${conditionId} panorama stays compact for Pages`);
+    hashes.add(createHash("sha256").update(bytes).digest("hex"));
+  }
+  assert.equal(hashes.size, 3, "each condition keeps a distinct vertical world");
+
+  const loaderSource = read(path.join(ROOT, "js", "asset-loader.js"));
+  assert.match(loaderSource, /`\$\{conditionId\}-aerial\.png`/);
+  assert.match(loaderSource, /BACKGROUND_WIDTH = 1536/);
+  assert.match(loaderSource, /BACKGROUND_HEIGHT = 640/);
 });
 
 function read(file) {

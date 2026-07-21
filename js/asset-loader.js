@@ -6,8 +6,8 @@ const CONDITION_IDS = Object.freeze([
   "stormbreak",
 ]);
 
-const BACKGROUND_WIDTH = 384;
-const BACKGROUND_HEIGHT = 80;
+const BACKGROUND_WIDTH = 1536;
+const BACKGROUND_HEIGHT = 640;
 const IMAGE_LOAD_TIMEOUT_MS = 4000;
 
 let visualAssetsPromise = null;
@@ -24,7 +24,7 @@ export function preloadVisualAssets() {
 async function loadVisualAssets() {
   const requests = [];
   for (const conditionId of CONDITION_IDS) {
-    requests.push(loadImage(conditionId, "backgrounds", `${conditionId}-strip.png`, true));
+    requests.push(loadImage(conditionId, "backgrounds", `${conditionId}-aerial.png`, true));
   }
   for (const [family, descriptor] of Object.entries(GENERATED_ASSET_MANIFEST)) {
     requests.push(loadGeneratedAtlas(family, descriptor));

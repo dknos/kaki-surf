@@ -87,6 +87,24 @@ The case-sensitive output names intentionally match the condition IDs used by th
 
 The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. The live gameplay wave remains a separate layer and stays readable over the scenic strip.
 
+## Vertical aerial panorama build
+
+The sky-to-space extension uses six reviewed Grok candidates and six reference-controlled Vertex/Nano candidates. The selected mix, complete prompts, and source filenames are recorded in [Vertical aerial source selection](./art-source/aerial/README.md).
+
+`tools/art/build-aerial-panoramas.py` preserves each existing 384 x 80 coast at the initial camera crop, stitches selected upper and lower components across a 96-pixel ordered-dither overlap, welds the horizontal loop without mirroring, sharpens restrainedly, and quantizes to a condition-owned 36-color palette.
+
+```console
+python3 tools/art/build-aerial-panoramas.py
+```
+
+| Output | Vertical identity | Dimensions |
+| --- | --- | ---: |
+| `assets/backgrounds/goldenCoast-aerial.png` | Peach cloud towers, cobalt atmosphere, gold rim, playful stars/satellite | 1536 x 640 |
+| `assets/backgrounds/twilightGlass-aerial.png` | Violet cloud tops, indigo atmosphere, aurora, moon and nebula | 1536 x 640 |
+| `assets/backgrounds/stormbreak-aerial.png` | Storm interior, lightning, glowing thunderhead tops, cold stars | 1536 x 640 |
+
+The renderer samples a 384 x 216 crop from these masters with signed horizontal camera parallax and canonical normalized `aerialAltitude`. The wave, collision, rider, and world traffic remain code-driven layers; the panorama never defines a gameplay surface.
+
 ## Grok modular atlas build
 
 The deterministic offline build still publishes 15 generated families from reviewed sources. The browser manifest loads 13: the rejected 1280 x 720 continuous side-break and 384 x 216 six-cell travelling-break outputs remain preserved for auditability but are no longer downloaded or composited. The production MVP silhouette is built directly from the canonical wave state as a long face plus fixed-grid gravity columns and persistent foam contrails.
