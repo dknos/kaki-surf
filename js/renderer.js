@@ -1,11 +1,9 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import {
-  aerialCameraTarget,
   aerialPanoramaCropX,
-  aerialPanoramaCropY,
-  aerialRiderFrameOffset,
 } from "./aerial.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
+import { cameraLayerOffset } from "./camera.js";
 import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
 import { persistentHudContract } from "./hud-contract.js";
 import { drawPixelText } from "./pixel-font.js";
@@ -43,17 +41,15 @@ const CALLOUT_MIN_READ_TIME = 1.05;
  * offset pushed high jumps farther offscreen.
  */
 export function verticalCameraTarget(player, reducedMotion = false) {
+  void reducedMotion;
   if (player?.state !== "airborne") return 0;
-  const altitude = Number.isFinite(Number(player.aerialAltitude))
-    ? Number(player.aerialAltitude)
-    : clamp(Number(player.maxAirHeight ?? 0) / 132, 0, 0.75);
-  return aerialCameraTarget(altitude, reducedMotion);
+  return Math.min(0, (Number(player.airY) || 0) - 48);
 }
 
 /** Signed panoramic travel remains coherent through either aerial direction. */
 export function backgroundParallaxPhase(source, reducedMotion = false) {
   if (reducedMotion) return aerialPanoramaCropX(0);
-  const cameraWorldX = Number(source?.cameraWorldX ?? source?.worldTravel ?? source?.travel ?? 0);
+  const cameraWorldX = Number(source?.camera?.worldX ?? source?.cameraWorldX ?? 0);
   return aerialPanoramaCropX(cameraWorldX);
 }
 
@@ -86,6 +82,8 @@ export class KakiRenderer {
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     this.wavePresentationClocks = createWavePresentationClocks();
+    this.cameraDebug = typeof globalThis.location?.search === "string"
+      && new URLSearchParams(globalThis.location.search).has("debugCamera");
   }
 
   applySettings(settings) {
@@ -201,7 +199,7 @@ export class KakiRenderer {
         break;
       case "launch":
         this.spawnSpray(player.tailX, player.tailY, 17, 1.6);
-        this.shake = Math.max(this.shake, 1.25);
+        this.shake = Math.max(this.shake, 0.22);
         break;
       case "apex":
         this.spawnSparkles(player.airX, player.airY, 6);
@@ -214,7 +212,7 @@ export class KakiRenderer {
         }
         break;
       case "aerialReentry":
-        this.shake = Math.max(this.shake, 0.72);
+        this.shake = Math.max(this.shake, 0.16);
         break;
       case "land": {
         this.lastLandingQuality = payload.quality ?? "clean";
@@ -321,11 +319,7 @@ export class KakiRenderer {
       rideSpeedCapFor(simulation),
       this.settings.reducedMotion,
     );
-    const cameraTarget = verticalCameraTarget(player, this.settings.reducedMotion);
-    const cameraResponse = player.state === "airborne" && player.airVY > 0
-      ? TUNING.cameraResponse * 1.48
-      : TUNING.cameraResponse;
-    this.cameraY = damp(this.cameraY, cameraTarget, cameraResponse, dt);
+    this.cameraY = Number(simulation.camera?.worldY) || 0;
 
     for (const particle of this.particles) {
       if (particle.life <= 0) continue;
@@ -374,18 +368,21 @@ export class KakiRenderer {
     const shakeX = Math.round(Math.sin(this.time * 71) * this.shake * motionScale);
     const shakeY = Math.round(Math.cos(this.time * 53) * this.shake * motionScale * 0.55);
     const heroBarrel = isHeroBarrelWave(simulation.wave);
+    const worldOffset = cameraLayerOffset("world", simulation.camera, shakeX, shakeY, this.settings.reducedMotion);
+    this.renderCameraWorldX = Number(simulation.camera?.worldX) || 0;
     const allowsBackgroundTraffic = this.conditionId !== "twilightGlass";
-    ctx.setTransform(1, 0, 0, 1, shakeX, shakeY);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.fillStyle = palette.skyTop;
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
     this.drawSky(simulation);
     this.drawAerialDepthLayer(simulation, false);
 
-    // Keep the wave on its authored shelf. High-air framing is applied only to
-    // Kaki below; translating the whole water world makes the wave appear to
-    // jump with the rider and destroys the readable California Games stage.
+    // The sky remains screen-locked; every physical world layer shares one
+    // horizontal/vertical projection plus the small isolated impact shake.
     ctx.save();
+    ctx.setTransform(1, 0, 0, 1, worldOffset.x, worldOffset.y);
+    this.drawCoastline(simulation);
     // Twilight keeps a pristine hero-wave sky. Other conditions retain only
     // correctly depth-sorted traffic behind the break: no craft is allowed to
     // paste across the barrel, rider, or falling-water curtain.
@@ -395,7 +392,9 @@ export class KakiRenderer {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "background");
     }
     ctx.restore();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.save();
+    ctx.setTransform(1, 0, 0, 1, worldOffset.x, worldOffset.y);
     this.drawBackWater(simulation);
     if (allowsBackgroundTraffic) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
     this.drawWave(simulation);
@@ -418,6 +417,7 @@ export class KakiRenderer {
     this.drawAerialDepthLayer(simulation, true);
     this.drawLandingIndicator(simulation);
     this.drawHud(simulation);
+    if (this.cameraDebug) this.drawCameraTelemetry(simulation);
     if (!simulation.coreSurfLab) this.drawCallouts();
 
     if (this.flash > 0) {
@@ -430,61 +430,32 @@ export class KakiRenderer {
   }
 
   drawSky(simulation) {
-    if (this.drawBackgroundAsset(simulation)) return;
     this.drawAerialFallback(simulation);
   }
 
   drawBackgroundAsset(simulation) {
-    if (this.settings.highContrast) return false;
-    const image = this.visualAssets?.backgrounds?.[this.conditionId];
-    if (!image?.complete || !(image.naturalWidth > 0)) return false;
-    const altitude = clamp(Number(simulation?.player?.aerialAltitude) || 0, 0, 1);
-    const sourceY = aerialPanoramaCropY(altitude, image.naturalHeight, LOGICAL_HEIGHT);
-    const sourceX = backgroundParallaxPhase(simulation, this.settings.reducedMotion);
-    const firstWidth = Math.min(LOGICAL_WIDTH, image.naturalWidth - sourceX);
-    this.ctx.drawImage(
-      image,
-      sourceX,
-      sourceY,
-      firstWidth,
-      LOGICAL_HEIGHT,
-      0,
-      0,
-      firstWidth,
-      LOGICAL_HEIGHT,
-    );
-    if (firstWidth < LOGICAL_WIDTH) {
-      const remaining = LOGICAL_WIDTH - firstWidth;
-      this.ctx.drawImage(
-        image,
-        0,
-        sourceY,
-        remaining,
-        LOGICAL_HEIGHT,
-        firstWidth,
-        0,
-        remaining,
-        LOGICAL_HEIGHT,
-      );
-    }
-    return true;
+    void simulation;
+    return false;
   }
 
   drawAerialFallback(simulation) {
     const ctx = this.ctx;
     const p = this.palette;
-    const altitude = clamp(Number(simulation?.player?.aerialAltitude) || 0, 0, 1);
+    const altitude = clamp(-(Number(simulation?.camera?.worldY) || 0) / 84, 0, 1);
     const space = smoothstep(0.68, 0.96, altitude);
     const cloud = smoothstep(0.1, 0.3, altitude) * (1 - smoothstep(0.58, 0.82, altitude));
-    const bands = this.conditionId === "twilightGlass"
-      ? [p.deepInk, p.ink, p.violet, p.skyTop, p.sky]
-      : this.conditionId === "stormbreak"
-        ? [p.deepInk, p.ink, p.skyTop, p.distant, p.sky]
-        : [p.deepInk, p.skyTop, p.sky, p.distant, p.haze];
-    for (let index = 0; index < bands.length; index += 1) {
-      ctx.fillStyle = bands[index];
-      ctx.fillRect(0, index * 44 - Math.round(space * 14), LOGICAL_WIDTH, 46);
-    }
+    ctx.fillStyle = p.skyTop;
+    ctx.fillRect(0, 0, LOGICAL_WIDTH, 72);
+    ctx.fillStyle = p.sky;
+    ctx.fillRect(0, 72, LOGICAL_WIDTH, 78);
+    ctx.fillStyle = p.haze;
+    ctx.fillRect(0, 150, LOGICAL_WIDTH, 66);
+    ctx.globalAlpha = space;
+    ctx.fillStyle = p.deepInk;
+    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    ctx.globalAlpha = smoothstep(0.35, 0.82, altitude) * (1 - space * 0.25);
+    ctx.fillStyle = this.conditionId === "twilightGlass" ? p.violet : p.ink;
+    ctx.fillRect(0, 80, LOGICAL_WIDTH, 136);
     ctx.fillStyle = p.white;
     ctx.globalAlpha = 0.2 + space * 0.68;
     for (let index = 0; index < 24; index += 1) {
@@ -496,23 +467,30 @@ export class KakiRenderer {
     drawCloud(ctx, 28, 92, p.foam, p.foamShade);
     drawCloud(ctx, 194, 116, p.foam, p.foamShade);
     ctx.globalAlpha = 1;
-    if (altitude < 0.08) {
-      if (this.conditionId === "twilightGlass") this.drawTwilightSky(simulation);
-      else if (this.conditionId === "stormbreak") this.drawStormSky(simulation);
-      else {
-        ctx.fillStyle = p.haze;
-        ctx.fillRect(0, 62, LOGICAL_WIDTH, 18);
-        drawPixelSun(ctx, 318, 28, 16, p.sun, p.gold);
-        ctx.fillStyle = p.distant;
-        drawSteppedHill(ctx, -24, 71, 120, 15);
-        drawPalm(ctx, 42, 61, p.deepInk, p.distant);
-      }
+    if (altitude < 0.2) drawPixelSun(ctx, 318, 28, 16, p.sun, p.gold);
+  }
+
+  drawCoastline(simulation) {
+    const ctx = this.ctx;
+    const p = this.palette;
+    const cameraX = Number(simulation?.camera?.worldX ?? simulation?.cameraWorldX) || 0;
+    const shift = cameraX * 0.08;
+    ctx.save();
+    ctx.fillStyle = p.haze;
+    ctx.fillRect(0, 62, LOGICAL_WIDTH, 18);
+    ctx.fillStyle = p.distant;
+    for (let tile = -1; tile <= 2; tile += 1) {
+      const x = tile * 280 - ((shift % 280) + 280) % 280;
+      drawSteppedHill(ctx, x, 72, 178, 13);
+      drawSteppedHill(ctx, x + 132, 74, 190, 10);
     }
+    if (this.conditionId === "goldenCoast") drawPalm(ctx, 42 - ((shift * 0.4) % 460), 61, p.deepInk, p.distant);
+    ctx.restore();
   }
 
   drawAerialDepthLayer(simulation, foreground = false) {
     const player = simulation?.player;
-    const altitude = clamp(Number(player?.aerialAltitude) || 0, 0, 1);
+    const altitude = clamp(-(Number(simulation?.camera?.worldY) || 0) / 84, 0, 1);
     const cloudPresence = smoothstep(0.13, 0.3, altitude)
       * (1 - smoothstep(0.58, 0.8, altitude));
     if (cloudPresence <= 0.015) {
@@ -545,9 +523,8 @@ export class KakiRenderer {
     if (importantTrick || this.settings.reducedMotion || player?.state !== "airborne") return;
     const pass = 0.5 + Math.sin(this.time * 0.72 + signedTravel * 0.014 + altitude * 7) * 0.5;
     if (pass < 0.6) return;
-    const riderX = Number(player.airX) || 192;
-    const riderY = (Number(player.airY) || 60)
-      + aerialRiderFrameOffset(player, this.cameraY);
+    const riderX = (Number(player.worldX) || 192) - (Number(simulation.camera?.worldX) || 0);
+    const riderY = (Number(player.airY) || 60) - (Number(simulation.camera?.worldY) || 0);
     const frontX = riderX - 44 + (pass - 0.6) * 42;
     const frontY = clamp(riderY + 8, 22, 174);
     ctx.save();
@@ -611,7 +588,8 @@ export class KakiRenderer {
     const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace);
     if (surfaceY < LOGICAL_HEIGHT - 20) return;
     const ctx = this.ctx;
-    const x = clamp(Math.round(Number(player.airX) || LOGICAL_WIDTH / 2), 24, LOGICAL_WIDTH - 24);
+    const x = clamp(Math.round((Number(player.worldX) || LOGICAL_WIDTH / 2)
+      - (Number(simulation.camera?.worldX) || 0)), 24, LOGICAL_WIDTH - 24);
     ctx.save();
     ctx.fillStyle = this.palette.deepInk;
     ctx.globalAlpha = 0.76;
@@ -690,7 +668,7 @@ export class KakiRenderer {
     if (isHeroBarrelWave(simulation.wave)) {
       drawHeroBackWater(
         ctx,
-        simulation,
+        projectedSimulation(simulation),
         p,
         this.settings,
         this.wavePresentationClocks.backWater,
@@ -737,10 +715,11 @@ export class KakiRenderer {
   }
 
   drawWave(simulation) {
+    const projected = projectedSimulation(simulation);
     if (isHeroBarrelWave(simulation.wave)) {
       drawHeroBarrelBack(
         this.ctx,
-        simulation,
+        projected,
         this.palette,
         this.settings,
         this.visualAssets,
@@ -751,7 +730,7 @@ export class KakiRenderer {
     }
     drawLayeredWave(
       this.ctx,
-      simulation,
+      projected,
       this.palette,
       this.settings,
       this.time,
@@ -769,7 +748,7 @@ export class KakiRenderer {
   drawWaveFront(simulation) {
     drawHeroBarrelFront(
       this.ctx,
-      simulation,
+      projectedSimulation(simulation),
       this.palette,
       this.settings,
       this.visualAssets,
@@ -784,6 +763,7 @@ export class KakiRenderer {
     // the already-rendered backwater remains visible through the passed wave,
     // so the opening can never turn into the old white/haze shelf.
     ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawSky(simulation);
     ctx.restore();
     if (bottom <= 80) return;
@@ -833,9 +813,9 @@ export class KakiRenderer {
   drawImpactCavity(simulation) {
     if (this.impact <= 0) return;
     const player = simulation.player;
-    const x = Math.round(player.state === "airborne" ? player.airX : player.x);
+    const x = Math.round(player.worldX - (Number(simulation.camera?.worldX) || 0));
     const face = player.state === "airborne" ? player.landingFace : player.face;
-    const y = Math.round(simulation.wave.ridingY(x, face));
+    const y = Math.round(simulation.wave.ridingY(player.worldX, face));
     const size = Math.max(2, Math.round(this.impact * 7));
     this.ctx.fillStyle = this.palette.deepInk;
     this.ctx.fillRect(x - size, y - 1, size * 2, 3);
@@ -888,16 +868,14 @@ export class KakiRenderer {
     let x;
     let y;
     if (player.state === "airborne" || player.state === "wipeout") {
-      x = lerp(player.previousAirX, player.airX, alpha);
+      x = lerp(player.previousWorldX, player.worldX, alpha);
       y = lerp(player.previousAirY, player.airY, alpha);
-      if (player.state === "airborne") {
-        y += aerialRiderFrameOffset(player, this.cameraY);
-      }
     } else {
-      x = lerp(player.previousX, player.x, alpha);
+      x = lerp(player.previousWorldX, player.worldX, alpha);
       const face = lerp(player.previousFace, player.face, alpha);
       y = wave.ridingY(x, face);
     }
+    x -= Number(simulation.camera?.worldX) || 0;
     x = Math.round(x);
     y = Math.round(y);
 
@@ -945,7 +923,8 @@ export class KakiRenderer {
     const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace);
     const slope = simulation.wave.slopeAt(player.airX, player.landingFace);
     ctx.save();
-    ctx.translate(Math.round(player.airX), Math.round(surfaceY));
+    const screenX = player.worldX - (Number(simulation.camera?.worldX) || 0);
+    ctx.translate(Math.round(screenX), Math.round(surfaceY));
     ctx.rotate(slope);
     ctx.fillStyle = p.foamShade;
     ctx.fillRect(-23, -1, 46, 3);
@@ -956,7 +935,7 @@ export class KakiRenderer {
     ctx.fillStyle = p.ink;
     for (let x = -20; x <= 20; x += 5) ctx.fillRect(x, 0, 2, 1);
     ctx.restore();
-    if (this.settings.highContrast || String(this.settings.waveReadAssist).toLowerCase() === "full") drawPixelText(ctx, "LAND", player.airX, surfaceY + 5, { scale: 1, align: "center", color: p.gold, shadow: p.ink });
+    if (this.settings.highContrast || String(this.settings.waveReadAssist).toLowerCase() === "full") drawPixelText(ctx, "LAND", screenX, surfaceY + 5, { scale: 1, align: "center", color: p.gold, shadow: p.ink });
   }
 
   drawParticles(foreground) {
@@ -967,10 +946,11 @@ export class KakiRenderer {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = particle.color;
       const size = particle.kind === "bubble" ? Math.max(1, Math.round(particle.size * (1 - alpha * 0.3))) : particle.size;
-      ctx.fillRect(Math.round(particle.x), Math.round(particle.y), size, size);
+      const x = particle.screenSpace ? particle.x : particle.x - (Number(this.renderCameraWorldX) || 0);
+      ctx.fillRect(Math.round(x), Math.round(particle.y), size, size);
       if (particle.kind === "star" && size >= 2) {
-        ctx.fillRect(Math.round(particle.x) - 1, Math.round(particle.y) + 1, size + 2, 1);
-        ctx.fillRect(Math.round(particle.x) + 1, Math.round(particle.y) - 1, 1, size + 2);
+        ctx.fillRect(Math.round(x) - 1, Math.round(particle.y) + 1, size + 2, 1);
+        ctx.fillRect(Math.round(x) + 1, Math.round(particle.y) - 1, 1, size + 2);
       }
     }
     ctx.globalAlpha = 1;
@@ -1014,6 +994,38 @@ export class KakiRenderer {
       drawPixelText(ctx, `X${multiplier.toFixed(1)}`, 234, 195, { align: "right", color: multiplier > 2.2 ? p.gold : p.white, shadow: p.ink });
     }
     this.drawTeachingOverlay(simulation);
+  }
+
+  drawCameraTelemetry(simulation) {
+    const ctx = this.ctx;
+    const player = simulation.player;
+    const playerWorldX = Number(player.worldX) || 0;
+    const curlWorldX = Number(simulation.wave.curlWorldX) || 0;
+    const cameraWorldX = Number(simulation.camera?.worldX) || 0;
+    const cameraWorldY = Number(simulation.camera?.worldY) || 0;
+    const playerWorldY = ["airborne", "wipeout"].includes(player.state)
+      ? Number(player.airY) || 0
+      : simulation.wave.ridingY(playerWorldX, player.face);
+    const rows = [
+      `playerWorldX ${playerWorldX.toFixed(1)}`,
+      `curlWorldX ${curlWorldX.toFixed(1)}`,
+      `cameraWorldX ${cameraWorldX.toFixed(1)}`,
+      `playerScreenX ${(playerWorldX - cameraWorldX).toFixed(1)}`,
+      `barrelGap ${(playerWorldX - curlWorldX).toFixed(1)}`,
+      `cameraWorldY ${cameraWorldY.toFixed(1)}`,
+      `playerScreenY ${(playerWorldY - cameraWorldY).toFixed(1)}`,
+    ];
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.84;
+    ctx.fillStyle = this.palette.deepInk;
+    ctx.fillRect(4, 58, 126, 60);
+    ctx.globalAlpha = 1;
+    rows.forEach((row, index) => drawPixelText(ctx, row, 8, 62 + index * 8, {
+      color: this.palette.gold,
+      shadow: this.palette.ink,
+    }));
+    ctx.restore();
   }
 
   drawCoreSurfTelemetry(simulation) {
@@ -1671,6 +1683,57 @@ function signedInt(value) {
 function signedFixed(value) {
   const number = Number(value) || 0;
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
+}
+
+/** Build a read-only screen projection without leaking camera state into play. */
+export function projectedSimulation(simulation) {
+  const cameraX = Number(simulation?.camera?.worldX ?? simulation?.cameraWorldX) || 0;
+  const sourceWave = simulation.wave;
+  const wave = Object.create(sourceWave);
+  const translate = (method) => (screenX, ...args) => sourceWave[method](cameraX + Number(screenX), ...args);
+  for (const method of [
+    "crestY",
+    "faceDepth",
+    "ridingY",
+    "powerFaceAt",
+    "slopeAt",
+    "surfaceGradientAt",
+    "pocketRisk",
+    "speedPotentialAt",
+  ]) {
+    if (typeof sourceWave[method] === "function") wave[method] = translate(method);
+  }
+  Object.defineProperty(wave, "curlX", {
+    enumerable: true,
+    value: sourceWave.curlWorldX - cameraX,
+  });
+  Object.defineProperty(wave, "curlWorldX", {
+    enumerable: true,
+    value: sourceWave.curlWorldX,
+  });
+  wave.contactX = () => sourceWave.contactX() - cameraX;
+
+  const sourcePlayer = simulation.player;
+  const player = Object.create(sourcePlayer);
+  for (const key of ["x", "airX", "tailX"]) {
+    Object.defineProperty(player, key, {
+      enumerable: true,
+      value: Number(sourcePlayer[key]) - cameraX,
+    });
+  }
+  for (const key of ["previousX", "previousAirX"]) {
+    Object.defineProperty(player, key, {
+      enumerable: true,
+      value: Number(sourcePlayer[key]) - cameraX,
+    });
+  }
+  const projected = Object.create(simulation);
+  Object.defineProperties(projected, {
+    wave: { enumerable: true, value: wave },
+    player: { enumerable: true, value: player },
+    cameraWorldX: { enumerable: true, value: 0 },
+  });
+  return projected;
 }
 
 function createParticle() {

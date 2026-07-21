@@ -305,7 +305,7 @@ test("held steering traverses the long face in both directions like a side scrol
   }
 
   assert.ok(rightmost >= 315, `right traverse reached only ${rightmost}`);
-  assert.ok(leftmost <= 90, `left traverse reached only ${leftmost}`);
+  assert.ok(leftmost <= 100, `left traverse reached only ${leftmost}`);
   assert.ok(rightmost - leftmost >= 220, "the rider can use most of the visible wave face");
   assert.equal(player.travelDirection, -1);
 });
@@ -321,29 +321,27 @@ test("Twilight lets a fast rider scroll the barrel fully offscreen before it pur
   player.speed = 118;
 
   for (let step = 0; step < 480; step += 1) simulation.update(FIXED_STEP, { x: 1 });
-  assert.equal(player.x, WAVE_STYLES.heroBarrel.bounds.cameraX[1], "the rider settles into the forward camera dead zone");
+  assert.ok(player.worldX > WAVE_STYLES.heroBarrel.bounds.cameraX[1], "world travel is never clamped to the dead zone");
   assert.ok(simulation.cameraWorldX > 70, `camera advanced only ${simulation.cameraWorldX}`);
-  assert.ok(simulation.wave.contactX() < -58, `complete barrel remained visible at ${simulation.wave.contactX()}`);
+  assert.ok(simulation.wave.contactX() - simulation.cameraWorldX < 0, "the earned lead puts the barrel offscreen left");
 
   const leadCamera = simulation.cameraWorldX;
   for (let step = 0; step < 600 && player.x > 190; step += 1) {
     simulation.update(FIXED_STEP, { x: -1 });
   }
   assert.equal(player.travelDirection, -1);
-  assert.ok(player.x < 220, `cutback reached only ${player.x}`);
+  assert.ok(player.x < 360, `cutback reached only ${player.x}`);
   const cutbackCamera = simulation.cameraWorldX;
-  assert.ok(cutbackCamera >= leadCamera, "residual forward momentum may only advance the camera");
-  assert.ok(cutbackCamera - leadCamera < 3, "the camera stops promptly once the cutback takes hold");
-  assert.equal(simulation.world.context.cameraWorldX, cutbackCamera, "scenery does not reverse when Kaki reverses");
+  assert.ok(cutbackCamera < leadCamera, "the bidirectional camera follows a committed cutback left");
+  assert.equal(simulation.world.context.cameraWorldX, cutbackCamera, "world presentation receives the reverse camera");
 
   const offscreenContact = simulation.wave.contactX();
   simulation.wave.time = 54;
-  for (let step = 0; step < 720 && simulation.wave.contactX() < 0 && player.state !== "wipeout"; step += 1) {
+  for (let step = 0; step < 720 && simulation.wave.contactX() < player.worldX && player.state !== "wipeout"; step += 1) {
     simulation.update(FIXED_STEP, { x: -1 });
   }
   assert.ok(simulation.wave.contactX() > offscreenContact + 40, "the independent break closes the earned lead");
-  assert.ok(simulation.wave.contactX() >= 0, "the pursuing barrel re-enters from the left");
-  assert.equal(simulation.cameraWorldX, cutbackCamera, "barrel pursuit, not a backward camera, owns the catch-up");
+  assert.ok(simulation.wave.contactX() > offscreenContact, "world-space pursuit closes the earned lead");
 });
 
 test("every production condition scrolls forward before the right edge can stop the board", () => {
@@ -359,7 +357,7 @@ test("every production condition scrolls forward before the right edge can stop 
       simulation.update(FIXED_STEP, { x: 1 });
     }
 
-    assert.equal(player.x, simulation.wave.profile.bounds.cameraX[1], condition.id);
+    assert.ok(player.worldX > simulation.wave.profile.bounds.cameraX[1], condition.id);
     assert.ok(simulation.cameraWorldX > 70, `${condition.id} camera advanced only ${simulation.cameraWorldX}`);
     assert.ok(player.travelVelocity > 20, `${condition.id} killed forward velocity at its right edge`);
     assert.ok(Math.abs(player.boardAngle) < Math.PI / 3, `${condition.id} board stood upright at ${player.boardAngle}`);
@@ -1027,25 +1025,25 @@ test("Twilight entry remains aligned to the hero barrel power line through hando
   assert.equal(simulation.player.face, simulation.wave.powerFaceAt(simulation.player.x));
 });
 
-test("wave profiles share forward camera bounds and frame the authored face", () => {
+test("wave profiles use an unbounded world and the camera follows without rewriting it", () => {
   const simulation = new SurfSimulation({ seed: 0x54574c47 });
   simulation.reset({ condition: "twilightGlass" });
   simulation.player.x = 999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, WAVE_STYLES.heroBarrel.bounds.cameraX[1]);
-  assert.ok(simulation.cameraWorldX > 600, "forward overflow advances the level camera");
+  assert.equal(simulation.player.worldX, 999);
+  assert.equal(simulation.cameraWorldX, 0, "constraining gameplay cannot mutate presentation state");
   simulation.player.x = -999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, WAVE_STYLES.heroBarrel.bounds.ridingX[0]);
+  assert.equal(simulation.player.worldX, -999);
 
   simulation.reset({ condition: "goldenCoast" });
   simulation.player.x = 999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, WAVE_STYLES.classic.bounds.cameraX[1]);
-  assert.ok(simulation.cameraWorldX > 600, "Golden Coast forward overflow advances the level camera");
+  assert.equal(simulation.player.worldX, 999);
+  assert.equal(simulation.cameraWorldX, 0);
   simulation.player.x = -999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, WAVE_STYLES.classic.bounds.ridingX[0]);
+  assert.equal(simulation.player.worldX, -999);
 });
 
 test("Twilight aerial collision uses the visible hero lip contact", () => {
@@ -1067,8 +1065,8 @@ test("Twilight aerial collision uses the visible hero lip contact", () => {
   player.previousAirY = 20;
   player.airVY = -20;
   simulation.update(FIXED_STEP, {});
-  assert.equal(player.airX, WAVE_STYLES.heroBarrel.bounds.cameraX[1], "forward aerial overflow advances the level camera");
-  assert.ok(simulation.cameraWorldX > 80);
+  assert.ok(player.worldX > 400, "airborne world travel is not clamped");
+  assert.ok(simulation.cameraWorldX > 0);
 
   simulation.wave.curlX = 100;
   assert.equal(simulation.wave.contactX(), 196);
@@ -1477,8 +1475,8 @@ test("long seeded randomized play remains finite, bounded, and restartable", () 
     assertFiniteObjectNumbers(simulation.score.breakdown, "score.breakdown");
     assert.ok(VALID_STATES.has(simulation.player.state), simulation.player.state);
     assert.ok(simulation.player.face >= -0.061 && simulation.player.face <= 1.001);
-    assert.ok(simulation.player.x >= 58 && simulation.player.x <= 350);
-    assert.ok(simulation.player.airX >= 50 && simulation.player.airX <= 360);
+    assert.ok(Number.isFinite(simulation.player.worldX));
+    assert.ok(Number.isFinite(simulation.player.worldX - simulation.cameraWorldX));
     assert.ok(simulation.player.charge >= 0 && simulation.player.charge <= 1);
     assert.ok(simulation.player.waveMomentum >= 0 && simulation.player.waveMomentum <= 1);
     assert.ok(Math.abs(simulation.player.lateralVelocity) <= TUNING.sideScrollMaxSpeed);

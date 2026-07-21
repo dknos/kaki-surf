@@ -262,24 +262,23 @@ test("tube state callouts replace queued predecessors behind unrelated feedback"
   assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["CLEAN TUBE EXIT"]);
 });
 
-test("canonical aerial altitude reveals authored sky while Reduced Motion keeps safe framing", () => {
+test("physical airborne position drives continuous framing independent of altitude shelves", () => {
   const highAir = {
     state: "airborne",
-    airY: 18,
+    airY: -82,
     maxAirHeight: 94,
     aerialAltitude: 0.7,
   };
-  assert.ok(verticalCameraTarget(highAir) >= 90, "upper-atmosphere air receives meaningful framing");
-  assert.ok(verticalCameraTarget({ ...highAir, aerialAltitude: 1 }) <= 174, "camera motion remains authored and clamped");
-  assert.ok(verticalCameraTarget(highAir, true) > 0, "Reduced Motion still keeps exceptional air on-screen");
-  assert.ok(verticalCameraTarget(highAir, true) < verticalCameraTarget(highAir));
+  assert.equal(verticalCameraTarget(highAir), -130);
+  assert.equal(verticalCameraTarget({ ...highAir, aerialAltitude: 1 }), -130);
+  assert.equal(verticalCameraTarget(highAir, true), -130, "Reduced Motion preserves physical framing");
   assert.equal(verticalCameraTarget({ state: "riding", airY: 18, maxAirHeight: 94 }), 0);
 
   const rendererSource = readFileSync(new URL("../js/renderer.js", import.meta.url), "utf8");
   assert.doesNotMatch(
     rendererSource,
-    /ctx\.translate\(0,\s*cameraY\)/,
-    "the aerial camera must not translate the complete wave/water world",
+    /aerialRiderFrameOffset/,
+    "the retired rider-only framing path must stay absent",
   );
 });
 

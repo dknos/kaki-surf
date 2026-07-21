@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.0.2";
+export const GAME_VERSION = "2.0.3";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -84,6 +84,7 @@ export const WAVE_STYLES = Object.freeze({
       proximityNearGap: 24,
       proximityFarGap: 156,
       temporalPressureScale: 0.82,
+      maxSpeed: 38,
     }),
     pocket: Object.freeze({
       nearOffset: 14,
@@ -167,10 +168,8 @@ export const WAVE_STYLES = Object.freeze({
       // collision remains disabled by `curlGrace`, but the shot no longer
       // appears frozen until the first wipeout consumes that clock.
       openingSpeed: 6.2,
-      cameraCoupled: true,
-      // Screen-space pursuit is faster than the classic fixed-frame threat,
-      // because a fast rider can now advance the camera and push the barrel
-      // completely offscreen. Escalation eventually closes that earned lead.
+      // World-space pursuit can fall fully offscreen behind a skilled rider;
+      // escalation eventually closes only the genuinely earned world gap.
       maxSpeed: 38,
       maxRelief: 0.34,
     }),
@@ -244,8 +243,8 @@ export const TUNING = {
   // aerial trick is actually banked through a clean or perfect landing.
   turboStartCharge: 1,
   turboDrainPerSecond: 0.36,
-  turboAcceleration: 62,
-  turboSpeedCapMultiplier: 1.14,
+  turboAcceleration: 112,
+  turboSpeedCapMultiplier: 1.42,
   turboOverdriveBuild: 11,
   turboOverdriveDecay: 2.6,
   turboTrickBaseRefill: 0.18,
@@ -310,7 +309,7 @@ export const TUNING = {
   sideScrollGlideSpeed: 0.09,
   sideScrollSteerBase: 20,
   sideScrollSteerSpeed: 0.1,
-  sideScrollMaxSpeed: 52,
+  sideScrollMaxSpeed: 112,
   launchForce: 112,
   gravity: 176,
   rotationAcceleration: 13.6,

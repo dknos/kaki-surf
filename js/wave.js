@@ -97,6 +97,12 @@ export class GameplayWave {
     this.phaseB = 0;
     this.profile = WAVE_STYLES[DEFAULT_WAVE_STYLE_ID];
     this.profileId = this.profile.id;
+    this.curlWorldX = 0;
+    Object.defineProperty(this, "curlX", {
+      enumerable: true,
+      get: () => this.curlWorldX,
+      set: (value) => { this.curlWorldX = Number(value) || 0; },
+    });
     this.reset(seed, profile);
   }
 
@@ -115,7 +121,7 @@ export class GameplayWave {
     this.travel = 0;
     this.worldTravel = 0;
     const initialCurlX = Number(this.profile.threat?.initialCurlX);
-    this.curlX = Number.isFinite(initialCurlX) ? initialCurlX : 48;
+    this.curlWorldX = Number.isFinite(initialCurlX) ? initialCurlX : 48;
     this.pressure = 0;
   }
 

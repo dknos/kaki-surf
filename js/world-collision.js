@@ -106,11 +106,13 @@ export function isSharkPathFair({
 }
 
 export function projectWorldX(worldX, cameraWorldX, parallax, centerX = 192) {
-  return finite(centerX, 192) + (finite(worldX) - finite(cameraWorldX)) * Math.max(0.0001, finite(parallax, 1));
+  void centerX;
+  return finite(worldX) - finite(cameraWorldX) * Math.max(0.0001, finite(parallax, 1));
 }
 
 export function worldXForScreenX(screenX, cameraWorldX, parallax, centerX = 192) {
-  return finite(cameraWorldX) + (finite(screenX, centerX) - finite(centerX, 192)) / Math.max(0.0001, finite(parallax, 1));
+  void centerX;
+  return finite(screenX, 192) + finite(cameraWorldX) * Math.max(0.0001, finite(parallax, 1));
 }
 
 export function isProjectedOffscreen(worldX, cameraWorldX, parallax, { width = 384, margin = 64, centerX = 192 } = {}) {

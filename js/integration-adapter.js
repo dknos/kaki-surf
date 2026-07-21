@@ -46,5 +46,6 @@ export async function createKakiSurf({
     restart: () => game.restart(),
     destroy: () => game.destroy(),
     getSnapshot: () => game.getSnapshot(),
+    getCameraDebugSnapshot: () => game.getCameraDebugSnapshot(),
   });
 }

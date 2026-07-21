@@ -27,6 +27,7 @@ import { SurfSchool } from "./tutorial.js";
 import { AerialTrickSession, normalizeTrickInput } from "./tricks.js";
 import { GameplayWave } from "./wave.js";
 import { WorldSimulation } from "./world.js";
+import { createCameraState, updateCamera } from "./camera.js";
 
 const EMPTY_INPUT = Object.freeze({
   x: 0,
@@ -118,6 +119,7 @@ export class SurfSimulation {
     controlMode = "simple",
     tutorialEnabled = false,
     mode = DEFAULT_RUN_MODE_ID,
+    cameraSettings = {},
   } = {}) {
     this.seed = seed >>> 0;
     this.tuning = tuning;
@@ -143,7 +145,12 @@ export class SurfSimulation {
     this.modeId = this.mode.id;
     this.controlMode = normalizeControlMode(controlMode);
     this.worldTravel = 0;
-    this.cameraWorldX = 0;
+    this.camera = createCameraState(cameraSettings);
+    Object.defineProperty(this, "cameraWorldX", {
+      enumerable: true,
+      get: () => this.camera.worldX,
+      set: (value) => { this.camera.worldX = Number(value) || 0; },
+    });
     this.player = createPlayer();
     this.aerialSession = null;
     this.lastWipeoutAt = -Infinity;
@@ -208,6 +215,11 @@ export class SurfSimulation {
     this.eventCount = 0;
     this.worldTravel = 0;
     this.cameraWorldX = 0;
+    this.camera.worldY = 0;
+    this.camera.velocityX = 0;
+    this.camera.velocityY = 0;
+    this.camera.verticalTracking = false;
+    this.camera.verticalAnchorY = 0;
     this.lastWipeoutAt = -Infinity;
     this.lastGiantTrickAt = -Infinity;
     resetRunHighlights(this.highlights);
@@ -300,11 +312,6 @@ export class SurfSimulation {
     }
     this.worldTravel = this.wave.worldTravel;
     player.worldTravel = this.worldTravel;
-    // Legacy level profiles still use their signed travel camera. Twilight's
-    // long face opts into a forward-only dead-zone camera below, so a cutback
-    // moves Kaki across the screen instead of reversing every world object.
-    if (!this.wave.profile.bounds?.cameraX) this.cameraWorldX = this.worldTravel;
-
     switch (player.state) {
       case "entry":
         this.updateEntry(dt, input);
@@ -331,6 +338,9 @@ export class SurfSimulation {
     this.applyAnimalRideTuning(dt);
     this.syncCanonicalMotion(dt, true);
     this.updateWakeHistory(dt);
+    // Camera state is presentation only. It runs after every gameplay update
+    // and is never read by movement, threat, scoring, or wave sampling.
+    this.updateCameraPresentation(dt);
     this.updateWorld(dt, previousWorldTravel, previousCameraWorldX);
     if (this.coreSurfLab) this.score.reset();
 
@@ -373,6 +383,10 @@ export class SurfSimulation {
     });
   }
 
+  updateCameraPresentation(dt) {
+    return updateCamera(this.camera, this.player, dt);
+  }
+
   updateWorld(dt, previousWorldTravel, previousCameraWorldX = this.cameraWorldX) {
     const player = this.player;
     const airborne = player.state === "airborne" || player.state === "wipeout";
@@ -404,7 +418,7 @@ export class SurfSimulation {
     context.lastWipeoutAge = this.elapsed - this.lastWipeoutAt;
     context.giantTrickAge = this.elapsed - this.lastGiantTrickAt;
     context.waterlineY = clamp(this.wave.crestY(airborne ? player.airX : player.x), 70, 92);
-    context.curlScreenX = this.wave.contactX();
+    context.curlWorldX = this.wave.contactX();
     context.curlApproaching = this.wave.pressure >= 0.56;
 
     this.world.update(dt, context);
@@ -477,7 +491,7 @@ export class SurfSimulation {
     player.wakeSampleClock %= interval;
     const sample = player.wakeSamples[player.wakeSampleCursor];
     sample.active = true;
-    sample.worldX = player.tailX + this.cameraWorldX;
+    sample.worldX = player.tailX;
     sample.y = player.tailY;
     sample.vx = -player.motionVX;
     sample.vy = -player.motionVY;
@@ -1376,9 +1390,6 @@ export class SurfSimulation {
     player.airVX *= 1 - dt * 0.09;
     player.airX += player.airVX * dt;
     player.airY += player.airVY * dt;
-    this.advanceForwardCamera("airX");
-    const [airMinX, airMaxX] = this.wave.profile.bounds.airX;
-    player.airX = clamp(player.airX, airMinX, airMaxX);
     player.landingFace = clamp(
       player.landingFace + dt * (0.032 + Math.abs(player.airVX) * 0.002),
       0.1,
@@ -1653,7 +1664,9 @@ export class SurfSimulation {
       finiteTuning(this.tuning.sideScrollSteerBase, TUNING.sideScrollSteerBase)
         + player.speed * finiteTuning(this.tuning.sideScrollSteerSpeed, TUNING.sideScrollSteerSpeed)
     );
-    const target = intent * (glideMagnitude + steeringMagnitude) + player.redirectVelocity;
+    const traversalOverdrive = 1 + clamp(Number(player.turboOverdrive) || 0, 0, 1) * 1.5;
+    const target = intent * (glideMagnitude + steeringMagnitude) * traversalOverdrive
+      + player.redirectVelocity;
     const opposing = directionInput !== 0 && directionInput !== player.travelDirection;
     const baseResponse = Math.abs(inputX) > 0.02 || Math.abs(player.redirectVelocity) > 0.5
       ? finiteTuning(this.tuning.lateralResponse, TUNING.lateralResponse) * this.board.grip
@@ -1742,17 +1755,9 @@ export class SurfSimulation {
   }
 
   constrainRidingX() {
-    const player = this.player;
-    this.advanceForwardCamera("x");
-    const [ridingMinX, ridingMaxX] = this.wave.profile.bounds.ridingX;
-    const nextX = clamp(player.x, ridingMinX, ridingMaxX);
-    if (nextX !== player.x) {
-      const pushingOut = (nextX === ridingMinX && player.lateralVelocity < 0)
-        || (nextX === ridingMaxX && player.lateralVelocity > 0);
-      if (pushingOut) player.lateralVelocity = 0;
-      if (pushingOut) player.travelVelocity = 0;
-      player.x = nextX;
-    }
+    // World coordinates are intentionally unbounded. Kept as a compatibility
+    // seam for callers from older tests/builds; it may never rewrite motion.
+    return this.player.worldX;
   }
 
   /**
@@ -1762,22 +1767,8 @@ export class SurfSimulation {
    * barrel instead of instantly dragging the whole world backward.
    */
   advanceForwardCamera(positionKey = "x") {
-    const cameraBounds = this.wave.profile.bounds.cameraX;
-    if (!cameraBounds) return 0;
-    const maxX = Number(cameraBounds[1]);
-    const current = Number(this.player[positionKey]);
-    if (!Number.isFinite(maxX) || !Number.isFinite(current) || current <= maxX) return 0;
-    const shift = current - maxX;
-    this.player[positionKey] = maxX;
-    const previousKey = positionKey === "airX" ? "previousAirX" : "previousX";
-    this.player[previousKey] = Math.min(Number(this.player[previousKey]) || maxX, maxX);
-    this.cameraWorldX += shift;
-    // Twilight's authored travelling barrel is world-coupled and may leave
-    // frame when Kaki earns a lead. The classic California-style stage keeps
-    // its breaking edge screen-authored while scenery scrolls behind it, so an
-    // idle rider cannot escape the threat merely by reaching the dead zone.
-    if (this.wave.profile.threat?.cameraCoupled) this.wave.curlX -= shift;
-    return shift;
+    void positionKey;
+    return 0;
   }
 
   querySpeedPotential(input = EMPTY_INPUT) {
@@ -2296,9 +2287,6 @@ export class SurfSimulation {
     player.aerialZone = aerialZoneForAltitude(player.aerialAltitude).id;
     player.airVY += this.tuning.gravity * 0.72 * dt;
     player.airX += player.airVX * dt;
-    const boundedAirX = clamp(player.airX, 50, 360);
-    if (boundedAirX !== player.airX) player.airVX *= -0.18;
-    player.airX = boundedAirX;
     player.airY += player.airVY * dt;
     player.bodyAngle += player.wipeoutSpin * dt;
     player.boardAngle -= player.wipeoutSpin * 0.55 * dt;
@@ -2421,7 +2409,7 @@ function createWorldStepContext() {
     lastWipeoutAge: Infinity,
     giantTrickAge: Infinity,
     waterlineY: 79,
-    curlScreenX: 0,
+    curlWorldX: 0,
     curlApproaching: false,
   };
 }
@@ -2475,11 +2463,11 @@ function resetCarveArcState(player) {
 }
 
 function createPlayer() {
-  return {
+  const player = {
     state: "entry",
     stateTime: 0,
-    x: 212,
-    previousX: 212,
+    worldX: 212,
+    previousWorldX: 212,
     face: 0.48,
     previousFace: 0.48,
     faceVelocity: 0,
@@ -2546,8 +2534,6 @@ function createPlayer() {
     pocketAnnounced: false,
     tubeReady: false,
     tubeRide: createTubeRide(),
-    airX: 212,
-    previousAirX: 212,
     airY: 118,
     previousAirY: 118,
     airVX: 0,
@@ -2591,6 +2577,23 @@ function createPlayer() {
       trick4: false,
     },
   };
+  // Transitional names remain API-compatible while all simulation consumers
+  // resolve to the single canonical horizontal coordinate.
+  for (const key of ["x", "airX"]) {
+    Object.defineProperty(player, key, {
+      enumerable: true,
+      get: () => player.worldX,
+      set: (value) => { player.worldX = Number(value) || 0; },
+    });
+  }
+  for (const key of ["previousX", "previousAirX"]) {
+    Object.defineProperty(player, key, {
+      enumerable: true,
+      get: () => player.previousWorldX,
+      set: (value) => { player.previousWorldX = Number(value) || 0; },
+    });
+  }
+  return player;
 }
 
 function resetPlayer(
@@ -2602,10 +2605,10 @@ function resetPlayer(
   player.state = "entry";
   player.stateTime = 0;
   if (resetPosition) {
-    player.x = 212;
+    player.worldX = 212;
     player.face = 0.48;
   }
-  player.previousX = player.x;
+  player.previousWorldX = player.worldX;
   player.previousFace = player.face;
   player.faceVelocity = 0;
   player.speed = baseSpeed;

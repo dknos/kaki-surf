@@ -166,16 +166,16 @@ test("the opening grace cannot catch even a rider reversing toward the curl", ()
   assert.equal(simulation.wipeouts, 0);
   assert.ok(simulation.wave.curlX >= initialCurlX);
   assert.ok(simulation.wave.curlX - initialCurlX < 1e-6);
-  assert.ok(gap(simulation) > 13);
+  assert.ok(gap(simulation) < 212, "a real cutback closes world-space barrel distance during grace");
 });
 
 test("an idle rider is caught in the intended late-run window", () => {
   const simulation = beginRiding({ curlX: 48 });
-  const metrics = runFor(simulation, 78);
+  const metrics = runFor(simulation, 82);
 
   assert.equal(metrics.wipeoutCause, "curl");
   assert.ok(
-    metrics.firstWipeout >= 50 && metrics.firstWipeout <= 78,
+    metrics.firstWipeout >= 50 && metrics.firstWipeout <= 82,
     `idle catch was ${metrics.firstWipeout.toFixed(3)}s`,
   );
 

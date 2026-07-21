@@ -26,7 +26,6 @@ import {
   projectWorldX,
   sweptCircleContact,
   sweptCircleDistanceSquared,
-  worldXForScreenX,
 } from "./world-collision.js";
 import { whaleFrameMetadata } from "./whale-contract.js";
 
@@ -187,7 +186,7 @@ export class WorldSimulation {
     entity.phaseTime = 0;
     entity.spawnTime = this.elapsed;
     entity.despawnTime = this.elapsed + Math.max(0.25, duration);
-    entity.worldX = worldXForScreenX(screenX, this.context.cameraWorldX, layerConfig.parallax, WORLD_LIMITS.centerX);
+    entity.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
     entity.previousWorldX = entity.worldX;
     entity.y = y;
     entity.previousY = y;
@@ -610,9 +609,9 @@ export class WorldSimulation {
       return;
     }
 
-    if (Number.isFinite(this.context.curlScreenX)) {
+    if (Number.isFinite(this.context.curlWorldX)) {
       const birdX = entityCurrent.x;
-      const curlDistance = Math.abs(birdX - this.context.curlScreenX);
+      const curlDistance = Math.abs(birdX - this.context.curlWorldX);
       if (curlDistance <= 58 && (this.context.curlApproaching || curlDistance <= 34)) {
         this.triggerBirdReaction(entity, "bank", "incomingCurl");
       }
@@ -676,7 +675,7 @@ export class WorldSimulation {
     this.courier.birdId = bird.id;
     this.courier.powerupKind = powerupKind;
     this.courier.direction = direction;
-    this.courier.dropWorldX = worldXForScreenX(dropX, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
+    this.courier.dropWorldX = this.context.player.x + dropX - WORLD_LIMITS.centerX;
     this.courier.dropY = dropY;
     this.courier.dropVx = dropVx;
     this.courier.dropVy = dropVy;
@@ -762,7 +761,7 @@ export class WorldSimulation {
     const direction = signOr(options.direction, this.context.direction);
     const safeRaceX = clamp(
       Math.max(
-        finite(this.context.curlScreenX, 40) + 148,
+        finite(this.context.curlWorldX, 40) + 148,
         finite(this.context.player?.x, WORLD_LIMITS.centerX) + 98,
       ),
       294,
@@ -922,7 +921,7 @@ export class WorldSimulation {
     this.aircraftDrop.trafficId = plane.id;
     this.aircraftDrop.powerupKind = powerupKind;
     this.aircraftDrop.direction = direction;
-    this.aircraftDrop.dropWorldX = worldXForScreenX(dropX, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
+    this.aircraftDrop.dropWorldX = this.context.player.x + dropX - WORLD_LIMITS.centerX;
     this.aircraftDrop.dropY = dropY;
     this.aircraftDrop.dropVx = dropVx;
     this.aircraftDrop.dropVy = dropVy;
@@ -1048,7 +1047,7 @@ export class WorldSimulation {
       gate.phase = "available";
       gate.previousPhase = "available";
       gate.collidable = false;
-      gate.worldX = worldXForScreenX(screenX, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
+      gate.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
       gate.previousWorldX = gate.worldX;
       gate.y = clamp(baseY + yPattern[index], 38, 190);
       gate.previousY = gate.y;
@@ -1369,7 +1368,7 @@ export class WorldSimulation {
     entity.previousPhase = phase;
     entity.phaseTime = clamp(finite(options.phaseTime), 0, finite(definition.phases[phase], 1));
     entity.spawnTime = this.elapsed;
-    entity.worldX = worldXForScreenX(screenX, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
+    entity.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
     entity.previousWorldX = entity.worldX;
     entity.y = screenY;
     entity.previousY = screenY;
@@ -1417,7 +1416,7 @@ export class WorldSimulation {
       entity.phaseTime += dt;
 
       if (entity.phase === "mounted") {
-        entity.worldX = worldXForScreenX(this.context.player.x, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
+        entity.worldX = this.context.player.x;
         entity.y = this.context.player.y + (entity.kind === "whale" ? 9 : 5);
         if (entity.kind === "whale") entity.waterAnchorY = this.context.player.y + 7;
         // Once mounted, the animal belongs to Kaki's current line rather than
@@ -1605,7 +1604,7 @@ export class WorldSimulation {
     entity.previousPhase = phase;
     entity.phaseTime = 0;
     entity.spawnTime = this.elapsed;
-    entity.worldX = worldXForScreenX(screenX, this.context.cameraWorldX, 1, WORLD_LIMITS.centerX);
+    entity.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
     entity.previousWorldX = entity.worldX;
     entity.y = screenY;
     entity.previousY = screenY;
@@ -1760,21 +1759,11 @@ export class WorldSimulation {
     scratch.playerPrevious.y = this.context.player.previousY;
     scratch.playerCurrent.x = this.context.player.x;
     scratch.playerCurrent.y = this.context.player.y;
-    scratch.entityPrevious.x = projectWorldX(
-      entity.previousWorldX,
-      this.context.previousCameraWorldX,
-      1,
-      WORLD_LIMITS.centerX,
-    );
+    scratch.entityPrevious.x = entity.previousWorldX;
     scratch.entityPrevious.y = Number.isFinite(entity.previousCollisionY)
       ? entity.previousCollisionY
       : entity.previousY;
-    scratch.entityCurrent.x = projectWorldX(
-      entity.worldX,
-      this.context.cameraWorldX,
-      1,
-      WORLD_LIMITS.centerX,
-    );
+    scratch.entityCurrent.x = entity.worldX;
     scratch.entityCurrent.y = Number.isFinite(entity.collisionY)
       ? entity.collisionY
       : entity.y;
@@ -1782,24 +1771,15 @@ export class WorldSimulation {
   }
 
   prepareTrafficCollision(entity, parallax) {
+    void parallax;
     const scratch = this.collisionScratch;
     scratch.playerPrevious.x = this.context.player.previousX;
     scratch.playerPrevious.y = this.context.player.previousY;
     scratch.playerCurrent.x = this.context.player.x;
     scratch.playerCurrent.y = this.context.player.y;
-    scratch.entityPrevious.x = projectWorldX(
-      entity.previousWorldX,
-      this.context.previousCameraWorldX,
-      parallax,
-      WORLD_LIMITS.centerX,
-    );
+    scratch.entityPrevious.x = entity.previousWorldX;
     scratch.entityPrevious.y = entity.previousY;
-    scratch.entityCurrent.x = projectWorldX(
-      entity.worldX,
-      this.context.cameraWorldX,
-      parallax,
-      WORLD_LIMITS.centerX,
-    );
+    scratch.entityCurrent.x = entity.worldX;
     scratch.entityCurrent.y = entity.y;
     return scratch;
   }
@@ -2305,7 +2285,7 @@ function createStepContext() {
     lastWipeoutAge: Infinity,
     giantTrickAge: Infinity,
     waterlineY: 79,
-    curlScreenX: NaN,
+    curlWorldX: NaN,
     curlApproaching: false,
   };
 }
@@ -2352,9 +2332,11 @@ function copyStepContext(target, source, previousCameraFallback) {
   target.lastWipeoutAge = finite(context.lastWipeoutAge, Infinity);
   target.giantTrickAge = finite(context.giantTrickAge, Infinity);
   target.waterlineY = clamp(finite(context.waterlineY, 79), 64, 100);
-  target.curlScreenX = Number.isFinite(context.curlScreenX)
-    ? context.curlScreenX
-    : Number.isFinite(context.curlX) ? context.curlX : NaN;
+  target.curlWorldX = Number.isFinite(context.curlWorldX)
+    ? context.curlWorldX
+    : Number.isFinite(context.curlScreenX)
+      ? context.curlScreenX
+      : Number.isFinite(context.curlX) ? context.curlX : NaN;
   target.curlApproaching = Boolean(context.curlApproaching || context.incomingCurl);
 }
 

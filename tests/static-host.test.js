@@ -119,7 +119,7 @@ test("integration adapter preserves the lifecycle surface and local dynamic impo
   const source = read(adapterPath);
   const imports = extractModuleSpecifiers(tokenizeJavaScript(source));
   const dynamicImports = imports.filter((imported) => imported.kind === "dynamic");
-  const lifecycle = ["start", "pause", "resume", "restart", "destroy", "getSnapshot"];
+  const lifecycle = ["start", "pause", "resume", "restart", "destroy", "getSnapshot", "getCameraDebugSnapshot"];
 
   assert.equal(typeof createKakiSurf, "function");
   assert.deepEqual(dynamicImports, [{ kind: "dynamic", specifier: "./game.js" }]);

@@ -310,6 +310,34 @@ export class KakiSurfGame {
     };
   }
 
+  getCameraDebugSnapshot() {
+    const simulation = this.simulation;
+    const player = simulation.player;
+    const playerWorldX = Number(player.worldX) || 0;
+    const curlWorldX = Number(simulation.wave.curlWorldX) || 0;
+    const cameraWorldX = Number(simulation.camera.worldX) || 0;
+    const cameraWorldY = Number(simulation.camera.worldY) || 0;
+    const playerWorldY = ["airborne", "wipeout"].includes(player.state)
+      ? Number(player.airY) || 0
+      : simulation.wave.ridingY(playerWorldX, player.face);
+    return {
+      state: player.state,
+      playerWorldX,
+      curlWorldX,
+      cameraWorldX,
+      playerScreenX: playerWorldX - cameraWorldX,
+      barrelGap: playerWorldX - curlWorldX,
+      cameraWorldY,
+      playerScreenY: playerWorldY - cameraWorldY,
+      maxAirHeight: player.maxAirHeight,
+      aerialAltitude: player.aerialAltitude,
+      airVY: player.airVY,
+      turbo: player.turbo,
+      turboActive: player.turboActive,
+      direction: player.travelDirection,
+    };
+  }
+
   frame(now) {
     if (this.destroyed) return;
     const frameDelta = clamp((now - this.lastFrame) / 1000, 0, MAX_FRAME_DELTA);
@@ -344,6 +372,7 @@ export class KakiSurfGame {
         }
       } else {
         this.accumulator = 0;
+        this.simulation.updateCameraPresentation?.(frameDelta);
       }
       this.audio.update?.(this.simulation);
       this.syncTouchActionState();
@@ -712,6 +741,7 @@ export class KakiSurfGame {
 
   toggleDebug() {
     this.elements.debugPanel.hidden = !this.elements.debugPanel.hidden;
+    this.renderer.cameraDebug = !this.elements.debugPanel.hidden;
   }
 
   updateSetting(input) {
@@ -1094,7 +1124,10 @@ export class KakiSurfGame {
         aerialSpaceQualified: stage.tier === 4,
         aerialMilestoneTier: stage.tier,
       });
-      this.renderer.cameraY = verticalCameraTarget(player, this.settings.reducedMotion);
+      this.simulation.camera.worldY = verticalCameraTarget(player, this.settings.reducedMotion);
+      this.simulation.camera.verticalAnchorY = this.simulation.camera.worldY;
+      this.simulation.camera.verticalTracking = true;
+      this.renderer.cameraY = this.simulation.camera.worldY;
       if (stage.label) {
         this.renderer.onEvent({
           type: "aerialMilestone",
@@ -1171,7 +1204,10 @@ export class KakiSurfGame {
         player.airVY = 2;
         player.maxAirHeight = 96;
         player.provisionalScore = 2840;
-        this.renderer.cameraY = 42;
+        this.simulation.camera.worldY = -42;
+        this.simulation.camera.verticalAnchorY = -42;
+        this.simulation.camera.verticalTracking = true;
+        this.renderer.cameraY = -42;
         break;
       case "clockwiseSpin":
         makeAirborne("apex", "360 AIR SPIN", Math.PI * 2);
@@ -1425,7 +1461,10 @@ export class KakiSurfGame {
         });
         // QA freezes after its first frame, so use the settled target to prove
         // the same vertical framing that the live camera eases toward.
-        this.renderer.cameraY = 46;
+        this.simulation.camera.worldY = -46;
+        this.simulation.camera.verticalAnchorY = -46;
+        this.simulation.camera.verticalTracking = true;
+        this.renderer.cameraY = -46;
         break;
       }
       case "dolphinRide":
