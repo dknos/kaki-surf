@@ -23,6 +23,7 @@ import {
 import {
   heroBarrelGeometry,
   heroBarrelStage,
+  heroBreakColumns,
   heroPassedSkyWindow,
   heroWaterfallFrame,
   isHeroBarrelWave,
@@ -200,6 +201,36 @@ test("Twilight's passing curtain advances right without following rider directio
   }
   assert.deepEqual(samples, [...samples].sort((a, b) => a - b));
   assert.equal(new Set(samples).size, samples.length, "each advancing contact reveals more horizon");
+});
+
+test("the advancing break uses fixed staggered columns with gravity-falling heads", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  wave.curlX = 36;
+  wave.pressure = 0.85;
+  const player = { x: 248, face: 0.58, state: "riding", curlTimer: 0, travelDirection: 1 };
+  const first = heroBreakColumns(wave, player);
+
+  assert.ok(first.length >= 12, "the waterfall is assembled from many narrow columns");
+  for (let index = 1; index < first.length; index += 1) {
+    assert.equal(first[index].x - first[index - 1].x, 3, "columns stay on a fixed screen grid");
+    assert.ok(first[index].headY >= first[index].topY + 4, "every moving head falls below its crest tile");
+  }
+  const collision = first.reduce((nearest, column) => (
+    Math.abs(column.x - wave.contactX()) < Math.abs(nearest.x - wave.contactX()) ? column : nearest
+  ));
+  assert.ok(Math.abs(collision.headY - heroBarrelGeometry(wave, player).powerY) < 34,
+    "a gravity head reaches board height at the collision plane");
+
+  const fixedX = first[Math.floor(first.length * 0.55)].x;
+  const before = first.find((column) => column.x === fixedX).headY;
+  wave.curlX += 12;
+  const advanced = heroBreakColumns(wave, player);
+  const after = advanced.find((column) => column.x === fixedX).headY;
+  assert.ok(after > before, "a fixed column head falls farther as the break advances");
+
+  player.travelDirection = -1;
+  assert.deepEqual(heroBreakColumns(wave, player), advanced,
+    "reversing the surfer cannot mirror or rewind waterfall columns");
 });
 
 test("Twilight waterfall frames pour forward, freeze for Reduced Motion, and densify on collapse", () => {

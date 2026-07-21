@@ -585,21 +585,15 @@ export class KakiRenderer {
   drawPassedSkyBackdrop(simulation, window) {
     const ctx = this.ctx;
     const bottom = Math.round(window?.bottom ?? 104);
-    const p = this.palette;
+    // The sky painter owns only the authored strip above the horizon. Below it
+    // the already-rendered backwater remains visible through the passed wave,
+    // so the opening can never turn into the old white/haze shelf.
     this.drawSky(simulation);
     if (bottom <= 80) return;
-
-    // The authored sky strip ends at the horizon. A very shallow haze apron
-    // continues it under the curling lip without becoming the old sand-colored
-    // slab or adding another set of moving water lines.
-    ctx.fillStyle = p.haze;
-    ctx.fillRect(0, 80, LOGICAL_WIDTH, bottom - 79);
-    ctx.fillStyle = p.sky;
-    for (let index = 0; index < 10; index += 1) {
-      const x = 8 + index * 29;
-      const y = 83 + (index * 7) % Math.max(4, bottom - 84);
-      ctx.fillRect(x, y, 2 + index % 3, 2);
-    }
+    ctx.fillStyle = this.palette.water;
+    ctx.globalAlpha = this.settings.highContrast ? 0.32 : 0.1;
+    ctx.fillRect(0, 79, LOGICAL_WIDTH, Math.min(4, bottom - 79));
+    ctx.globalAlpha = 1;
   }
 
   drawMaxSpeedFeedback(simulation) {

@@ -2,7 +2,7 @@
 
 Date: 2026-07-20.
 
-The active build publishes 15 source families generated through the local Grok Imagine workflow for this repository. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases. Superseded wave studies remain preserved here but are not selected by the renderer.
+The offline asset build publishes 15 source families generated through the local Grok Imagine workflow for this repository; the browser manifest currently loads 13. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases. The continuous side-break and travelling-break outputs are preserved here but were removed from the runtime manifest after browser review; the MVP wave silhouette is now code-native.
 
 ## Rebuild command
 
@@ -16,12 +16,12 @@ The script reads the preserved sources, validates declared exact hashes and dime
 
 ## Selected source and output record
 
-The active Twilight travelling-break source is 384 x 216, the modular wave-breaker polish source is 1024 x 1024, and the other active or preserved studies use their documented source dimensions. SHA-256 values identify the exact files used at this checkpoint.
+The preserved retired Twilight travelling-break source is 384 x 216, the active modular wave-breaker polish source is 1024 x 1024, and the other active or preserved studies use their documented source dimensions. SHA-256 values identify the exact files used at this checkpoint.
 
 | Family | Selection | Preserved source | Source SHA-256 | Runtime atlas | Atlas dimensions |
 | --- | --- | --- | --- | --- | ---: |
-| Continuous side break | Variant 4 selected from the four-image long-face pass; foremost curtain registered to collision and generated lower rail removed in conversion | `docs/art-source/grok/continuous-side-break-source.jpg` | `b70ef5baf639d9af207881e3a7f80b2a68fdf2a5915e581417465b447ba85436` | `assets/generated/continuous-side-break-atlas.png` | 384 x 216 |
-| Twilight travelling break | Variant 4 selected from the narrow-edge pass; later broad cells demoted to the clean pocket texture in runtime | `docs/art-source/grok/twilight-travelling-break-v2-source.png` | `8cad52668112bb477e4bb8923693333848b631662fe2ab3f3f2307b40b88fd1f` | `assets/generated/twilight-travelling-break-v2-atlas.png` | 336 x 208 |
+| Continuous side break | Retired after runtime review exposed pasted-image perspective and continuation seams; output preserved but not in browser manifest | `docs/art-source/grok/continuous-side-break-source.jpg` | `b70ef5baf639d9af207881e3a7f80b2a68fdf2a5915e581417465b447ba85436` | `assets/generated/continuous-side-break-atlas.png` | 384 x 216 |
+| Twilight travelling break | Retired after runtime review exposed isolated-slab motion; output preserved but not in browser manifest | `docs/art-source/grok/twilight-travelling-break-v2-source.png` | `8cad52668112bb477e4bb8923693333848b631662fe2ab3f3f2307b40b88fd1f` | `assets/generated/twilight-travelling-break-v2-atlas.png` | 336 x 208 |
 | Twilight long barrel back | Retired complete-wave study; source preserved, runtime atlas removed | `docs/art-source/grok/twilight-long-barrel-back-edit-v1.png` | `269800eda215821d40c9bbf24eaf7fa77f47e3a2159e36b9221720892975e05b` | — | — |
 | Twilight hero barrel | Retired complete-wave study; source preserved, runtime atlas removed | `docs/art-source/grok/twilight-hero-barrel-source.png` | `197f3eb67470ea3acf488fa6bfd236853f4d7e802b490ac7b2c4d7c144f10ecf` | — | — |
 | Wave breaker | Square polish pass selected; v2 preserved | `docs/art-source/grok/wave-breaker-source-v2.png` | `07554da55eb79d344d60dea70174384c6497146b33a5923e5c913fe98c6b9ca9` | `assets/generated/wave-breaker-atlas.png` | 288 x 128 |

@@ -22,12 +22,6 @@ function atlas(filename, columns, rows, cellWidth, cellHeight, names, {
 }
 
 export const GENERATED_ASSET_MANIFEST = Object.freeze({
-  continuousSideBreak: atlas("continuous-side-break-atlas.png", 1, 1, 384, 216, [
-    "sideBreak",
-  ], { anchor: [0.53, 0.5] }),
-  twilightTravellingBreak: atlas("twilight-travelling-break-v2-atlas.png", 3, 2, 112, 104, [
-    "spill", "steepen", "fall", "pocket", "curtain", "collapse",
-  ], { anchor: [0.82, 1] }),
   twilightHeroWave: atlas("twilight-hero-wave-components-atlas.png", 2, 2, 128, 72, [
     "foamCrown", "faceRibbons", "foregroundShoulder", "contactSpray",
   ]),

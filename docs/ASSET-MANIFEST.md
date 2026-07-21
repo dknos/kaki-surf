@@ -35,12 +35,10 @@ The three full-resolution environment sources were generated offline, curated, t
 
 ## Generated runtime atlases
 
-All 15 families are optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family.
+Thirteen families are loaded at runtime and remain optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family. The continuous side-break and six-cell travelling-break outputs remain in the offline 15-family build for provenance, but browser review rejected both as active MVP silhouettes and they are absent from `js/asset-manifest.js`.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
-| `continuousSideBreak` | `continuous-side-break-atlas.png` | 384 x 216 | One connected barrel/waterfall/long-face silhouette; its 53%-width front edge registers directly to gameplay contact and its lower/right edges dissolve into live water | One-path procedural curl, trough, foam crest, live falling curtain, and churn |
-| `twilightTravellingBreak` | `twilight-travelling-break-v2-atlas.png` | 336 x 208 | Six registered spill/steepen/fall/pocket/curtain/collapse cells; selected falling-water detail is layered over the live travelling wall | Collision-aligned procedural wall, crest, curtain, tube shadow, and churn |
 | `twilightHeroWave` | `twilight-hero-wave-components-atlas.png` | 256 x 144 | `contactSpray` at the board; `foamCrown`, `faceRibbons`, and `foregroundShoulder` remain packed for reproducibility but are not currently rendered | Procedural board-contact spray |
 | `waveBreaker` | `wave-breaker-atlas.png` | 288 x 128 | Foam-isolated crest, spray, mist, impact, churn, and tendril accents | Continuous procedural face, curl, foam, spray |
 | `waveProgression` | `wave-progression-atlas.png` | 320 x 192 | Four tapered threat stages: rounded swell, pitching lip, open curl, airy whitewater impact | Collision-aligned procedural shoulder, folding lip, shadow wedge, and churn |
@@ -65,7 +63,7 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 | --- | --- |
 | `js/sprites.js` | Kitty poses, board deformation, signed facing, wake, and atlas-aware board drawing |
 | `js/wave-visuals.js` | Ride surface, face bands, fast-line guidance, curl geometry, foam, wave-atlas accents, and monotonic presentation clocks including the wave-time-driven fall clock |
-| `js/hero-wave-visuals.js` | Back/rider/front barrel staging, passed-sky window, segmented curl/pour composition, rideable tube presentation, collision-aligned edge, board spray, and complete procedural fallbacks |
+| `js/hero-wave-visuals.js` | Long side-view face, fixed-grid gravity columns, persistent contrail foam, passed-sky/backwater window, rideable tube presentation, collision-aligned edge, board spray, and impact churn |
 | `js/world-visuals.js` | Traffic layers, wildlife phases, powerups, carrier/airshow, and their procedural fallbacks |
 | `js/asset-drawing.js` | Shared atlas-frame drawing with anchor, scale, direction, alpha, and transform controls |
 | `js/renderer.js` | Layer composition, interpolation, HUD, particles, callouts, access presentation, and state-driven VFX |
@@ -75,7 +73,7 @@ Exact source paths, hashes, selection decisions, all Grok prompts including reje
 
 ## Offline source and deterministic conversion
 
-The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The active continuous side-break source is 1280 x 720, the travelling-break sheet is 384 x 216, the wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, retired studies, and other selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. All are documentation/source assets, never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The retired continuous side-break source is 1280 x 720, the retired travelling-break sheet is 384 x 216, the active wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, other studies, and remaining selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. Source sheets are documentation assets and are never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
 2. identifies and removes the chroma-magenta field while preserving coral accents; the continuous wave uses a narrow black key so its isolation field and tube opening reveal the live world without erasing saturated navy water;
@@ -97,7 +95,7 @@ The conversion requires Pillow only at authoring time. Generated PNGs and the ma
 - Fixed 384 x 216 logical Canvas with `imageSmoothingEnabled = false`.
 - CSS uses `image-rendering: pixelated` / `crisp-edges`.
 - Strong deep-navy silhouettes and controlled condition palettes remain readable at native scale.
-- Signed direction flips rider-facing sprites and wakes at the drawing boundary; the travelling break, horizon crest, and falling-water phases never mirror when the rider reverses.
+- Signed direction flips rider-facing sprites and wakes at the drawing boundary; the gravity-column break, structural crest, and falling-water phases never mirror when the rider reverses.
 - State-driven anticipation, compression, trick, landing, mount, collision, and wipeout poses are selected from simulation state.
 - Alpha is deliberate for transparent atlases, HUD panels, particles, impact flash, and fades.
 

@@ -89,11 +89,11 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Grok modular atlas build
 
-The active build publishes 15 generated families from sources reviewed at source and runtime size. The production wave uses a selected 1280 x 720 continuous side-break source plus the 384 x 216 six-cell travelling-break sheet; superseded full-wave, curtain, and long-back studies remain under `docs/art-source/grok` for auditability.
+The deterministic offline build still publishes 15 generated families from reviewed sources. The browser manifest loads 13: the rejected 1280 x 720 continuous side-break and 384 x 216 six-cell travelling-break outputs remain preserved for auditability but are no longer downloaded or composited. The production MVP silhouette is built directly from the canonical wave state as a long face plus fixed-grid gravity columns and persistent foam contrails.
 
 `tools/art/build-grok-assets.py` is the deterministic production conversion. Its declared family records define source directory, source and output grids, fixed cell size, frame names, anchor, palette size, and padding. The script removes chroma magenta or the continuous wave's narrow black isolation field, extracts each cell, applies contact-preserving layout rules, removes the source's straight lower rail, blends continuation edges, quantizes the local sprite, packs transparent RGBA atlases, and writes `assets/generated/manifest.json`.
 
-Normal rendering in every condition pins the continuous wave's foremost falling edge to canonical collision, scales the registered mass with pressure, blends its tapered face into live water, then draws Kaki, moving waterfall packets, churn, and contact spray. Runtime geometry owns the playable surface, collision, stage pressure, passed-sky extent, tube rules, collapse, and monotonic left-to-right break direction. Missing generated art uses the same one-path continuous fallback.
+Normal rendering in every condition pins the gravity front to canonical collision, advances newly activated columns left-to-right, accelerates their heads downward, and leaves revealed foam packets fixed behind them. Runtime geometry owns the playable surface, collision, stage pressure, passed-sky extent, tube rules, collapse, and break direction; generated art is limited to subordinate churn/contact accents and is never required for the silhouette.
 
 ```console
 python3 tools/art/build-grok-assets.py
