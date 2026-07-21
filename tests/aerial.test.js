@@ -99,6 +99,7 @@ test("panorama crop covers every altitude and signed horizontal wrap without bla
   const center = aerialPanoramaCropX(0);
   const right = aerialPanoramaCropX(240);
   const left = aerialPanoramaCropX(-240);
+  assert.equal(center, 192, "the authored opening crop starts on the single coherent coast");
   assert.ok(right > center);
   assert.ok(left < center);
   for (const x of [aerialPanoramaCropX(-100000), aerialPanoramaCropX(100000)]) {

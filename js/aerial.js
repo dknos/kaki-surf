@@ -167,7 +167,10 @@ export function aerialPanoramaCropX(
   parallax = 0.22,
 ) {
   const span = Math.max(1, Number(width) || AERIAL_PANORAMA.width);
-  const base = Math.max(0, (span - Number(viewportWidth || 0)) * 0.5);
+  // The reviewed panoramas put their single coastal landmark at this authored
+  // shelf. Starting here also keeps the repaired outer-edge join outside the
+  // opening crop while leaving useful signed travel in both directions.
+  const base = Math.max(0, Math.min(span - Number(viewportWidth || 0), span * 0.125));
   const signed = base + (Number(cameraWorldX) || 0) * (Number(parallax) || 0);
   return ((signed % span) + span) % span;
 }

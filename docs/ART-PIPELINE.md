@@ -89,9 +89,9 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Vertical aerial panorama build
 
-The sky-to-space extension uses six reviewed Grok candidates and six reference-controlled Vertex/Nano candidates. The selected mix, complete prompts, and source filenames are recorded in [Vertical aerial source selection](./art-source/aerial/README.md).
+The sky-to-space extension keeps six reviewed Grok candidates and six reference-controlled Vertex/Nano candidates as the comparison matrix. After live continuity review, each runtime master was rebuilt from one continuous edit source rather than a provider splice. The repair decisions, prompts, and filenames are recorded in [Vertical aerial source selection](./art-source/aerial/README.md).
 
-`tools/art/build-aerial-panoramas.py` preserves each existing 384 x 80 coast at the initial camera crop, stitches selected upper and lower components across a 96-pixel ordered-dither overlap, welds the horizontal loop without mirroring, sharpens restrainedly, and quantizes to a condition-owned 36-color palette.
+`tools/art/build-aerial-panoramas.py` reframes each single continuous source so its authored horizon lands at the normal-riding camera shelf, sharpens restrainedly, and quantizes to a compact 64- or 72-color indexed PNG. Its `--check` mode guards the old pasted-strip boundaries and static-host budget without rewriting assets.
 
 ```console
 python3 tools/art/build-aerial-panoramas.py

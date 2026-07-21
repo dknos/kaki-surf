@@ -29,10 +29,10 @@ all layers --> 384 x 216 Canvas --> nearest-neighbor CSS scaling
 | Family | Files | Dimensions | Fallback |
 | --- | --- | --- | --- |
 | Gameplay aerial panoramas | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-aerial.png` | 1536 x 640 each | Condition-specific Canvas coast/cloud/space bands |
-| Preserved coast sources | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-strip.png` | 384 x 80 each | Build inputs locked into the initial aerial crop |
+| Preserved coast sources | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-strip.png` | 384 x 80 each | Original lower-art references retained for comparison |
 | Menu art | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-menu.png` | 768 x 432 each | CSS color treatment and readable menu shell |
 
-The lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. The vertical masters mix reviewed Grok and reference-controlled Vertex/Nano components through `tools/art/build-aerial-panoramas.py`; prompts and selection decisions are in [Vertical aerial source selection](./art-source/aerial/README.md).
+The lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. The vertical masters are rebuilt from one reviewed continuous source per condition through `tools/art/build-aerial-panoramas.py`; the rejected Grok/Vertex splice, repair prompts, and selection decisions are documented in [Vertical aerial source selection](./art-source/aerial/README.md).
 
 ## Generated runtime atlases
 

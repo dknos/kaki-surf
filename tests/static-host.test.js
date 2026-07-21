@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { GAME_VERSION, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
@@ -177,6 +178,17 @@ test("condition aerial panoramas are tall local masters with unique art directio
     hashes.add(createHash("sha256").update(bytes).digest("hex"));
   }
   assert.equal(hashes.size, 3, "each condition keeps a distinct vertical world");
+
+  const continuityCheck = spawnSync(
+    "python3",
+    ["tools/art/build-aerial-panoramas.py", "--check"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  assert.equal(
+    continuityCheck.status,
+    0,
+    `aerial panorama continuity check failed:\n${continuityCheck.stdout}${continuityCheck.stderr}`,
+  );
 
   const loaderSource = read(path.join(ROOT, "js", "asset-loader.js"));
   assert.match(loaderSource, /`\$\{conditionId\}-aerial\.png`/);
