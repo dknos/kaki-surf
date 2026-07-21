@@ -49,6 +49,25 @@ test("direction and downhill events have physical, direction-aware pitch sweeps"
   assert.ok(calls.some((call) => call.method === "noiseBurst" && call.end > call.start));
 });
 
+test("Turbo start, landed-trick refill, and empty-tank stop have distinct cues", () => {
+  const { audio, calls } = createAudioProbe();
+
+  audio.onEvent({ type: "turboStart", payload: { level: 0.8 } });
+  assert.ok(calls.some((call) => call.method === "noiseBurst" && call.filter === "highpass"));
+  assert.ok(firstTone(calls).end > firstTone(calls).start, "boost ignition rises");
+
+  calls.length = 0;
+  audio.onEvent({ type: "turboRefill", payload: { amount: 0.42, quality: "perfect" } });
+  assert.equal(calls.filter((call) => call.method === "tone").length, 3);
+  assert.equal(firstTone(calls).start, 523);
+
+  calls.length = 0;
+  audio.onEvent({ type: "turboStop", payload: { reason: "released" } });
+  assert.equal(calls.length, 0, "ordinary release avoids audio chatter");
+  audio.onEvent({ type: "turboStop", payload: { reason: "empty" } });
+  assert.ok(firstTone(calls).end < firstTone(calls).start, "empty tank resolves downward");
+});
+
 test("dolphin, shark, and whale semantics resolve to distinct frequency identities", () => {
   const { audio, calls } = createAudioProbe();
 

@@ -20,7 +20,8 @@ export const KEY_BINDINGS = Object.freeze({
   down: Object.freeze(["ArrowDown", "KeyS"]),
   edge: Object.freeze(["Space", "KeyZ"]),
   trick: Object.freeze(["KeyF", "KeyX"]),
-  special: Object.freeze(["KeyT", "ShiftLeft", "ShiftRight"]),
+  turbo: Object.freeze(["ShiftLeft", "ShiftRight"]),
+  special: Object.freeze(["KeyT"]),
   spinLeft: Object.freeze(["KeyQ"]),
   spinRight: Object.freeze(["KeyE"]),
   trick1: TRICK1_KEYS,
@@ -34,10 +35,11 @@ export const KEY_BINDINGS = Object.freeze({
   debug: Object.freeze(["Backquote"]),
 });
 
-const ADVANCED_ACTIONS = Object.freeze(["edge", "trick1", "trick2", "trick3", "trick4"]);
-const SIMPLE_ACTIONS = Object.freeze(["edge", "trick", "special", "spinLeft", "spinRight"]);
+const ADVANCED_ACTIONS = Object.freeze(["edge", "turbo", "trick1", "trick2", "trick3", "trick4"]);
+const SIMPLE_ACTIONS = Object.freeze(["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]);
 const STEP_ACTIONS = Object.freeze([
   "edge",
+  "turbo",
   "trick1",
   "trick2",
   "trick3",
@@ -63,6 +65,9 @@ export function createInputStep() {
     edge: false,
     edgePressed: false,
     edgeReleased: false,
+    turbo: false,
+    turboPressed: false,
+    turboReleased: false,
     trick1: false,
     trick1Pressed: false,
     trick1Released: false,
@@ -480,6 +485,7 @@ function snapshotGamepad(pad) {
     x: dpadX || applyDeadZone(pad.axes?.[0] ?? 0),
     y: dpadY || applyDeadZone(pad.axes?.[1] ?? 0),
     edge: buttonPressed(pad, 0) || buttonPressed(pad, 7),
+    turbo: buttonPressed(pad, 10),
     trick: buttonPressed(pad, 2) || buttonPressed(pad, 1),
     special: buttonPressed(pad, 3),
     spinLeft: buttonPressed(pad, 4),
@@ -500,6 +506,7 @@ export const DISCONNECTED_GAMEPAD = Object.freeze({
   x: 0,
   y: 0,
   edge: false,
+  turbo: false,
   trick: false,
   special: false,
   spinLeft: false,
@@ -529,6 +536,7 @@ function createTouchState() {
     x: 0,
     y: 0,
     edge: false,
+    turbo: false,
     trick: false,
     special: false,
     spinLeft: false,
@@ -588,7 +596,7 @@ function isTouchControl(control) {
 }
 
 function normalizeTouchControl(control, mode) {
-  if (DIRECTION_CONTROLS.has(control) || control === "edge") return control;
+  if (DIRECTION_CONTROLS.has(control) || control === "edge" || control === "turbo") return control;
   if (mode === CONTROL_MODES.ADVANCED) {
     if (control === "style" || control === "spinLeft") return "trick1";
     if (control === "spinRight") return "trick2";

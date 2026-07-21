@@ -285,6 +285,8 @@ export class KakiSurfGame {
       timeRemaining: Number.isFinite(this.simulation.timeRemaining) ? this.simulation.timeRemaining : null,
       score: Math.round(this.simulation.score.total),
       multiplier: this.simulation.currentMultiplier(),
+      turbo: this.simulation.player.turbo,
+      turboActive: this.simulation.player.turboActive,
       wipeouts: this.simulation.wipeouts,
       board: this.selectedBoard,
       condition: this.selectedCondition,
@@ -922,7 +924,7 @@ export class KakiSurfGame {
     const conditionId = Object.keys(CONDITIONS).find((id) => scene === id || scene.endsWith(`-${id}`))
       ?? "goldenCoast";
     const boardId = Object.keys(BOARDS).find((id) => scene === id || scene.startsWith(`${id}-`))
-      ?? (scene === "maxSpeed" || scene === "tailGrab" || scene === "hugeAir" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff");
+      ?? (scene === "maxSpeed" || scene === "turboBoost" || scene === "tailGrab" || scene === "hugeAir" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff");
     this.selectedCondition = conditionId;
     this.selectedMode = "endless";
     this.host.dataset.condition = conditionId;
@@ -962,6 +964,9 @@ export class KakiSurfGame {
       previousFace: targetFace,
       faceVelocity: -0.12,
       speed: 92,
+      turbo: 1,
+      turboActive: false,
+      turboOverdrive: 0,
       compression: 0,
       charge: 0,
       boardAngle: this.simulation.wave.slopeAt(232, targetFace),
@@ -1030,6 +1035,15 @@ export class KakiSurfGame {
         player.speedTier = "BLASTING";
         player.powerLine = true;
         this.renderer.onEvent({ type: "fullPower", payload: { momentum: 1 } }, this.simulation);
+        break;
+      case "turboBoost":
+        player.turbo = 0.68;
+        player.turboActive = true;
+        player.turboOverdrive = 1;
+        player.waveMomentum = 1;
+        player.speed = Math.round(this.simulation.currentRideSpeedCap() * 0.98);
+        player.speedTier = "BLASTING";
+        this.renderer.onEvent({ type: "turboStart", payload: { level: player.turbo } }, this.simulation);
         break;
       case "pumpCompression":
         player.compression = 1;
@@ -1468,7 +1482,7 @@ function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve and rotate with arrows or WASD, use Space or Z for action, F or X for a context trick, and T or Shift for an available animal special."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve and rotate with arrows or WASD, use Space or Z for action, F or X for a context trick, hold Shift for trick-recharged Turbo, and press T for an available animal special."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="pause-run" aria-label="Pause surfing">II</button>
@@ -1504,7 +1518,7 @@ function gameMarkup() {
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
           </dl>
-          <p class="controls-line"><b>CARVE + SPIN</b> ARROWS / STICK <b>ACTION</b> SPACE / A <b>TRICK</b> F / X <b>SPECIAL</b> T / Y WHEN READY</p>
+          <p class="controls-line"><b>CARVE + SPIN</b> ARROWS / STICK <b>ACTION</b> SPACE / A <b>TRICK</b> F / X <b>TURBO</b> SHIFT / L3 <b>SPECIAL</b> T / Y</p>
         </div>
 
         <div class="game-layer compact-layer" data-layer="pause" hidden>
@@ -1542,6 +1556,7 @@ function gameMarkup() {
             <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" aria-label="Optional counterclockwise spin or advanced trick one"><b>Q</b><span>SPIN</span></button>
             <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" aria-label="Optional clockwise spin or advanced trick two"><b>E</b><span>SPIN</span></button>
             <button class="touch-trick" type="button" data-control="trick" aria-label="Context trick"><b>TRICK</b><span>TAP / HOLD</span></button>
+            <button class="touch-turbo" type="button" data-control="turbo" aria-label="Hold Turbo boost; successful landed tricks refill it"><b>TURBO</b><span>HOLD</span></button>
             <button class="touch-special" type="button" data-control="special" aria-label="Animal special ability" hidden><b>SPECIAL</b><span>READY</span></button>
             <button class="touch-action" type="button" data-control="edge" aria-label="Action: compress, pump, and pop"><b>ACTION</b><span>HOLD / RELEASE</span></button>
           </div>

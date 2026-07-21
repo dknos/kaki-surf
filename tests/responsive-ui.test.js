@@ -170,24 +170,23 @@ test("320px portrait keeps every essential touch target at least 44px without sc
   );
   assert.match(
     STYLES,
-    /@media \(max-width:\s*370px\) and \(orientation:\s*portrait\)[\s\S]*?\.touch-actions\s*\{[\s\S]*?width:\s*calc\(100vw - 172px\);[\s\S]*?transform:\s*none;/,
+    /@media \(max-width:\s*370px\) and \(orientation:\s*portrait\)[\s\S]*?\.touch-actions\s*\{[\s\S]*?width:\s*140px;[\s\S]*?height:\s*92px;[\s\S]*?transform:\s*none;/,
   );
   assert.doesNotMatch(STYLES, /@media \(max-width:\s*350px\)[\s\S]*?transform:\s*scale\(0\.8\)/);
 
   const viewportWidth = 320;
   const dpadRight = 8 + 140;
-  const actionsLeft = viewportWidth - 8 - (viewportWidth - 172);
-  assert.equal(actionsLeft - dpadRight, 16);
-  for (const size of [45, 44, 58, 64]) assert.ok(size >= 44);
+  const actionsLeft = viewportWidth - 8 - 140;
+  assert.equal(actionsLeft - dpadRight, 24);
+  for (const size of [45, 44]) assert.ok(size >= 44);
 
-  const narrowActionWidth = viewportWidth - 172;
   const topRow = [
     [0, 44],
-    [46, 90],
-    [narrowActionWidth - 54, narrowActionWidth],
+    [48, 92],
+    [96, 140],
   ];
   for (let index = 0; index < topRow.length - 1; index += 1) {
-    assert.ok(topRow[index][1] <= topRow[index + 1][0], "spin and Special targets do not overlap");
+    assert.ok(topRow[index][1] <= topRow[index + 1][0], "spin and Turbo targets do not overlap");
   }
 });
 
@@ -206,7 +205,7 @@ test("short landscape touch clusters clear the lower HUD", () => {
   );
   assert.match(
     STYLES,
-    /@media \(max-height: 560px\) and \(orientation: landscape\)[\s\S]*?\.touch-actions\s*\{[\s\S]*?width:\s*156px;[\s\S]*?transform:\s*none;/,
+    /@media \(max-height: 560px\) and \(orientation: landscape\)[\s\S]*?\.touch-actions\s*\{[\s\S]*?width:\s*140px;[\s\S]*?height:\s*92px;[\s\S]*?transform:\s*none;/,
   );
 
   const targetSize = 45;

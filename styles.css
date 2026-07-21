@@ -1473,12 +1473,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .touch-actions .touch-special {
-  right: 54px;
+  right: 0;
   top: 0;
   width: 58px;
-  height: 42px;
+  height: 44px;
   border-color: var(--gold);
   color: var(--gold);
+}
+
+.touch-actions .touch-turbo {
+  right: 60px;
+  top: 0;
+  width: 52px;
+  height: 44px;
+  border-color: var(--crest);
+  color: var(--crest);
 }
 
 .touch-actions .touch-spin {
@@ -1550,28 +1559,31 @@ input[type="range"]::-moz-range-thumb {
 
   .touch-actions {
     right: max(8px, env(safe-area-inset-right));
-    width: calc(100vw - 172px);
+    width: 140px;
+    height: 92px;
     transform: none;
   }
 
+  .touch-actions .touch-spin--left,
+  .touch-actions .touch-spin--right,
+  .touch-actions .touch-turbo,
+  .touch-actions .touch-trick,
+  .touch-actions .touch-special,
   .touch-actions .touch-action,
   .touch-actions [data-control="edge"] {
-    width: 64px;
-    height: 64px;
-  }
-
-  .touch-actions .touch-trick {
-    right: 66px;
-    width: 58px;
-    height: 58px;
-  }
-
-  .touch-actions .touch-special {
-    right: 0;
-    top: 0;
-    width: 54px;
+    width: 44px;
     height: 44px;
+    border-radius: 0;
   }
+
+  .touch-actions .touch-spin--left { left: 0; top: 0; }
+  .touch-actions .touch-spin--right { left: 48px; top: 0; }
+  .touch-actions .touch-turbo { left: 96px; right: auto; top: 0; }
+  .touch-actions .touch-trick { left: 0; right: auto; top: 48px; bottom: auto; }
+  .touch-actions .touch-special { left: 48px; right: auto; top: 48px; }
+  .touch-actions .touch-action,
+  .touch-actions [data-control="edge"] { left: 96px; right: auto; top: 48px; bottom: auto; }
+
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
@@ -1594,8 +1606,8 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .touch-actions {
-    width: 156px;
-    height: 118px;
+    width: 140px;
+    height: 92px;
     transform: none;
   }
 
@@ -1606,28 +1618,43 @@ input[type="range"]::-moz-range-thumb {
     height: 44px;
   }
 
-  .touch-actions .touch-spin--left { left: 0; }
-  .touch-actions .touch-spin--right { left: 46px; }
+  .touch-actions .touch-spin--left { left: 0; top: 0; }
+  .touch-actions .touch-spin--right { left: 48px; top: 0; }
+
+  .touch-actions .touch-turbo {
+    left: 96px;
+    right: auto;
+    top: 0;
+    width: 44px;
+    height: 44px;
+  }
 
   .touch-actions .touch-special {
-    right: 0;
-    top: 0;
-    width: 54px;
+    left: 48px;
+    right: auto;
+    top: 48px;
+    width: 44px;
     height: 44px;
   }
 
   .touch-actions .touch-trick {
-    right: 66px;
-    bottom: 0;
-    width: 58px;
-    height: 58px;
+    left: 0;
+    right: auto;
+    top: 48px;
+    bottom: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 0;
   }
 
   .touch-actions .touch-action,
   .touch-actions [data-control="edge"] {
-    right: 0;
-    bottom: 0;
-    width: 64px;
-    height: 64px;
+    left: 96px;
+    right: auto;
+    top: 48px;
+    bottom: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 0;
   }
 }

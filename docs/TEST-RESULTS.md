@@ -12,11 +12,11 @@ npm run check
 git diff --check
 ```
 
-The current native Node run passed **184 tests with 0 failures**. `npm run check` parsed **30 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
+The current native Node run passed **187 tests with 0 failures**. `npm run check` parsed **30 JavaScript modules** successfully. The final whitespace check is recorded with the handoff after documentation edits.
 
 The current suite covers:
 
-- Simple and Advanced control-mode selection, Twilight travelling-break fresh-save default with returning-profile preservation, migration of older saves to Advanced, mode-switch clearing, keyboard aliases, 120 ms action edges, active-second-gamepad selection, dead zone, and independent touch pointers.
+- Simple and Advanced control-mode selection, common Shift/L3/touch Turbo input, Twilight travelling-break fresh-save default with returning-profile preservation, migration of older saves to Advanced, mode-switch clearing, keyboard aliases, 120 ms action edges, active-second-gamepad selection, dead zone, and independent touch pointers.
 - Controller UI confirm/back edges, dominant-axis navigation, deliberate hold repeat, spatial focus selection, in-place range/select adjustment, and an allocation-free no-pad poll/consume path.
 - Native slider/select/checkbox/button keyboard behavior while Settings is open, modal gameplay-input suppression, safe Escape cleanup, and scrollable touch surfaces outside the Canvas control zone.
 - Simple context-Trick buffering, tap/hold interpretation, scored held Tube Tuck/Soul Arch in the eligible pocket, entry/hold hysteresis, pocket-exit grace, release-required re-arm, exclusive tube maneuver ownership, coherent best-ride duration/score records, finish-run grading, short foreground exit tail, pose cleanup, gated aerial fallback, spin impulses, board-specific auto-level, and nearest regular/opposite landing alignment.
@@ -29,6 +29,7 @@ The current suite covers:
 - Escalating monotonic curl pressure, eight-second opening grace, skilled relief, bounded respawn recovery, deterministic idle/skilled threat windows, and collision-aligned profile-specific contact.
 - Condition-first wave-profile installation, shared long-face rendering across `classic` and `heroBarrel` physics, x=30 opening contact, expanded ride/air bounds, six staged travelling-break sections, a monotonically growing passed-sky window, fixed-grid gravity columns with persistent contrails, one nonmirroring collision edge, and canonical aerial collision at the visible pitching lip.
 - Surface-gradient downhill acceleration, uphill cost, traverse drive, board hard caps, pump enhancement, speed-derived big air, landing carry, and separation of Speed from Flow.
+- Finite face-only Turbo drain, real acceleration and 14% overdrive headroom, release decay, wipeout preservation/loss, and clean/perfect landed-trick refill scaling by completed entries, rotation, grade, and exact-repeat decay; empty pops and wobble returns stay at zero.
 - Board-specific steering, pop, air correction, landing windows, Simple correction strengths, and the 18% scoring reduction for explicit Steering/Landing assists.
 - Seeded `WorldSimulation` traffic pools, layer capacity and culling, stable stream isolation, quiet periods, wildlife phase machines, swept collision/reachability, powerup collection/consumption, carrier/airshow state, and bounded signal queues.
 - Bird reactions and harmless final-moment dodge, one-shot Feather Thread, courier and aircraft drops, no-penalty speedboat/jet-ski races, Dolphin/Fleet foam gates, and deterministic style-score integration.
@@ -41,11 +42,12 @@ The current suite covers:
 
 ## Browser QA status
 
-The canonical local-browser matrix contains 121 completed deterministic captures, including six locked Twilight travelling-break stages, separate right/left whale rides, and the rideable-tube and big-air-camera fixtures:
+The canonical local-browser matrix contains 122 completed deterministic captures, including six locked Twilight travelling-break stages, separate right/left whale rides, and the rideable-tube, big-air-camera, and active-Turbo fixtures:
 
-- The gallery, capture script, and contact-sheet source contain the same **121 scene identifiers**.
-- The checked-in capture directory contains all **121 normalized 1280 x 720 renders**. `docs/images/qa-contact-sheet.png` is the complete assembly and includes Gather, Pitch, Pour, Deep, Maximum, Collapse, Tube, Air, and both whale-ride directions.
-- An exact-image hash scan found 117 unique bitmaps. Intentional shared states are Golden Coast/Foam Puff, Stormbreak/Foam Puff, and the Twilight Foam Puff/condition/traffic trio; right/left whale rides, staged Twilight frames, tube, big-air, cargo ship, fishing boat, sailboat, speedboat, and carrier fixtures remain distinct.
+- The gallery, capture script, and contact-sheet source contain the same **122 scene identifiers**.
+- The checked-in capture directory contains all **122 normalized 1280 x 720 renders**. `docs/images/qa-contact-sheet.png` is the complete assembly and includes Gather, Pitch, Pour, Deep, Maximum, Collapse, Tube, Air, Turbo, and both whale-ride directions.
+- The persistent-CDP gallery pass completed all 122 scenes with no reported page exception, console error, or HTTP-error response. The Turbo fixture remains visually distinct from ordinary max speed and exposes the compact tank plus signed boost wake.
+- A real-browser Shift probe started an ordinary Twilight Endless run, reached riding with a full tank, held Shift for 650 ms, and observed Turbo active at 0.766 charge; releasing Shift left the same charge and cleared the active state. The probe reported zero browser errors. Native simulation coverage separately verifies the overdrive speed delta and landed-trick refill path.
 - The current CDP play probe exercised menu, native Settings slider input, modal Space suppression, native dialog close, start, pause, resume, corrupt-save reload, and a 100-restart stress loop with a stable 436-node DOM. It completed with **0 console errors, 0 uncaught exceptions, and 0 failed runtime loads**; the checked-in SVG favicon also removes the previous optional 404.
 - A fresh five-scene CDP release scan loaded menu, maximum-break, active-tube, big-air, and results states from the final local tree with **0 console errors, 0 uncaught exceptions, and 0 failed or HTTP-error runtime loads**.
 - Fresh Chromium interaction probes selected and started both modes. Score Attack exposed `START SCORE ATTACK`, `78 SECONDS`, a finite 78-second snapshot, and the `78 SEC BEST` record; Endless exposed `CHASE THE HORIZON`, `3 PAWS / NO CLOCK`, a null public timer, Set 1, and the `ENDLESS BEST` record. Both probes reported **0 page errors**.

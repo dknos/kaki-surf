@@ -22,9 +22,10 @@ Simple Controls are the default:
 | --- | --- | --- | --- |
 | Travel, carve, and trim | Arrows or WASD | Left stick or D-pad | Direction pad |
 | Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
+| Turbo Boost | Hold either Shift | Left-stick press (L3) | Hold **Turbo** |
 | Context trick / tube hold | F or X | X or B | **Trick** |
 | Optional spin impulses | Q / E | Left / right bumper | Left / right **Spin** |
-| Mounted-animal special | T or Shift | Y | **Special** when ready |
+| Mounted-animal special | T | Y | **Special** when ready |
 | Pause | Escape or P | Start | **II** pause button; Settings also pauses |
 
 Advanced Controls preserve the original Q/E/F/T map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
@@ -37,9 +38,10 @@ The rider can commit to left- or right-going travel. A reversal must scrub throu
 
 Wave geometry now supplies the main drive. Dropping down the face adds speed, climbing costs speed, and traversing retains a smaller glide. Action is an enhancer: compress and release to pump, or carry speed to the lip for bigger air. Launch height combines current speed, uphill approach, charge, board identity, pocket position, and any active bonus. Perfect and clean landings preserve useful carry into the next line.
 
-Speed and Flow are separate:
+Speed, Turbo, and Flow have separate jobs:
 
 - **Speed** is physical motion, reported as `STALLING`, `GLIDING`, `FAST`, `FLYING`, or `BLASTING` and reinforced by wake, spray, parallax, animation, and audio.
+- **Turbo** is a short earned overdrive. Hold Shift, L3, or the touch Turbo button on the face to spend it; only a completed aerial banked through a clean or perfect landing refills it. Bigger, varied, perfectly landed combinations return more fuel, while exact repeats return less.
 - **Flow** is the run's combo/style state. Valid full carves, timed pumps, direction changes, varied tricks, clean landings, and wildlife moments build it. A strong line can briefly sustain earned Flow, but passive riding, repetition, stalling, wobble, and wipeouts reduce it.
 
 Simple Controls make Trick contextual: hold it inside Twilight's critical pocket to tuck into the tube, or use it around a launch to buffer an eligible aerial move. A large move that no longer fits falls back to a readable grab, and late descent begins helping the board toward the nearest valid landing tangent. Advanced Controls retain direct on-wave maneuvers, a dedicated held Tube Tuck/Soul Arch, and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
@@ -94,7 +96,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **184/184 tests**, including visible pre-wipeout barrel travel, monotonic coast parallax, full-face bidirectional traversal, complete offscreen barrel relief and pursuit, bidirectional whale mounting, fixed-grid gravity columns, and ocean-registered whale spawns; the syntax gate checks **30 JavaScript modules**. The canonical local-browser gallery contains **121 deterministic 1280 x 720 captures**, including separate right- and left-going whale rides. A separate real-keyboard chase probe records opening motion without a fall, the complete offscreen lead, fixed-camera cutback, and pursuing return. The lifecycle/audio/wave pass additionally covers both run-mode contracts, pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. This checkpoint records local evidence and does not by itself claim that the GitHub Pages deployment has refreshed. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
+The native suite passes **187/187 tests**, including trick-gated Turbo drain/refill/audio, visible pre-wipeout barrel travel, monotonic coast parallax, full-face bidirectional traversal, complete offscreen barrel relief and pursuit, bidirectional whale mounting, fixed-grid gravity columns, and ocean-registered whale spawns; the syntax gate checks **30 JavaScript modules**. The canonical local-browser gallery contains **122 deterministic 1280 x 720 captures**, including dedicated Turbo and separate right-/left-going whale-ride scenes. A separate real-keyboard chase probe records opening motion without a fall, the complete offscreen lead, fixed-camera cutback, and pursuing return. The lifecycle/audio/wave pass additionally covers both run-mode contracts, pause/resume, corrupt-save recovery, 100-restart, controller-only menu/settings/results flow, rotation with held touch, native Settings input, touch-scroll, boat depth, and 25-state responsive checks. This checkpoint records local evidence and does not by itself claim that the GitHub Pages deployment has refreshed. See [Validation results](docs/TEST-RESULTS.md), [QA matrix](docs/QA.md), [Responsive QA](docs/RESPONSIVE-QA.md), and the [vertical highlight brief](docs/HIGHLIGHT-BRIEF.md).
 
 ## Static deployment and integration
 

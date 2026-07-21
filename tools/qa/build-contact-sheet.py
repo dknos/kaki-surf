@@ -37,6 +37,7 @@ SCENES = (
     ("heroTube-twilightGlass", "Twilight rideable tube pocket"),
     ("heroAir-twilightGlass", "Twilight big-air camera pan"),
     ("maxSpeed", "Movement-earned blasting speed"),
+    ("turboBoost", "Trick-recharged Turbo Boost"),
     ("pumpCompression", "ACTION compression"),
     ("pumpRelease", "ACTION release enhancer"),
     ("powerLine", "Optional readable speed seam"),

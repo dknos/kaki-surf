@@ -20,6 +20,9 @@ const EMPTY_INPUT = Object.freeze({
   edge: false,
   edgePressed: false,
   edgeReleased: false,
+  turbo: false,
+  turboPressed: false,
+  turboReleased: false,
   trick1: false,
   trick1Pressed: false,
   trick1Released: false,
@@ -64,6 +67,35 @@ const POWERUP_NAMES = Object.freeze({
   moonPop: "MOON POP",
   starFoam: "STAR FOAM",
 });
+
+/**
+ * Convert a banked aerial result into Turbo. Empty pops and wobble saves do
+ * not pay fuel; rotation, completed entries, landing grade, and repetition
+ * all remain visible in the economy.
+ */
+export function turboRefillForLanding(result, quality = "clean", tuning = TUNING) {
+  if (quality !== "clean" && quality !== "perfect") return 0;
+  const entries = Array.isArray(result?.entries) ? result.entries : [];
+  const halfTurns = Math.floor(Math.abs(Number(result?.rotationDegrees) || 0) / 180);
+  if (!entries.length && halfTurns < 1) return 0;
+
+  const raw = finiteTuning(tuning.turboTrickBaseRefill, TUNING.turboTrickBaseRefill)
+    + entries.length * finiteTuning(tuning.turboTrickEntryRefill, TUNING.turboTrickEntryRefill)
+    + Math.min(6, halfTurns)
+      * finiteTuning(tuning.turboSpinHalfTurnRefill, TUNING.turboSpinHalfTurnRefill);
+  const repeatFactor = clamp(Number(result?.decay ?? result?.repeatFactor ?? 1) || 0, 0, 1);
+  const repeatFloor = finiteTuning(
+    tuning.turboRepeatRefillFloor,
+    TUNING.turboRepeatRefillFloor,
+  );
+  const qualityFactor = quality === "perfect"
+    ? finiteTuning(
+      tuning.turboPerfectRefillMultiplier,
+      TUNING.turboPerfectRefillMultiplier,
+    )
+    : 1;
+  return clamp(raw * qualityFactor * (repeatFloor + (1 - repeatFloor) * repeatFactor), 0, 1);
+}
 
 export class SurfSimulation {
   constructor({
@@ -162,7 +194,12 @@ export class SurfSimulation {
     this.lastWipeoutAt = -Infinity;
     this.lastGiantTrickAt = -Infinity;
     resetRunHighlights(this.highlights);
-    resetPlayer(this.player, true, this.tuning.speed);
+    resetPlayer(
+      this.player,
+      true,
+      this.tuning.speed,
+      this.tuning.turboStartCharge,
+    );
     if (this.wave.profileId === "heroBarrel") {
       const entryFace = this.wave.powerFaceAt(this.player.x);
       this.player.face = entryFace;
@@ -213,6 +250,7 @@ export class SurfSimulation {
       0,
       1,
     );
+    this.updateTurboState(dt, input);
 
     if (this.mode.timed && player.state !== "entry" && player.state !== "wipeout") {
       this.timeRemaining = Math.max(0, this.timeRemaining - dt);
@@ -262,6 +300,7 @@ export class SurfSimulation {
         break;
     }
 
+    this.applyTurboAcceleration(dt);
     this.applyAnimalRideTuning(dt);
     this.updateWorld(dt, previousWorldTravel, previousCameraWorldX);
 
@@ -360,6 +399,72 @@ export class SurfSimulation {
     player.speed = clamp(Math.max(player.speed, minimumSpeed), 34, this.currentRideSpeedCap());
     player.waveMomentum = Math.max(player.waveMomentum, player.animalMount === "whale" ? 0.94 : 0.78);
     this.score.addFlow(dt * (player.animalMount === "whale" ? 0.055 : 0.04));
+  }
+
+  updateTurboState(dt, input) {
+    const player = this.player;
+    const rideable = ["riding", "lip", "landing", "wobble"].includes(player.state);
+    const wasActive = Boolean(player.turboActive);
+    const requested = Boolean(input.turbo) && rideable && !player.animalMount;
+    const drain = finiteTuning(
+      this.tuning.turboDrainPerSecond,
+      TUNING.turboDrainPerSecond,
+    ) * dt;
+    player.turboActive = requested && player.turbo > 0;
+
+    if (player.turboActive) {
+      player.turbo = Math.max(0, player.turbo - Math.min(player.turbo, drain));
+      player.turboOverdrive = damp(
+        player.turboOverdrive,
+        1,
+        finiteTuning(this.tuning.turboOverdriveBuild, TUNING.turboOverdriveBuild),
+        dt,
+      );
+      if (player.turbo <= 0) player.turboActive = false;
+    } else {
+      player.turboOverdrive = Math.max(
+        0,
+        player.turboOverdrive
+          - finiteTuning(this.tuning.turboOverdriveDecay, TUNING.turboOverdriveDecay) * dt,
+      );
+    }
+
+    if (!wasActive && player.turboActive) {
+      this.emit("turboStart", { level: player.turbo });
+    } else if (wasActive && !player.turboActive) {
+      this.emit("turboStop", {
+        level: player.turbo,
+        reason: player.turbo <= 0 ? "empty" : rideable ? "released" : "airborne",
+      });
+    }
+  }
+
+  applyTurboAcceleration(dt) {
+    const player = this.player;
+    if (!player.turboActive || !["riding", "lip", "landing", "wobble"].includes(player.state)) return;
+    player.speed = Math.min(
+      player.speed
+        + finiteTuning(this.tuning.turboAcceleration, TUNING.turboAcceleration) * dt,
+      this.currentRideSpeedCap(),
+    );
+  }
+
+  refillTurboFromLanding(result, quality) {
+    const refill = turboRefillForLanding(result, quality, this.tuning);
+    if (refill <= 0) return 0;
+    const previous = this.player.turbo;
+    this.player.turbo = clamp(previous + refill, 0, 1);
+    const applied = this.player.turbo - previous;
+    if (applied > 0) {
+      this.emit("turboRefill", {
+        amount: applied,
+        level: this.player.turbo,
+        quality,
+        tricks: result.entries.length,
+        rotationDegrees: result.rotationDegrees,
+      });
+    }
+    return applied;
   }
 
   handleWorldInteraction(signal) {
@@ -1248,6 +1353,7 @@ export class SurfSimulation {
       multiplier: manifest?.launchData.multiplier
         ?? this.currentMultiplier() * (this.tuning.scoreAir / 1.25),
     });
+    this.refillTurboFromLanding(result, quality);
     const landingSkill = quality === "perfect" ? 1 : quality === "clean" ? 0.68 : 0.2;
     player.skillMomentum = clamp(
       player.skillMomentum + TUNING.landingSkillGain * landingSkill,
@@ -1444,10 +1550,19 @@ export class SurfSimulation {
     });
   }
 
-  currentRideSpeedCap(momentum = this.player.waveMomentum) {
+  baseRideSpeedCap() {
     const baseTarget = this.tuning.speed * this.board.acceleration;
-    const hardMax = Math.max(baseTarget, this.tuning.maxSpeed * this.board.maxSpeed);
-    return hardMax;
+    return Math.max(baseTarget, this.tuning.maxSpeed * this.board.maxSpeed);
+  }
+
+  currentRideSpeedCap(overdrive = this.player.turboOverdrive) {
+    const base = this.baseRideSpeedCap();
+    const envelope = clamp(Number(overdrive) || 0, 0, 1);
+    const multiplier = finiteTuning(
+      this.tuning.turboSpeedCapMultiplier,
+      TUNING.turboSpeedCapMultiplier,
+    );
+    return base * (1 + envelope * (multiplier - 1));
   }
 
   constrainRidingX() {
@@ -1963,6 +2078,13 @@ export class SurfSimulation {
     if (player.animalMount) this.world.cancelMountedAnimals(cause || "wipeout");
     player.animalMount = "";
     player.animalSpecialReady = false;
+    player.turbo = clamp(
+      player.turbo * (1 - finiteTuning(this.tuning.turboWipeoutLoss, TUNING.turboWipeoutLoss)),
+      0,
+      1,
+    );
+    player.turboActive = false;
+    player.turboOverdrive = 0;
     player.wipeoutCause = cause;
     player.wipeoutSpin = player.angularVelocity || (cause === "curl" ? -5.4 : 4.7);
     player.airX = player.state === "airborne" ? player.airX : player.x;
@@ -2018,7 +2140,9 @@ export class SurfSimulation {
       ),
     );
     this.wave.curlX = retreat;
+    const preservedTurbo = player.turbo;
     resetPlayer(player, false, this.tuning.speed);
+    player.turbo = preservedTurbo;
     this.aerialSession = null;
     player.x = clamp(this.wave.curlX + 122, 160, 282);
     player.face = 0.5;
@@ -2181,6 +2305,9 @@ function createPlayer() {
     faceVelocity: 0,
     speed: TUNING.speed,
     speedTier: "GLIDING",
+    turbo: TUNING.turboStartCharge,
+    turboActive: false,
+    turboOverdrive: 0,
     flowTier: "",
     flow: 0,
     travelDirection: 1,
@@ -2264,7 +2391,12 @@ function createPlayer() {
   };
 }
 
-function resetPlayer(player, resetPosition = true, baseSpeed = TUNING.speed) {
+function resetPlayer(
+  player,
+  resetPosition = true,
+  baseSpeed = TUNING.speed,
+  turboStart = TUNING.turboStartCharge,
+) {
   player.state = "entry";
   player.stateTime = 0;
   if (resetPosition) {
@@ -2276,6 +2408,13 @@ function resetPlayer(player, resetPosition = true, baseSpeed = TUNING.speed) {
   player.faceVelocity = 0;
   player.speed = baseSpeed;
   player.speedTier = "GLIDING";
+  player.turbo = clamp(
+    finiteTuning(turboStart, TUNING.turboStartCharge),
+    0,
+    1,
+  );
+  player.turboActive = false;
+  player.turboOverdrive = 0;
   player.flowTier = "";
   player.flow = 0;
   player.travelDirection = 1;

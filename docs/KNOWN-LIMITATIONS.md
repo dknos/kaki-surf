@@ -1,6 +1,6 @@
 # Known limitations
 
-The implementation includes complete Endless Surf and Score Attack loops, Simple and Advanced controls, compositional aerials, bidirectional/switch surfing, a rideable tube, three boards and conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 120-state browser QA matrix, and a static-host adapter. The broader commercial-arcade roadmap still has product work as well as physical-lab validation.
+The implementation includes complete Endless Surf and Score Attack loops, Simple and Advanced controls, trick-recharged Turbo, compositional aerials, bidirectional/switch surfing, a rideable tube, three boards and conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 122-state browser QA matrix, and a static-host adapter. The broader commercial-arcade roadmap still has product work as well as physical-lab validation.
 
 ## Current limitations
 
@@ -19,7 +19,7 @@ The implementation includes complete Endless Surf and Score Attack loops, Simple
 
 1. Tune Endless set pacing from broader player data, then add progression/challenges without fragmenting the movement simulation.
 2. Author level-specific Golden Coast and Stormbreak silhouettes on the locked continuous-wave contact/render contract rather than restoring the legacy compositor.
-3. Run and record a physical controller/mobile matrix in both modes, including simultaneous direction plus Action/Trick, conditional Special, and B's gameplay-versus-results context.
+3. Run and record a physical controller/mobile matrix in both modes, including simultaneous direction plus Action/Trick/Turbo, conditional Special, L3 comfort, and B's gameplay-versus-results context.
 4. Complete a screen-reader, keyboard-only, switch/voice, focus, and zoom audit; log concrete issues rather than assuming Canvas labels provide gameplay equivalence.
 5. Add the missing remap/text-size/quality/OS-preference options and profile long runs on representative low-powered devices.
 6. Archive the rights grant and permitted-use scope alongside the reference and generated-art provenance before commercial distribution.

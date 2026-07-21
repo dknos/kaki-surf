@@ -19,6 +19,9 @@ const STEP_FIELDS = [
   "edge",
   "edgePressed",
   "edgeReleased",
+  "turbo",
+  "turboPressed",
+  "turboReleased",
   "trick1",
   "trick1Pressed",
   "trick1Released",
@@ -86,17 +89,17 @@ test("gameplay keys leave native settings controls alone", () => {
   input.destroy();
 });
 
-test("Simple mode is the default and exposes buffered action, context trick, special, and spin semantics", () => {
+test("Simple mode exposes action, Turbo, context trick, special, and spin semantics", () => {
   const target = new FakeTarget();
   const input = new InputManager({ target, getGamepads: () => [] });
   assert.equal(input.controlMode, CONTROL_MODES.SIMPLE);
 
-  for (const code of ["Space", "KeyF", "KeyT", "KeyQ", "KeyE"]) {
+  for (const code of ["Space", "ShiftLeft", "KeyF", "KeyT", "KeyQ", "KeyE"]) {
     target.dispatch("keydown", { code });
   }
   input.update(0);
   let step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]) {
     assert.equal(step[action], true, `${action} held`);
     assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
   }
@@ -104,12 +107,12 @@ test("Simple mode is the default and exposes buffered action, context trick, spe
     assert.equal(step[action], false, `${action} stays inactive in Simple mode`);
   }
 
-  for (const code of ["Space", "KeyF", "KeyT", "KeyQ", "KeyE"]) {
+  for (const code of ["Space", "ShiftLeft", "KeyF", "KeyT", "KeyQ", "KeyE"]) {
     target.dispatch("keyup", { code });
   }
   input.update(0);
   step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]) {
     assert.equal(step[action], false, `${action} released hold`);
     assert.equal(step[`${action}Released`], true, `${action} release buffered`);
   }
@@ -133,13 +136,19 @@ test("Simple keyboard aliases share logical edges and setControlMode clears befo
 
   target.dispatch("keydown", { code: "ShiftLeft" });
   input.update(0);
-  assert.equal(input.consumeStep().specialPressed, true, "Shift starts SPECIAL");
+  let shifted = input.consumeStep();
+  assert.equal(shifted.turboPressed, true, "Shift starts Turbo");
+  assert.equal(shifted.specialPressed, false, "Shift no longer spends an animal special");
   target.dispatch("keydown", { code: "KeyT" });
   input.update(0);
-  assert.equal(input.consumeStep().specialPressed, false, "T and Shift are one SPECIAL action");
+  shifted = input.consumeStep();
+  assert.equal(shifted.specialPressed, true, "T owns the animal special");
+  assert.equal(shifted.turboPressed, false, "T does not duplicate Turbo");
   target.dispatch("keyup", { code: "ShiftLeft" });
   input.update(0);
-  assert.equal(input.consumeStep().specialReleased, false, "T keeps SPECIAL held");
+  shifted = input.consumeStep();
+  assert.equal(shifted.turboReleased, true);
+  assert.equal(shifted.specialReleased, false, "T keeps SPECIAL held");
   target.dispatch("keyup", { code: "KeyT" });
   input.update(0);
   assert.equal(input.consumeStep().specialReleased, true);
@@ -476,14 +485,14 @@ test("gamepad polling walks sparse pad lists without an intermediate array pipel
   assert.equal(pollGamepad(() => { throw new Error("denied"); }).connected, false);
 });
 
-test("Simple gamepad maps A/RT, X/B, Y, and bumpers without leaking Advanced trick edges", () => {
+test("Simple gamepad maps A/RT, L3 Turbo, X/B, Y, and bumpers without leaking Advanced trick edges", () => {
   const pad = createPad();
   const input = new InputManager({ target: new FakeTarget(), getGamepads: () => [pad] });
 
-  pressButtons(pad, 0, 7, 2, 1, 3, 4, 5);
+  pressButtons(pad, 0, 7, 10, 2, 1, 3, 4, 5);
   input.update(0);
   let step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]) {
     assert.equal(step[action], true, `${action} held`);
     assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
   }
@@ -495,7 +504,7 @@ test("Simple gamepad maps A/RT, X/B, Y, and bumpers without leaking Advanced tri
   releaseButtons(pad);
   input.update(0);
   step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]) {
     assert.equal(step[`${action}Released`], true, `${action} released`);
   }
   input.destroy();
@@ -507,6 +516,7 @@ test("touch tracks independent direction and action pointers with visible active
     "right",
     "up",
     "edge",
+    "turbo",
     "trick1",
     "trick2",
     "trick3",
@@ -522,13 +532,13 @@ test("touch tracks independent direction and action pointers with visible active
     controlMode: CONTROL_MODES.ADVANCED,
   });
 
-  const active = ["left", "up", "edge", "trick1", "trick2", "trick3", "trick4"];
+  const active = ["left", "up", "edge", "turbo", "trick1", "trick2", "trick3", "trick4"];
   active.forEach((control, index) => buttons[control].dispatch("pointerdown", { pointerId: index + 1 }));
   input.update(0);
   let step = snapshot(input.consumeStep());
   assert.equal(step.x, -1);
   assert.equal(step.y, -1);
-  for (const action of ["edge", "trick1", "trick2", "trick3", "trick4"]) {
+  for (const action of ["edge", "turbo", "trick1", "trick2", "trick3", "trick4"]) {
     assert.equal(step[action], true);
     assert.equal(step[`${action}Pressed`], true);
   }
@@ -544,7 +554,7 @@ test("touch tracks independent direction and action pointers with visible active
   assert.equal(buttons.right.classList.contains("is-active"), false);
 
   buttons.trick2.dispatch("pointerdown", { pointerId: 21 });
-  buttons.trick2.dispatch("pointerup", { pointerId: 5 });
+  buttons.trick2.dispatch("pointerup", { pointerId: 6 });
   input.update(0);
   step = snapshot(input.consumeStep());
   assert.equal(step.trick2, true, "another pointer keeps the same button held");
@@ -555,7 +565,7 @@ test("touch tracks independent direction and action pointers with visible active
   assert.equal(input.consumeStep().trick2Released, true);
 
   buttons.style.dispatch("pointerdown", { pointerId: 30 });
-  buttons.trick1.dispatch("pointerup", { pointerId: 4 });
+  buttons.trick1.dispatch("pointerup", { pointerId: 5 });
   input.update(0);
   step = snapshot(input.consumeStep());
   assert.equal(step.trick1, true, "legacy style touch control maps to trick1");
@@ -570,8 +580,8 @@ test("touch tracks independent direction and action pointers with visible active
   input.destroy();
 });
 
-test("Simple multitouch keeps direction, ACTION, TRICK, SPECIAL, and optional spins independent", () => {
-  const controls = ["left", "up", "edge", "trick", "special", "spinLeft", "spinRight"];
+test("Simple multitouch keeps direction, ACTION, TURBO, TRICK, SPECIAL, and spins independent", () => {
+  const controls = ["left", "up", "edge", "turbo", "trick", "special", "spinLeft", "spinRight"];
   const buttons = Object.fromEntries(controls.map((control) => [control, new FakeButton(control)]));
   const input = new InputManager({
     target: new FakeTarget(),
@@ -584,13 +594,13 @@ test("Simple multitouch keeps direction, ACTION, TRICK, SPECIAL, and optional sp
   let step = snapshot(input.consumeStep());
   assert.equal(step.x, -1);
   assert.equal(step.y, -1);
-  for (const action of ["edge", "trick", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]) {
     assert.equal(step[action], true, `${action} held`);
     assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
   }
 
   buttons.trick.dispatch("pointerdown", { pointerId: 20 });
-  buttons.trick.dispatch("pointerup", { pointerId: 4 });
+  buttons.trick.dispatch("pointerup", { pointerId: 5 });
   input.update(0);
   step = snapshot(input.consumeStep());
   assert.equal(step.trick, true, "a second pointer keeps TRICK held");

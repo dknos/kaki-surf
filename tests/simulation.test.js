@@ -4,7 +4,7 @@ import test from "node:test";
 import { BOARDS, CONDITIONS, FIXED_STEP, TUNING, WAVE_STYLES } from "../js/config.js";
 import { seededRandom, shortestAngle, TAU } from "../js/math.js";
 import { ScoreSystem } from "../js/scoring.js";
-import { SurfSimulation } from "../js/simulation.js";
+import { SurfSimulation, turboRefillForLanding } from "../js/simulation.js";
 import { formatTrickName } from "../js/trick-scoring.js";
 
 const VALID_STATES = new Set([
@@ -59,6 +59,9 @@ function simulationSnapshot(simulation) {
       face: player.face,
       faceVelocity: player.faceVelocity,
       speed: player.speed,
+      turbo: player.turbo,
+      turboActive: player.turboActive,
+      turboOverdrive: player.turboOverdrive,
       boardAngle: player.boardAngle,
       bodyAngle: player.bodyAngle,
       airX: player.airX,
@@ -397,10 +400,85 @@ test("movement alone reaches the hard board cap and wave momentum is not a permi
 
   assert.equal(first.speedCap, hardMax);
   assert.equal(first.simulation.currentRideSpeedCap(0), hardMax);
-  assert.equal(first.simulation.currentRideSpeedCap(1), hardMax);
+  assert.equal(
+    first.simulation.currentRideSpeedCap(1),
+    hardMax * TUNING.turboSpeedCapMultiplier,
+  );
   assert.equal(first.topSpeed, hardMax);
   assert.equal(second.topSpeed, first.topSpeed, "movement loop remains deterministic");
   assert.ok(first.simulation.player.charge < 0.01, "cap is reachable without pumping");
+});
+
+test("Shift Turbo spends a finite tank and creates real overdrive speed", () => {
+  const boosted = beginRiding(BOARDS.mangoFish);
+  const control = beginRiding(BOARDS.mangoFish);
+  boosted.wave.curlX = -1_000;
+  control.wave.curlX = -1_000;
+  boosted.player.speed = 72;
+  control.player.speed = 72;
+  boosted.player.turbo = 0.6;
+  control.player.turbo = 0.6;
+
+  for (let step = 0; step < 120; step += 1) {
+    boosted.update(FIXED_STEP, { turbo: true, turboPressed: step === 0 });
+    control.update(FIXED_STEP, {});
+  }
+
+  assert.equal(boosted.player.turboActive, true);
+  assert.ok(boosted.player.turbo < 0.25, `Turbo tank remained ${boosted.player.turbo}`);
+  assert.ok(boosted.player.turbo > 0.2, `Turbo drained too quickly to ${boosted.player.turbo}`);
+  assert.ok(boosted.player.speed > control.player.speed + 28);
+  assert.ok(boosted.currentRideSpeedCap() > boosted.baseRideSpeedCap());
+
+  boosted.update(FIXED_STEP, { turboReleased: true });
+  assert.equal(boosted.player.turboActive, false);
+  const events = collectEvents(boosted);
+  assert.equal(events.filter((event) => event.type === "turboStart").length, 1);
+  assert.equal(events.filter((event) => event.type === "turboStop").length, 1);
+});
+
+test("only successfully banked tricks refill Turbo, with quality and repetition scaling", () => {
+  const empty = { entries: [], rotationDegrees: 0, decay: 1 };
+  const spin = { entries: [], rotationDegrees: 360, decay: 1 };
+  const combo = {
+    entries: [{ id: "frontRailGrab" }, { id: "boardVarial" }],
+    rotationDegrees: 360,
+    decay: 1,
+  };
+  assert.equal(turboRefillForLanding(empty, "perfect"), 0, "an empty pop is not a trick refill");
+  assert.equal(turboRefillForLanding(spin, "wobble"), 0, "a wobble does not bank Turbo");
+  assert.ok(turboRefillForLanding(spin, "clean") > 0);
+  assert.ok(turboRefillForLanding(spin, "perfect") > turboRefillForLanding(spin, "clean"));
+  assert.ok(turboRefillForLanding(combo, "clean") > turboRefillForLanding(spin, "clean"));
+  assert.ok(
+    turboRefillForLanding({ ...combo, decay: 0.34 }, "clean")
+      < turboRefillForLanding(combo, "clean"),
+    "exact-repeat decay prevents easy fuel farming",
+  );
+
+  const noTrick = prepareLaunch(BOARDS.foamPuff);
+  noTrick.player.turbo = 0.08;
+  forceContact(noTrick, 0);
+  noTrick.update(FIXED_STEP, {});
+  assert.equal(noTrick.player.turbo, 0.08, "landing an empty pop leaves Turbo unchanged");
+
+  const landedTrick = prepareLaunch(BOARDS.foamPuff);
+  landedTrick.controlMode = "advanced";
+  landedTrick.player.turbo = 0.08;
+  for (let step = 0; step < 12; step += 1) {
+    landedTrick.update(FIXED_STEP, {
+      trick1: true,
+      trick1Pressed: step === 0,
+    });
+  }
+  landedTrick.update(FIXED_STEP, { trick1Released: true });
+  assert.equal(landedTrick.aerialSession.manifest.sequence[0]?.complete, true);
+  collectEvents(landedTrick);
+  forceContact(landedTrick, 0);
+  landedTrick.update(FIXED_STEP, {});
+  const landingEvents = collectEvents(landedTrick);
+  assert.ok(landedTrick.player.turbo > 0.08);
+  assert.ok(landingEvents.some((event) => event.type === "turboRefill"));
 });
 
 test("launch energy is led by approach speed and uphill slope while Pump remains an enhancer", () => {

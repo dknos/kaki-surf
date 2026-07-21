@@ -23,6 +23,7 @@ const SCENES = [
   ["heroTube-twilightGlass", "Twilight / rideable tube pocket", "", "perfect"],
   ["heroAir-twilightGlass", "Twilight / big-air camera pan", "", "perfect"],
   ["maxSpeed", "Movement-earned blasting speed", "", "perfect"],
+  ["turboBoost", "Trick-recharged Turbo Boost", "", "perfect"],
   ["pumpCompression", "ACTION compression"],
   ["pumpRelease", "ACTION release enhancer", "", "perfect"],
   ["powerLine", "Optional readable speed seam", "", "perfect"],

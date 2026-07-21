@@ -192,6 +192,7 @@ export class SurfAudio {
     const combo = Number(simulation.score?.combo ?? simulation.currentMultiplier?.() ?? 1);
     const airborne = player.state === "airborne";
     const tubeActive = Boolean(player.tubeRide?.active);
+    const turboActive = Boolean(player.turboActive);
     const timed = simulation.mode?.timed !== false;
     const seconds = timed ? Math.ceil(simulation.timeRemaining ?? 99) : Number.POSITIVE_INFINITY;
     const now = this.context.currentTime;
@@ -210,9 +211,14 @@ export class SurfAudio {
     const carveMix = clamp(Math.abs(Number(player.faceVelocity) || 0) / 1.4, 0, 1);
     const effectsLevel = safeLevel(this.settings.effects, 0.78);
     const boardLevel = contact
-      ? effectsLevel * (0.012 + speedMix * 0.045 + carveMix * 0.055) * (tubeActive ? 0.58 : 1)
+      ? effectsLevel
+        * (0.012 + speedMix * 0.045 + carveMix * 0.055)
+        * (tubeActive ? 0.58 : 1)
+        * (turboActive ? 1.32 : 1)
       : 0;
-    const windLevel = airborne ? effectsLevel * (0.018 + speedMix * 0.095) : effectsLevel * speedMix * 0.008;
+    const windLevel = airborne
+      ? effectsLevel * (0.018 + speedMix * 0.095)
+      : effectsLevel * speedMix * (turboActive ? 0.026 : 0.008);
     setParamTarget(this.boardGain?.gain, boardLevel, now, 0.045);
     setParamTarget(this.boardFilter?.frequency, 780 + speedMix * 1750 + carveMix * 920, now, 0.055);
     setParamTarget(this.windGain?.gain, windLevel, now, airborne ? 0.05 : 0.12);
@@ -277,6 +283,20 @@ export class SurfAudio {
       : event?.payload ?? event ?? EMPTY_EVENT_PAYLOAD;
     const now = this.context.currentTime;
     switch (type) {
+      case "turboStart":
+        this.duck(0.78, 0.16);
+        this.chirp(now, 174, 696, 0.18, 0.11);
+        this.noiseBurst(now, 0.13, 0.045, "highpass", 620, 2800);
+        break;
+      case "turboRefill":
+        this.chirp(now, 523, 1175, 0.16, 0.085);
+        this.tone(now + 0.075, 1568, 0.09, "sine", 0.05, this.effectsGain, 2093);
+        break;
+      case "turboStop":
+        if (payload.reason === "empty") {
+          this.tone(now, 220, 0.1, "triangle", 0.035, this.effectsGain, 150);
+        }
+        break;
       case "endlessSet":
         this.duck(0.74, 0.28);
         this.chirp(now, 196, payload.final ? 988 : 784, 0.22, 0.11);

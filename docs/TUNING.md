@@ -35,9 +35,19 @@ The game loop accumulates at most 14 fixed steps per frame. Render interpolation
 | `reversalCommitSpeed` | 7 | Minimum signed travel speed for a direction change |
 | `reversalScrub` | 13.5 | Speed cost while opposite input fights existing travel |
 | `wavePush` | 15.5 | Acceleration scaled by shared speed potential |
+| `turboStartCharge` | 1 | Full opening Turbo tank |
+| `turboDrainPerSecond` | 0.36/s | Held face-riding drain; one tank lasts about 2.8 seconds |
+| `turboAcceleration` | 62 | Added acceleration while Turbo is active |
+| `turboSpeedCapMultiplier` | 1.14 | Fully built overdrive headroom above the board cap |
+| `turboOverdriveBuild` / `turboOverdriveDecay` | 11/s / 2.6/s | Speed-envelope attack and release |
+| `turboTrickBaseRefill` / `turboTrickEntryRefill` | 0.18 / 0.12 | Base clean bank and per-completed-entry refill |
+| `turboSpinHalfTurnRefill` | 0.035 | Refill per landed 180 degrees, capped at six half-turns |
+| `turboPerfectRefillMultiplier` | 1.15 | Perfect-landing refill multiplier |
+| `turboRepeatRefillFloor` | 0.35 | Minimum refill factor after exact-repeat decay |
+| `turboWipeoutLoss` | 0.25 | Fraction of remaining fuel lost on wipeout |
 | `curlSpeed` | 2.35 | Base advance of the breaking curl |
 | `curlCatchDelay` | 0.58 s | Continuous curl contact before a wipeout |
-| `curlGrace` / `curlRampEnd` | 8 s / 72 s | No-advance opening and end of the smooth threat ramp |
+| `curlGrace` / `curlRampEnd` | 8 s / 72 s | Collision-safe opening and end of the smooth threat ramp |
 | `curlThreatMaxSpeed` | 10.8 | Maximum late-run threat advance before skill relief |
 | `curlSkillRelief` / `curlSpeedRelief` / `curlMaxRelief` | 0.46 / 0.18 / 0.58 | Bounded reduction earned by recent valid play and real speed |
 | `pumpStrength` | 18.5 | Maximum pump impulse before line, rhythm, and board factors |
@@ -62,15 +72,18 @@ Primary drive comes from `GameplayWave.surfaceGradientAt(x, face)`. Simulation p
 
 A release qualifies as a pump only after enough charge, a useful line, upward intent, compatible face velocity, and the cadence floor. Invalid releases consume their partial charge so tapping cannot bank hidden energy. Carve score/Flow likewise requires a sustained arc with real face excursion and peak velocity. These gates make rhythm and line choice outperform input spam.
 
-The curl stays at its start point through `curlGrace`, then accelerates smoothly toward `curlThreatMaxSpeed`. Recent valid pumps, full carves, reversals, clean landings, and high physical speed provide bounded relief; signed rider travel never reverses the threat. Recovery may explicitly retreat the curl to a safe respawn position. Twilight's visible curtain edge is welded three logical pixels behind the canonical contact and therefore advances left-to-right with the threat rather than mirroring the rider.
+During `curlGrace`, collision stays disabled while Twilight's curtain still advances at its authored 6.2 logical-pixels-per-second opening speed. After grace, it accelerates smoothly toward `curlThreatMaxSpeed`. Recent valid pumps, full carves, reversals, clean landings, and high physical speed provide bounded relief; signed rider travel never reverses the threat. Recovery may explicitly retreat the curl to a safe respawn position. Twilight's visible curtain edge is welded three logical pixels behind the canonical contact and therefore advances left-to-right with the threat rather than mirroring the rider.
 
 `player.waveMomentum` follows a mix of downhill drive, line quality, and pocket position. It is a smooth presentation/launch-history value rather than a speed-cap gate. A correctly timed pump can still add up to 0.14. The ride cap is:
 
 ```text
 baseTarget = speed * board.acceleration
 hardMax = max(baseTarget, maxSpeed * board.maxSpeed)
-rideCap = hardMax
+turboEnvelope = 1 + turboOverdrive * (turboSpeedCapMultiplier - 1)
+rideCap = hardMax * turboEnvelope
 ```
+
+`turboOverdrive` stays in `0..1`. Turbo drains only in riding, lip, landing, or wobble states and does not activate on animal mounts. A clean or perfect landing calls `turboRefillForLanding()` after the aerial score is banked; empty pops and failed/wobble landings return zero. Completed entries, landed half-turns, landing grade, and the trick result's repeat-decay factor determine the bounded refill.
 
 Travel velocity is bounded to `-48..48`. Same-direction input accelerates toward its signed target. Opposite input responds more slowly at high speed, scrubs velocity, and must satisfy both reversal thresholds before `travelDirection` changes. Releasing input coasts toward the current signed glide. Playfield edges remove only the outward component.
 

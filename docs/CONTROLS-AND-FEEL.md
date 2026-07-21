@@ -10,9 +10,10 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 | --- | --- | --- | --- |
 | Travel left/right; carve up/down | Arrows or WASD | Left stick or D-pad | Direction pad |
 | Action: compress, pump, and commit a lip pop | Space or Z | A (0) or right trigger (7) | **Action** |
+| Turbo Boost | Hold either Shift | Left-stick press / L3 (10) | Hold **Turbo** |
 | Context trick | F or X | X (2) or B (1) | **Trick** |
 | Optional counterclockwise / clockwise spin impulse | Q / E | Left / right bumper | Left / right **Spin** |
-| Mounted-animal special | T or either Shift | Y (3) | **Special** when ready |
+| Mounted-animal special | T | Y (3) | **Special** when ready |
 | Pause | Escape or P | Start (9) | **II** pause button; Settings also pauses |
 | Restart / retry | R; Space on results | B on results; A on results | Results button |
 
@@ -23,6 +24,8 @@ Simple Trick is contextual and buffered. On Twilight's wave face, holding it ins
 Late in descent, Simple mode nudges the board toward whichever landing tangent is nearer: normal or opposite-facing. The board-specific correction is strongest on Foam Puff and lightest on Moon Log. This is not a guaranteed landing; speed, trick-relative board motion, contact error, and the normal landing bands still apply.
 
 ### Advanced Controls
+
+Turbo remains the same common action in Advanced mode: hold either Shift, L3 (10), or the touch **Turbo** button. T remains the direct Twist input, so Turbo never steals an aerial trick key.
 
 | Action | Keyboard | Standard gamepad | Touch control | On the wave | In the air |
 | --- | --- | --- | --- | --- | --- |
@@ -43,7 +46,7 @@ Advanced gamepad B is Board Varial during a run and retry only on the results sc
 
 Keyboard repeat cannot create duplicate edges. In Advanced mode Q/X/C are aliases for one action, so releasing one alias while another remains held does not generate a release. The legacy `style`, `stylePressed`, and `styleReleased` fields mirror `trick1` for old host adapters.
 
-Simple mode additionally exposes `trick`, `special`, `spinLeft`, and `spinRight`; Advanced mode exposes `trick1` through `trick4`. Inactive-mode actions remain false. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers; a held gamepad must return to neutral before it can create a new edge.
+Both modes expose `turbo`. Simple mode additionally exposes `trick`, `special`, `spinLeft`, and `spinRight`; Advanced mode exposes `trick1` through `trick4`. Inactive-mode actions remain false. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers; a held gamepad must return to neutral before it can create a new edge.
 
 Touch pointers are independent, allowing direction plus Action or a held Trick at the same time. Releasing one pointer does not cancel another.
 
@@ -91,7 +94,7 @@ Advanced mode composes body spin, manual trim, and the Q/E/F/T manifest directly
 
 Different tricks can be sequenced in one launch. Starting one grab ends the other active grab, while a completed grab can chain into a varial or signature. Body rotation remains independent from board-relative trick motion in both control modes. See [Trick grammar](./TRICK-GRAMMAR.md) for exact manifest and scoring fields.
 
-## Speed and Flow
+## Speed, Turbo, and Flow
 
 Speed is physical velocity. Its fixed presentation tiers are:
 
@@ -103,7 +106,11 @@ Speed is physical velocity. Its fixed presentation tiers are:
 | 101 through below 124 | `FLYING` |
 | 124 and above | `BLASTING` |
 
-Wake length, directional spray, water streaks, parallax, pose, wave-filter pitch, and speed accents reinforce those tiers. The HUD does not expose a persistent POWER meter.
+Wake length, directional spray, water flecks, parallax, pose, wave-filter pitch, and speed accents reinforce those tiers. The HUD does not expose the retired POWER meter.
+
+Turbo is a finite physical overdrive layered on top of that earned speed. A full tank lasts about 2.8 seconds. While held on a rideable face it adds acceleration, smoothly opens up to 14% headroom above the selected board's normal cap, intensifies water/wind audio, and emits short gold tail sparks that follow signed board travel. It cannot be spent in the air or during an animal mount. The overdrive envelope eases out after release instead of snapping the speed cap down.
+
+Only an aerial with a completed trick or at least a half-turn, followed by a clean or perfect landing, adds fuel. Completed trick entries, rotation, and a perfect grade increase the refill; exact-repeat decay also reduces fuel, closing the easiest farming loop. Empty pops, wobble recoveries, and failed landings add none. Wipeout keeps the mechanic legible by removing 25% of the remaining tank rather than silently resetting it.
 
 Flow is a separate 0–100 style/combo state. Valid full arcs, committed direction changes, timed pumps, varied landed tricks, landing quality, wildlife rides, near misses, and set-piece bonuses add Flow. A strong line can briefly sustain Flow that an action already earned, but ordinary riding never creates it; passive play, stalling, repetition, wobble, and wipeouts reduce it. Flow drives the live score multiplier but never replaces physical speed.
 
@@ -121,7 +128,7 @@ Surf School is independent of Wave Read and teaches six actions in order: **drop
 
 ## Wildlife and bonuses
 
-Dolphin and whale offers can temporarily mount Kitty. While mounted, the ride preserves a minimum speed and grows Flow; Special or a lip launch triggers a large animal-assisted dismount. A shark uses a minimum telegraph before crossing. Contact wipes out unless Star Foam is ready, while threading the crossing grants score and Flow. Twilight suppresses boat and aircraft traffic so no decorative craft can appear inside or behind its hero break; wildlife and bonuses remain simulation-owned opportunities.
+Dolphin and whale offers can temporarily mount Kitty. While mounted, the ride preserves a minimum speed and grows Flow; Simple Special (T/Y/touch Special) or a lip launch triggers a large animal-assisted dismount. A shark uses a minimum telegraph before crossing. Contact wipes out unless Star Foam is ready, while threading the crossing grants score and Flow. Twilight suppresses boat and aircraft traffic so no decorative craft can appear inside or behind its hero break; wildlife and bonuses remain simulation-owned opportunities.
 
 Mango Rush reduces uphill loss for its active duration, Moon Pop multiplies the next launch and is consumed on use, and Star Foam protects one shark contact or wobble landing before being consumed. Powerups, mounts, and active timers come from `WorldSimulation.getModifiers()`; their sprites and HUD are presentation only.
 

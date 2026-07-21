@@ -73,6 +73,9 @@ export class KakiRenderer {
     this.sprayClock = 0;
     this.time = 0;
     this.pumpRelease = 0;
+    this.turboPulse = 0;
+    this.turboRefillAmount = 0;
+    this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     this.wavePresentationClocks = createWavePresentationClocks();
   }
@@ -96,6 +99,9 @@ export class KakiRenderer {
     this.freeze = 0;
     this.sprayClock = 0;
     this.pumpRelease = 0;
+    this.turboPulse = 0;
+    this.turboRefillAmount = 0;
+    this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     this.currentBoard = simulation?.board ?? null;
     this.wavePresentationClocks = createWavePresentationClocks();
@@ -116,6 +122,18 @@ export class KakiRenderer {
         this.spawnSpray(player.x - 6, ridingY, 6 + Math.round((payload.strength ?? 0.5) * 8), 0.8 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.75);
         this.impact = Math.max(this.impact, (payload.efficiency ?? payload.strength ?? 0.5) * 0.7);
         this.pumpRelease = 0.2;
+        break;
+      case "turboStart":
+        this.spawnSeamGlints(player.x, ridingY, 11);
+        this.spawnSpray(player.x - player.travelDirection * 9, ridingY, 12, 1.4);
+        this.impact = Math.max(this.impact, 0.75);
+        this.shake = Math.max(this.shake, 0.7);
+        this.turboPulse = Math.max(this.turboPulse, 0.42);
+        break;
+      case "turboRefill":
+        this.spawnSparkles(player.x, ridingY - 8, 11);
+        this.turboPulse = 0.95;
+        this.turboRefillAmount = Number(payload.amount) || 0;
         break;
       case "powerLineEnter":
         this.spawnSeamGlints(player.x, ridingY, 9);
@@ -278,6 +296,7 @@ export class KakiRenderer {
     this.flash = Math.max(0, this.flash - dt);
     this.impact = Math.max(0, this.impact - dt * 3.8);
     this.pumpRelease = Math.max(0, this.pumpRelease - dt);
+    this.turboPulse = Math.max(0, this.turboPulse - dt);
     this.shake = Math.max(0, this.shake - dt * 7.5);
 
     const player = simulation.player;
@@ -316,6 +335,27 @@ export class KakiRenderer {
         const y = simulation.wave.ridingY(player.x, player.face);
         this.spawnParticle(player.x - 12, y + 1, -16 - player.speed * 0.08, -8 - Math.random() * 13, 0.3, this.palette.foam, 1, 52, 0.9);
       }
+    }
+    if (riding && player.turboActive) {
+      this.turboSparkClock += dt * 22;
+      while (this.turboSparkClock >= 1) {
+        this.turboSparkClock -= 1;
+        const direction = Math.sign(player.travelDirection) || 1;
+        const y = simulation.wave.ridingY(player.x, player.face);
+        this.spawnParticle(
+          player.x - direction * 13,
+          y - 1,
+          -direction * (28 + player.speed * 0.08),
+          -7 - Math.random() * 10,
+          0.24,
+          this.palette.gold,
+          1,
+          44,
+          0.88,
+        );
+      }
+    } else {
+      this.turboSparkClock = 0;
     }
   }
 
@@ -782,6 +822,7 @@ export class KakiRenderer {
     drawPixelText(ctx, score, 89, 9, { scale: 2, spacing: 1, align: "right", color: p.white, shadow: p.ink });
 
     this.drawSpeedMeter(player, speedCap);
+    this.drawTurboMeter(player);
 
     panel(ctx, 166, 5, 52, 19, p.deepInk, p.waterDeep);
     if (timed) {
@@ -858,6 +899,30 @@ export class KakiRenderer {
       ctx.fillRect(153, 8, 2, 2);
       ctx.fillRect(152, 9, 4, 1);
     }
+  }
+
+  drawTurboMeter(player) {
+    const ctx = this.ctx;
+    const p = this.palette;
+    const level = clamp(Number(player?.turbo) || 0, 0, 1);
+    const active = Boolean(player?.turboActive);
+    const pulse = this.turboPulse > 0;
+    panel(ctx, 224, 5, 58, 19, p.deepInk, p.waterDeep);
+    drawPixelText(ctx, "TURBO", 229, 8, {
+      color: active || pulse ? p.gold : level <= 0.02 ? p.danger : p.foamShade,
+      shadow: p.ink,
+    });
+    if (pulse && this.turboRefillAmount > 0) {
+      drawPixelText(ctx, `+${Math.round(this.turboRefillAmount * 100)}`, 277, 8, {
+        align: "right",
+        color: p.gold,
+        shadow: p.ink,
+      });
+    }
+    ctx.fillStyle = p.ink;
+    ctx.fillRect(229, 17, 48, 4);
+    ctx.fillStyle = active ? p.gold : level <= 0.02 ? p.danger : p.crest;
+    ctx.fillRect(230, 18, Math.round(46 * level), 2);
   }
 
   drawAerialHud(simulation) {
@@ -1427,7 +1492,7 @@ function paletteForCondition(conditionId) {
 }
 
 function rideSpeedCapFor(simulation) {
-  const published = Number(simulation?.currentRideSpeedCap?.());
+  const published = Number(simulation?.baseRideSpeedCap?.());
   if (Number.isFinite(published) && published > 0) return published;
   const tuningMax = Number(simulation?.tuning?.maxSpeed ?? TUNING.maxSpeed);
   const boardMax = Number(simulation?.board?.maxSpeed ?? 1);

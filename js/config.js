@@ -230,6 +230,21 @@ export const TUNING = {
   reversalCommitSpeed: 7,
   reversalScrub: 13.5,
   wavePush: 15.5,
+  // Turbo is an earned overdrive: one full tank lasts just under three
+  // seconds, raises the board envelope by 14%, and is refilled only when an
+  // aerial trick is actually banked through a clean or perfect landing.
+  turboStartCharge: 1,
+  turboDrainPerSecond: 0.36,
+  turboAcceleration: 62,
+  turboSpeedCapMultiplier: 1.14,
+  turboOverdriveBuild: 11,
+  turboOverdriveDecay: 2.6,
+  turboTrickBaseRefill: 0.18,
+  turboTrickEntryRefill: 0.12,
+  turboSpinHalfTurnRefill: 0.035,
+  turboPerfectRefillMultiplier: 1.15,
+  turboRepeatRefillFloor: 0.35,
+  turboWipeoutLoss: 0.25,
   curlSpeed: 2.35,
   curlCatchDelay: 0.58,
   curlGrace: 8,

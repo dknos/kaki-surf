@@ -20,7 +20,7 @@ export function normalizeTrickInput(input = {}, target = {}) {
   target.edgePressed = Boolean(input.edgePressed || input.actionPressed);
   target.edgeReleased = Boolean(input.edgeReleased || input.actionReleased);
 
-  for (const action of ["trick", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["turbo", "trick", "special", "spinLeft", "spinRight"]) {
     target[action] = Boolean(input[action]);
     target[`${action}Pressed`] = Boolean(input[`${action}Pressed`]);
     target[`${action}Released`] = Boolean(input[`${action}Released`]);
