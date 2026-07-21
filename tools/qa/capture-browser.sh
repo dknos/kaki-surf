@@ -14,6 +14,9 @@ scenes=(
   heroDeep-twilightGlass heroMax-twilightGlass heroCollapse-twilightGlass
   heroTube-twilightGlass heroAir-twilightGlass maxSpeed turboBoost
   pumpCompression pumpRelease powerLine smallAir launch hugeAir clockwiseSpin counterSpin
+  aerialCoast-goldenCoast aerialCloud-goldenCoast aerialUpper-goldenCoast aerialSpace-goldenCoast aerialReentry-goldenCoast
+  aerialCoast-twilightGlass aerialCloud-twilightGlass aerialUpper-twilightGlass aerialSpace-twilightGlass
+  aerialCoast-stormbreak aerialCloud-stormbreak aerialUpper-stormbreak aerialSpace-stormbreak
   frontRail tailGrab varial kakiTwist snap cutback floater tubeTuck combo360 combo540 switchLanding
   perfectLanding wobble wipeout dolphinApproach dolphinRide dolphinDismount
   sharkApproach sharkNearMiss sharkCollision whaleDistant whaleBreachStart whaleBreach whaleBreachReturn whaleRamp

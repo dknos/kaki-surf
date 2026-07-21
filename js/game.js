@@ -22,7 +22,7 @@ import {
   sanitizeSettings,
   writeSave,
 } from "./persistence.js";
-import { KakiRenderer } from "./renderer.js";
+import { KakiRenderer, verticalCameraTarget } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
 import {
   adjustFormControl,
@@ -288,6 +288,8 @@ export class KakiSurfGame {
       multiplier: this.simulation.currentMultiplier(),
       turbo: this.simulation.player.turbo,
       turboActive: this.simulation.player.turboActive,
+      aerialAltitude: this.simulation.player.aerialAltitude,
+      aerialZone: this.simulation.player.aerialZone,
       wipeouts: this.simulation.wipeouts,
       board: this.selectedBoard,
       condition: this.selectedCondition,
@@ -1065,6 +1067,42 @@ export class KakiSurfGame {
         },
       });
     };
+
+    const aerialQa = scene.match(/^aerial(Coast|Cloud|Upper|Space|Reentry)-/);
+    if (aerialQa) {
+      const stage = {
+        Coast: { altitude: 0.1, rawY: 62, height: 20, label: "BIG AIR", zone: "COASTAL SKY", zoneId: "coastalSky", tier: 1 },
+        Cloud: { altitude: 0.38, rawY: 24, height: 62, label: "CLOUD BREAKER", zone: "CLOUD LAYER", zoneId: "cloudLayer", tier: 2 },
+        Upper: { altitude: 0.68, rawY: -32, height: 118, label: "STRATOSPHERE KAKI", zone: "UPPER ATMOSPHERE", zoneId: "upperAtmosphere", tier: 3 },
+        Space: { altitude: 0.94, rawY: -84, height: 174, label: "KAKI IN ORBIT", zone: "KAKI SPACE", zoneId: "kakiSpace", tier: 4 },
+        Reentry: { altitude: 0.68, rawY: -18, height: 128, label: "", zone: "UPPER ATMOSPHERE", zoneId: "upperAtmosphere", tier: 3, descending: true },
+      }[aerialQa[1]];
+      makeAirborne(stage.descending ? "landingAnticipation" : "apex", stage.label, Math.PI * (stage.tier >= 3 ? 2 : 0.2));
+      Object.assign(player, {
+        airY: stage.rawY,
+        previousAirY: stage.rawY,
+        airVY: stage.descending ? 96 : stage.tier === 4 ? 0 : -4,
+        launchY: 82,
+        maxAirHeight: stage.height,
+        aerialAltitude: stage.altitude,
+        previousAerialAltitude: stage.altitude,
+        aerialAltitudeCeiling: stage.tier === 4 ? 1 : stage.altitude + 0.07,
+        aerialExpectedHeight: Math.max(28, stage.height),
+        aerialZone: stage.zoneId,
+        aerialLaunchQuality: stage.tier === 4 ? 0.96 : 0.48 + stage.tier * 0.12,
+        aerialTurboLaunch: stage.tier === 4 ? 1 : 0,
+        aerialSpaceQualified: stage.tier === 4,
+        aerialMilestoneTier: stage.tier,
+      });
+      this.renderer.cameraY = verticalCameraTarget(player, this.settings.reducedMotion);
+      if (stage.label) {
+        this.renderer.onEvent({
+          type: "aerialMilestone",
+          payload: { index: stage.tier, altitude: stage.altitude, text: stage.label },
+        }, this.simulation);
+        this.renderer.pushCallout(stage.label, stage.zone, "perfect", { channel: "aerial" });
+      }
+    }
 
     switch (scene) {
       case "powerLine":

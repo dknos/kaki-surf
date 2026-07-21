@@ -262,24 +262,26 @@ test("tube state callouts replace queued predecessors behind unrelated feedback"
   assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["CLEAN TUBE EXIT"]);
 });
 
-test("large aerials pan the world down to reveal sky and Reduced Motion stays fixed", () => {
+test("canonical aerial altitude reveals authored sky while Reduced Motion keeps safe framing", () => {
   const highAir = {
     state: "airborne",
     airY: 18,
     maxAirHeight: 94,
+    aerialAltitude: 0.7,
   };
-  assert.ok(verticalCameraTarget(highAir) >= 40, "big air receives meaningful vertical framing");
-  assert.ok(verticalCameraTarget({ ...highAir, airY: -60 }) <= 62, "camera motion remains clamped");
-  assert.equal(verticalCameraTarget(highAir, true), 0);
+  assert.ok(verticalCameraTarget(highAir) >= 90, "upper-atmosphere air receives meaningful framing");
+  assert.ok(verticalCameraTarget({ ...highAir, aerialAltitude: 1 }) <= 174, "camera motion remains authored and clamped");
+  assert.ok(verticalCameraTarget(highAir, true) > 0, "Reduced Motion still keeps exceptional air on-screen");
+  assert.ok(verticalCameraTarget(highAir, true) < verticalCameraTarget(highAir));
   assert.equal(verticalCameraTarget({ state: "riding", airY: 18, maxAirHeight: 94 }), 0);
 });
 
-test("distant coast parallax always moves forward instead of following rider reversals", () => {
-  const forward = { travel: 420, worldTravel: 420 };
-  const cutback = { travel: 420, worldTravel: -180 };
-  const later = { travel: 620, worldTravel: -380 };
+test("aerial panorama parallax preserves signed travel and freezes to the center crop", () => {
+  const center = backgroundParallaxPhase({ cameraWorldX: 0 });
+  const forward = backgroundParallaxPhase({ cameraWorldX: 420 });
+  const reverse = backgroundParallaxPhase({ cameraWorldX: -180 });
 
-  assert.equal(backgroundParallaxPhase(forward), backgroundParallaxPhase(cutback));
-  assert.ok(backgroundParallaxPhase(later) > backgroundParallaxPhase(cutback));
-  assert.equal(backgroundParallaxPhase(later, true), 0);
+  assert.ok(forward > center);
+  assert.ok(reverse < center);
+  assert.equal(backgroundParallaxPhase({ cameraWorldX: 900 }, true), center);
 });

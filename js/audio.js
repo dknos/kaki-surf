@@ -193,6 +193,13 @@ export class SurfAudio {
     const airborne = player.state === "airborne";
     const tubeActive = Boolean(player.tubeRide?.active);
     const turboActive = Boolean(player.turboActive);
+    const aerialAltitude = airborne ? clamp(Number(player.aerialAltitude) || 0, 0, 1) : 0;
+    const apexQuiet = airborne
+      ? smoothAudioStep(0, 12, Math.abs(Number(player.airVY) || 0))
+      : 1;
+    const reentry = airborne && (Number(player.airVY) || 0) > 0
+      ? aerialAltitude * smoothAudioStep(18, 96, Number(player.airVY) || 0)
+      : 0;
     const timed = simulation.mode?.timed !== false;
     const seconds = timed ? Math.ceil(simulation.timeRemaining ?? 99) : Number.POSITIVE_INFINITY;
     const now = this.context.currentTime;
@@ -200,11 +207,24 @@ export class SurfAudio {
 
     const conditionFilter = this.conditionId === "stormbreak" ? 360 : this.conditionId === "twilightGlass" ? 180 : 0;
     const openWaveFrequency = 560 + speed * 4.5 + risk * 1180 + potential * 310 + conditionFilter;
-    setParamTarget(this.waveFilter?.frequency, openWaveFrequency * (tubeActive ? 0.56 : 1), now, 0.08);
+    const altitudeFilter = 1 - smoothAudioStep(0.16, 0.92, aerialAltitude) * 0.78;
+    setParamTarget(
+      this.waveFilter?.frequency,
+      openWaveFrequency * (tubeActive ? 0.56 : 1) * altitudeFilter,
+      now,
+      0.08,
+    );
     const pocketGain = 0.05 + risk * 0.15 + potential * 0.045
       + (airborne ? -0.025 : 0)
       + (tubeActive ? 0.055 : 0);
-    setParamTarget(this.waveGain?.gain, safeLevel(this.settings.waveAudio, 0.52) * pocketGain, now, 0.07);
+    setParamTarget(
+      this.waveGain?.gain,
+      safeLevel(this.settings.waveAudio, 0.52)
+        * pocketGain
+        * (1 - smoothAudioStep(0.18, 0.94, aerialAltitude) * 0.88),
+      now,
+      0.07,
+    );
 
     const contact = ["riding", "lip", "landing", "wobble"].includes(player.state);
     const speedMix = clamp((speed - 28) / 118, 0, 1);
@@ -217,18 +237,30 @@ export class SurfAudio {
         * (turboActive ? 1.32 : 1)
       : 0;
     const windLevel = airborne
-      ? effectsLevel * (0.018 + speedMix * 0.095)
+      ? effectsLevel
+        * (0.018 + speedMix * 0.095)
+        * (0.82 + aerialAltitude * 0.52 + reentry * 1.35)
+        * (0.24 + apexQuiet * 0.76)
       : effectsLevel * speedMix * (turboActive ? 0.026 : 0.008);
     setParamTarget(this.boardGain?.gain, boardLevel, now, 0.045);
     setParamTarget(this.boardFilter?.frequency, 780 + speedMix * 1750 + carveMix * 920, now, 0.055);
     setParamTarget(this.windGain?.gain, windLevel, now, airborne ? 0.05 : 0.12);
-    setParamTarget(this.windFilter?.frequency, 720 + speedMix * 1900, now, 0.08);
+    setParamTarget(
+      this.windFilter?.frequency,
+      720 + speedMix * 1900 + aerialAltitude * 580 + reentry * 960,
+      now,
+      0.08,
+    );
 
     const duck = now < this.duckUntil ? this.duckAmount : 1;
     if (duck === 1) this.duckAmount = 1;
     setParamTarget(
       this.musicGain?.gain,
-      safeLevel(this.settings.music, 0.58) * (airborne ? 0.17 : 0.22 + Math.min(0.055, combo * 0.012)) * duck,
+      safeLevel(this.settings.music, 0.58)
+        * (airborne
+          ? 0.17 * (1 - smoothAudioStep(0.62, 1, aerialAltitude) * 0.42)
+          : 0.22 + Math.min(0.055, combo * 0.012))
+        * duck,
       now,
       duck < 1 ? 0.025 : 0.08,
     );
@@ -344,6 +376,17 @@ export class SurfAudio {
         break;
       case "apex":
         this.tone(now, 880, 0.08, "sine", 0.09, this.effectsGain, 1040);
+        break;
+      case "aerialMilestone": {
+        const tier = clamp(Math.round(Number(payload.index) || 1), 1, 4);
+        this.duck(tier >= 4 ? 0.48 : 0.7, tier >= 4 ? 0.5 : 0.24);
+        this.chirp(now, 330 + tier * 85, 660 + tier * 190, 0.18 + tier * 0.025, 0.08);
+        if (tier >= 3) this.tone(now + 0.08, 880 + tier * 110, 0.22, "sine", 0.045, this.effectsGain, 1320);
+        break;
+      }
+      case "aerialReentry":
+        this.noiseBurst(now, 0.34, 0.11, "highpass", 480, 3900);
+        this.chirp(now, 280, 920, 0.24, 0.09);
         break;
       case "maneuver":
       case "maneuverStart":
@@ -881,6 +924,12 @@ export class SurfAudio {
 export function safeLevel(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? clamp(number, 0, 1) : clamp(Number(fallback) || 0, 0, 1);
+}
+
+function smoothAudioStep(edge0, edge1, value) {
+  if (edge0 === edge1) return value < edge0 ? 0 : 1;
+  const t = clamp((Number(value) - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
 }
 
 function setParamTarget(param, value, time, constant) {

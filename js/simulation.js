@@ -7,6 +7,12 @@ import {
   SCORE,
   TUNING,
 } from "./config.js";
+import {
+  aerialAltitudeForFlight,
+  aerialMilestoneForAltitude,
+  aerialZoneForAltitude,
+  qualifyAerialLaunch,
+} from "./aerial.js";
 import { clamp, damp, shortestAngle, smoothstep, TAU } from "./math.js";
 import {
   boardTailContact,
@@ -1173,6 +1179,9 @@ export class SurfSimulation {
       1,
     );
     const pocketLaunch = clamp(player.speedPotential?.pocket ?? this.wave.pocketRisk(player.x), 0, 1);
+    const launchCharge = clamp(Number(player.charge) || 0, 0, 1);
+    const turboAtLaunch = Boolean(player.turboActive);
+    const turboOverdriveAtLaunch = clamp(Number(player.turboOverdrive) || 0, 0, 1);
     const launchEnergy = clamp(
       0.68
         + speedRatio * 0.42
@@ -1182,6 +1191,16 @@ export class SurfSimulation {
       0.68,
       1.36,
     );
+    const aerialProfile = qualifyAerialLaunch({
+      launchStrength: launchEnergy,
+      speedRatio,
+      uphillApproach,
+      charge: launchCharge,
+      pocketRisk: pocketLaunch,
+      turboActive: turboAtLaunch,
+      turboOverdrive: turboOverdriveAtLaunch,
+      launchScale: worldModifiers.launchScale,
+    });
     const launchMultiplier = this.currentMultiplier() * (this.tuning.scoreAir / 1.25);
     const launchRisk = this.wave.pocketRisk(player.x);
     player.airX = player.x;
@@ -1194,9 +1213,23 @@ export class SurfSimulation {
     player.airVY = -this.tuning.launchForce
       * this.board.launch
       * launchEnergy
-      * worldModifiers.launchScale;
+      * worldModifiers.launchScale
+      * aerialProfile.turboLiftMultiplier;
     player.launchY = player.airY;
     player.maxAirHeight = 0;
+    player.aerialAltitude = 0;
+    player.previousAerialAltitude = 0;
+    player.aerialAltitudeCeiling = aerialProfile.ceiling;
+    player.aerialExpectedHeight = Math.max(
+      aerialProfile.expectedHeight,
+      player.airVY * player.airVY / Math.max(1, this.tuning.gravity * 2),
+    );
+    player.aerialZone = "coastalSky";
+    player.aerialLaunchQuality = aerialProfile.lineQuality;
+    player.aerialTurboLaunch = aerialProfile.turbo;
+    player.aerialSpaceQualified = aerialProfile.spaceQualified;
+    player.aerialMilestoneTier = 0;
+    player.aerialReentryFired = false;
     player.rotationAccum = 0;
     player.angularVelocity = input.x * 1.6;
     player.takeoffDirection = player.travelDirection;
@@ -1229,6 +1262,11 @@ export class SurfSimulation {
         uphillApproach,
         launchVelocity: player.airVY,
         launchScale: worldModifiers.launchScale,
+        aerialCeiling: aerialProfile.ceiling,
+        aerialZone: aerialProfile.zone,
+        aerialLineQuality: aerialProfile.lineQuality,
+        turboLaunch: aerialProfile.turbo,
+        spaceQualified: aerialProfile.spaceQualified,
         pocketRisk: launchRisk,
         multiplier: launchMultiplier,
         boardStyle: this.board.style,
@@ -1253,6 +1291,9 @@ export class SurfSimulation {
       switch: player.switchStance,
       pocketRisk: launchRisk,
       provisionalScore: player.provisionalScore,
+      aerialZone: aerialProfile.zone,
+      aerialCeiling: aerialProfile.ceiling,
+      spaceQualified: aerialProfile.spaceQualified,
     });
   }
 
@@ -1343,6 +1384,43 @@ export class SurfSimulation {
       0.1,
       0.38,
     );
+    const surfaceY = this.wave.ridingY(player.airX, player.landingFace);
+    player.previousAerialAltitude = player.aerialAltitude;
+    player.aerialAltitude = aerialAltitudeForFlight({
+      state: player.state,
+      flightHeight: player.launchY - player.airY,
+      surfaceClearance: surfaceY - player.airY,
+      verticalVelocity: player.airVY,
+      ceiling: player.aerialAltitudeCeiling,
+      expectedHeight: player.aerialExpectedHeight,
+    });
+    player.aerialZone = aerialZoneForAltitude(player.aerialAltitude).id;
+    const milestone = aerialMilestoneForAltitude(player.aerialAltitude);
+    if (milestone && milestone.index > player.aerialMilestoneTier) {
+      player.aerialMilestoneTier = milestone.index;
+      this.emit("aerialMilestone", {
+        index: milestone.index,
+        altitude: player.aerialAltitude,
+        zone: player.aerialZone,
+        text: milestone.text,
+      });
+      this.emit("callout", {
+        text: milestone.text,
+        subtext: aerialZoneForAltitude(player.aerialAltitude).label,
+        tone: "perfect",
+        channel: "aerial",
+      });
+    }
+    if (!player.aerialReentryFired
+      && player.airVY > 18
+      && player.previousAerialAltitude >= 0.62
+      && player.aerialAltitude < 0.62) {
+      player.aerialReentryFired = true;
+      this.emit("aerialReentry", {
+        altitude: player.aerialAltitude,
+        speed: player.airVY,
+      });
+    }
     player.maxAirHeight = Math.max(player.maxAirHeight, player.launchY - player.airY);
     manifest.maxHeight = Math.max(manifest.maxHeight, player.maxAirHeight);
     manifest.rotationAccumulated = player.rotationAccum;
@@ -1372,7 +1450,6 @@ export class SurfSimulation {
       this.emit("apex", { height: player.maxAirHeight });
     }
 
-    const surfaceY = this.wave.ridingY(player.airX, player.landingFace);
     if (player.airVY > 0 && player.airY >= surfaceY - 1) {
       this.resolveLanding(dt, surfaceY);
       return;
@@ -1488,6 +1565,9 @@ export class SurfSimulation {
     player.provisionalTrickName = result.trick;
     player.landingQuality = quality;
     player.lastLandingQuality = quality;
+    player.aerialAltitude = 0;
+    player.previousAerialAltitude = 0;
+    player.aerialZone = "coastalSky";
     resetCarveArcState(player);
     this.highlights.biggestAir = Math.max(this.highlights.biggestAir, player.maxAirHeight);
     this.highlights.bestTrick = result.trick || this.highlights.bestTrick;
@@ -2210,6 +2290,9 @@ export class SurfSimulation {
 
   updateWipeout(dt) {
     const player = this.player;
+    player.previousAerialAltitude = player.aerialAltitude;
+    player.aerialAltitude = Math.max(0, player.aerialAltitude - dt * 1.8);
+    player.aerialZone = aerialZoneForAltitude(player.aerialAltitude).id;
     player.airVY += this.tuning.gravity * 0.72 * dt;
     player.airX += player.airVX * dt;
     const boundedAirX = clamp(player.airX, 50, 360);
@@ -2476,6 +2559,16 @@ function createPlayer() {
     contactTimer: -1,
     grabbed: false,
     apexFired: false,
+    aerialAltitude: 0,
+    previousAerialAltitude: 0,
+    aerialAltitudeCeiling: 0.18,
+    aerialExpectedHeight: 28,
+    aerialZone: "coastalSky",
+    aerialLaunchQuality: 0,
+    aerialTurboLaunch: 0,
+    aerialSpaceQualified: false,
+    aerialMilestoneTier: 0,
+    aerialReentryFired: false,
     wobble: 0,
     wipeoutCause: "",
     wipeoutSpin: 0,
@@ -2596,6 +2689,16 @@ function resetPlayer(
   player.contactTimer = -1;
   player.grabbed = false;
   player.apexFired = false;
+  player.aerialAltitude = 0;
+  player.previousAerialAltitude = 0;
+  player.aerialAltitudeCeiling = 0.18;
+  player.aerialExpectedHeight = 28;
+  player.aerialZone = "coastalSky";
+  player.aerialLaunchQuality = 0;
+  player.aerialTurboLaunch = 0;
+  player.aerialSpaceQualified = false;
+  player.aerialMilestoneTier = 0;
+  player.aerialReentryFired = false;
   player.wobble = 0;
   player.wipeoutCause = "";
   player.wipeoutSpin = 0;
