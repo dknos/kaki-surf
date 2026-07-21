@@ -85,6 +85,7 @@ export function heroBarrelGeometry(wave, player = null) {
   const apertureRight = Math.max(apertureLeft + 18, lipTipX);
   const breakSpan = columnBreakSpan(growth, collapse);
   const passedRight = clamp(lipTipX - breakSpan + 10, 0, LOGICAL_WIDTH);
+  const projectionWorldX = Number(wave?.projectionWorldX) || 0;
 
   return {
     stage,
@@ -92,6 +93,7 @@ export function heroBarrelGeometry(wave, player = null) {
     growth,
     opening,
     collapse,
+    projectionWorldX,
     contactX,
     collisionX: contactX,
     powerFace,
@@ -141,7 +143,7 @@ export function heroPassedSkyWindow(wave, player = null) {
 }
 
 /**
- * California Games-style staggered waterfall columns. Screen-grid columns are
+ * California Games-style staggered waterfall columns. World-grid columns are
  * activated as the lip advances; their noisy head falls under a gravity-like
  * curve while every tile already left above it remains fixed. No rider input
  * or travel direction participates in this calculation.
@@ -270,15 +272,17 @@ export function drawHeroBarrelBack(
 function breakColumnsForGeometry(g, out = []) {
   const c = g.curtain;
   const frontX = c.lipTipX;
+  const projectionWorldX = Number(g.projectionWorldX) || 0;
+  const frontWorldX = frontX + projectionWorldX;
   // Keep the oldest active columns just offscreen so the churn always enters
   // from the left edge instead of exposing a detached vertical rear seam.
   // Their opacity still fades toward that edge, allowing backwater through.
   const span = Math.max(columnBreakSpan(g.growth, g.collapse), frontX + BREAK_COLUMN_STEP * 3);
-  const firstGrid = Math.floor((frontX - span) / BREAK_COLUMN_STEP);
-  const lastGrid = Math.floor(frontX / BREAK_COLUMN_STEP);
+  const firstGrid = Math.floor((frontWorldX - span) / BREAK_COLUMN_STEP);
+  const lastGrid = Math.floor(frontWorldX / BREAK_COLUMN_STEP);
   let count = 0;
   for (let grid = firstGrid; grid <= lastGrid; grid += 1) {
-    const x = grid * BREAK_COLUMN_STEP;
+    const x = grid * BREAK_COLUMN_STEP - projectionWorldX;
     const distance = Math.max(0, frontX - x);
     const progress = clamp(distance / span, 0, 1);
     const topY = clamp(

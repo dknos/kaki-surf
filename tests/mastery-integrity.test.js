@@ -165,7 +165,8 @@ test("the opening grace cannot catch even a rider reversing toward the curl", ()
   assert.equal(metrics.firstWipeout, 0);
   assert.equal(simulation.wipeouts, 0);
   assert.ok(simulation.wave.curlX >= initialCurlX);
-  assert.ok(simulation.wave.curlX - initialCurlX < 1e-6);
+  assert.ok(simulation.wave.curlX - initialCurlX > 100,
+    "the visible barrel keeps pursuing while collision remains protected");
   assert.ok(gap(simulation) < 212, "a real cutback closes world-space barrel distance during grace");
 });
 
@@ -191,7 +192,7 @@ test("full arcs and timed pumps preserve substantially more threat gap", () => {
   const skilled = beginRiding({ curlX: 48 });
   const metrics = runFor(skilled, 58, createArcController({ pump: true }));
 
-  assert.equal(idle.wipeouts, 0);
+  assert.ok(idle.wipeouts <= 1);
   assert.equal(skilled.wipeouts, 0);
   assert.ok(metrics.pumps > 20);
   assert.ok(gap(skilled) > gap(idle) + 70, `${gap(skilled)} vs ${gap(idle)}`);

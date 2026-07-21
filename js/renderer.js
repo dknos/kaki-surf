@@ -430,12 +430,34 @@ export class KakiRenderer {
   }
 
   drawSky(simulation) {
+    if (this.drawBackgroundAsset(simulation)) return;
     this.drawAerialFallback(simulation);
   }
 
   drawBackgroundAsset(simulation) {
-    void simulation;
-    return false;
+    if (this.settings.highContrast) return false;
+    const image = this.visualAssets?.backgrounds?.[this.conditionId];
+    if (!image?.complete || !(image.naturalWidth > 0) || !(image.naturalHeight >= LOGICAL_HEIGHT)) return false;
+
+    // The aerial panorama is an authored atlas, not a camera surface. Select
+    // and crossfade a small set of complete atmospheric plates so physical
+    // altitude never scrubs a flattened coastline through the viewport.
+    const altitude = clamp(-(Number(simulation?.camera?.worldY) || 0), 0, 96);
+    const plates = [
+      { y: image.naturalHeight - LOGICAL_HEIGHT, weight: 1 - smoothstep(8, 30, altitude), parallax: 0.08 },
+      { y: Math.min(image.naturalHeight - LOGICAL_HEIGHT, 252), weight: atmospherePlateWeight(altitude, 8, 30, 54, 72), parallax: 0.055 },
+      { y: Math.min(image.naturalHeight - LOGICAL_HEIGHT, 104), weight: atmospherePlateWeight(altitude, 46, 66, 76, 92), parallax: 0.035 },
+      { y: 0, weight: smoothstep(76, 94, altitude), parallax: 0.02 },
+    ];
+    const cameraX = this.settings.reducedMotion ? 0 : Number(simulation?.camera?.worldX) || 0;
+    for (const plate of plates) {
+      if (plate.weight <= 0.001) continue;
+      this.ctx.save();
+      this.ctx.globalAlpha = clamp(plate.weight, 0, 1);
+      drawWrappedPanoramaCrop(this.ctx, image, cameraX * plate.parallax, plate.y);
+      this.ctx.restore();
+    }
+    return true;
   }
 
   drawAerialFallback(simulation) {
@@ -474,6 +496,22 @@ export class KakiRenderer {
     const ctx = this.ctx;
     const p = this.palette;
     const cameraX = Number(simulation?.camera?.worldX ?? simulation?.cameraWorldX) || 0;
+    const image = !this.settings.highContrast
+      ? this.visualAssets?.backgrounds?.[this.conditionId]
+      : null;
+    if (image?.complete && image.naturalWidth > 0) {
+      // Repaint only the authored horizon strip in world space. It shares the
+      // vertical camera with the wave and can therefore leave through the
+      // bottom of frame without bringing the flattened ocean/space slab back.
+      const sourceY = image.naturalHeight - LOGICAL_HEIGHT;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, LOGICAL_WIDTH, 82);
+      ctx.clip();
+      drawWrappedPanoramaCrop(ctx, image, cameraX * 0.08, sourceY);
+      ctx.restore();
+      return;
+    }
     const shift = cameraX * 0.08;
     ctx.save();
     ctx.fillStyle = p.haze;
@@ -1685,6 +1723,35 @@ function signedFixed(value) {
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
 }
 
+function atmospherePlateWeight(altitude, fadeInStart, fadeInEnd, fadeOutStart, fadeOutEnd) {
+  return smoothstep(fadeInStart, fadeInEnd, altitude)
+    * (1 - smoothstep(fadeOutStart, fadeOutEnd, altitude));
+}
+
+function drawWrappedPanoramaCrop(ctx, image, travel, sourceY) {
+  const maxSourceX = Math.max(1, image.naturalWidth);
+  let sourceX = ((Number(travel) % maxSourceX) + maxSourceX) % maxSourceX;
+  let destinationX = 0;
+  let remaining = LOGICAL_WIDTH;
+  while (remaining > 0) {
+    const width = Math.min(remaining, maxSourceX - sourceX);
+    ctx.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      width,
+      LOGICAL_HEIGHT,
+      destinationX,
+      0,
+      width,
+      LOGICAL_HEIGHT,
+    );
+    destinationX += width;
+    remaining -= width;
+    sourceX = 0;
+  }
+}
+
 /** Build a read-only screen projection without leaking camera state into play. */
 export function projectedSimulation(simulation) {
   const cameraX = Number(simulation?.camera?.worldX ?? simulation?.cameraWorldX) || 0;
@@ -1710,6 +1777,10 @@ export function projectedSimulation(simulation) {
   Object.defineProperty(wave, "curlWorldX", {
     enumerable: true,
     value: sourceWave.curlWorldX,
+  });
+  Object.defineProperty(wave, "projectionWorldX", {
+    enumerable: false,
+    value: cameraX,
   });
   wave.contactX = () => sourceWave.contactX() - cameraX;
 

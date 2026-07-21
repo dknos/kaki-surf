@@ -220,7 +220,7 @@ test("Twilight's protected opening visibly advances before any wipeout", () => {
   for (let step = 0; step < steps; step += 1) {
     classic.update(1 / 120, 84, TUNING.curlSpeed, 84, threat);
   }
-  assert.equal(classic.curlX, classicInitial, "legacy grace behavior remains profile-owned");
+  assert.ok(classic.curlX > classicInitial + 12, "classic opening also advances in world space");
 });
 
 test("the hero barrel may leave the viewport instead of sticking to a minimum screen x", () => {
@@ -245,7 +245,7 @@ test("the advancing break uses fixed staggered columns with gravity-falling head
 
   assert.ok(first.length >= 12, "the waterfall is assembled from many narrow columns");
   for (let index = 1; index < first.length; index += 1) {
-    assert.equal(first[index].x - first[index - 1].x, 3, "columns stay on a fixed screen grid");
+    assert.equal(first[index].x - first[index - 1].x, 3, "columns stay on a fixed world grid");
     assert.ok(first[index].headY >= first[index].topY + 4, "every moving head falls below its crest tile");
   }
   const collision = first.reduce((nearest, column) => (

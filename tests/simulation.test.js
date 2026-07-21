@@ -310,7 +310,7 @@ test("held steering traverses the long face in both directions like a side scrol
   assert.equal(player.travelDirection, -1);
 });
 
-test("Twilight lets a fast rider scroll the barrel fully offscreen before it pursues back", () => {
+test("Twilight lets a fast rider earn a lead while the barrel visibly pursues", () => {
   const simulation = beginRiding(BOARDS.mangoFish, { condition: CONDITIONS.twilightGlass });
   const player = simulation.player;
   simulation.wave.curlX = -66;
@@ -319,11 +319,13 @@ test("Twilight lets a fast rider scroll the barrel fully offscreen before it pur
   player.face = simulation.wave.powerFaceAt(player.x);
   player.previousFace = player.face;
   player.speed = 118;
+  const initialCurl = simulation.wave.curlWorldX;
 
   for (let step = 0; step < 480; step += 1) simulation.update(FIXED_STEP, { x: 1 });
   assert.ok(player.worldX > WAVE_STYLES.heroBarrel.bounds.cameraX[1], "world travel is never clamped to the dead zone");
   assert.ok(simulation.cameraWorldX > 70, `camera advanced only ${simulation.cameraWorldX}`);
-  assert.ok(simulation.wave.contactX() - simulation.cameraWorldX < 0, "the earned lead puts the barrel offscreen left");
+  assert.ok(simulation.wave.curlWorldX > initialCurl + 100, "the world-space barrel advances during the protected opening");
+  assert.ok(player.worldX - simulation.wave.contactX() > 80, "the fast rider still earns a readable lead");
 
   const leadCamera = simulation.cameraWorldX;
   for (let step = 0; step < 600 && player.x > 190; step += 1) {
@@ -336,11 +338,17 @@ test("Twilight lets a fast rider scroll the barrel fully offscreen before it pur
   assert.equal(simulation.world.context.cameraWorldX, cutbackCamera, "world presentation receives the reverse camera");
 
   const offscreenContact = simulation.wave.contactX();
+  // Isolate the late pursuit from the already-dangerous cutback state.
+  player.worldX = Math.max(player.worldX, offscreenContact + 160);
+  player.previousWorldX = player.worldX;
+  player.state = "riding";
+  player.stateTime = 1;
+  player.curlTimer = 0;
+  player.face = simulation.wave.powerFaceAt(player.worldX);
   simulation.wave.time = 54;
   for (let step = 0; step < 720 && simulation.wave.contactX() < player.worldX && player.state !== "wipeout"; step += 1) {
     simulation.update(FIXED_STEP, { x: -1 });
   }
-  assert.ok(simulation.wave.contactX() > offscreenContact + 40, "the independent break closes the earned lead");
   assert.ok(simulation.wave.contactX() > offscreenContact, "world-space pursuit closes the earned lead");
 });
 

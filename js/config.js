@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.0.3";
+export const GAME_VERSION = "2.0.4";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -84,7 +84,11 @@ export const WAVE_STYLES = Object.freeze({
       proximityNearGap: 24,
       proximityFarGap: 156,
       temporalPressureScale: 0.82,
-      maxSpeed: 38,
+      // Collision is protected during the opening, but the visible breaker
+      // must still chase through world space instead of sitting at x=17.
+      openingSpeed: 52,
+      maxSpeed: 68,
+      maxRelief: 0.46,
     }),
     pocket: Object.freeze({
       nearOffset: 14,
@@ -167,11 +171,11 @@ export const WAVE_STYLES = Object.freeze({
       // The barrel must visibly travel during the protected opening. Curl
       // collision remains disabled by `curlGrace`, but the shot no longer
       // appears frozen until the first wipeout consumes that clock.
-      openingSpeed: 6.2,
+      openingSpeed: 52,
       // World-space pursuit can fall fully offscreen behind a skilled rider;
       // escalation eventually closes only the genuinely earned world gap.
-      maxSpeed: 38,
-      maxRelief: 0.34,
+      maxSpeed: 68,
+      maxRelief: 0.46,
     }),
     pocket: Object.freeze({
       nearOffset: 0,

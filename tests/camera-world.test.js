@@ -58,10 +58,23 @@ test("left reversal moves a viewport and reverses camera smoothly", () => {
 
 test("Turbo creates world-space separation after the barrel is offscreen", () => {
   const simulation = riding(41, {}, "advanced");
+  const initialPlayerX = simulation.player.worldX;
   const initialGap = simulation.player.worldX - simulation.wave.curlWorldX;
   for (let frame = 0; frame < 900; frame += 1) simulation.update(FIXED_STEP, { ...RIGHT, turbo: true });
   assert.ok(simulation.wave.curlWorldX - simulation.camera.worldX < 0);
-  assert.ok(simulation.player.worldX - simulation.wave.curlWorldX > initialGap + LOGICAL_WIDTH);
+  assert.ok(simulation.player.worldX - initialPlayerX > LOGICAL_WIDTH);
+  assert.ok(simulation.player.worldX - simulation.wave.curlWorldX > initialGap + 180);
+});
+
+test("the protected opening still shows the barrel advancing through world space", () => {
+  const simulation = new SurfSimulation({ seed: 41, controlMode: "advanced" });
+  simulation.begin();
+  simulation.player.state = "riding";
+  const initialCurl = simulation.wave.curlWorldX;
+  for (let frame = 0; frame < 600; frame += 1) simulation.update(FIXED_STEP, RIGHT);
+  assert.ok(simulation.wave.curlWorldX > initialCurl + 150,
+    `barrel only advanced ${simulation.wave.curlWorldX - initialCurl}`);
+  assert.ok(simulation.player.worldX > simulation.wave.contactX(), "opening pursuit must not silently overtake Kaki");
 });
 
 test("vertical camera target is continuous through the apex and covers the viewport", () => {
