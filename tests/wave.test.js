@@ -85,6 +85,15 @@ test("Twilight hero barrel occupies the approved horizon, ride, and trough bands
   }
 });
 
+test("the passed hero break can only reveal the sky above the horizon", () => {
+  const wave = new GameplayWave(0x4b414b49, "heroBarrel");
+  wave.curlWorldX = 96;
+  const window = heroPassedSkyWindow(wave, { x: 220, state: "riding" });
+  assert.ok(window.right > 0, "the advanced break exposes a trailing opening");
+  assert.ok(window.bottom <= window.horizon,
+    `the sky cutout reaches ${window.bottom}, below horizon ${window.horizon}`);
+});
+
 test("hero barrel has a broad readable pocket but one canonical contact edge", () => {
   const wave = new GameplayWave(0x54574c47, "heroBarrel");
   wave.curlX = 100;

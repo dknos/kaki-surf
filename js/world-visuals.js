@@ -75,8 +75,7 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
   world.forEachTraffic(layer, (entity) => {
     const renderBand = entity.renderBand || (isBoatKind(entity.kind) ? "waterBack" : "skyTraffic");
     const watercraft = isBoatKind(entity.kind) || entity.activity === "race";
-    if (pass === "background" && renderBand === "playfieldFront") return;
-    if (pass === "foreground" && renderBand !== "playfieldFront") return;
+    if (!trafficPassMatches(renderBand, pass)) return;
     const x = projectWorldX(
       lerp(entity.previousWorldX, entity.worldX, alpha),
       camera,
@@ -112,6 +111,14 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       drawTrafficFallback(ctx, entity, x, y, palette, layer);
     }
   });
+}
+
+export function trafficPassMatches(renderBand, pass = "all") {
+  if (pass === "sky") return renderBand === "skyTraffic";
+  if (pass === "water") return renderBand !== "skyTraffic" && renderBand !== "playfieldFront";
+  if (pass === "background") return renderBand !== "playfieldFront";
+  if (pass === "foreground") return renderBand === "playfieldFront";
+  return true;
 }
 
 export function watercraftClearsBreaker(entity, x, simulation) {

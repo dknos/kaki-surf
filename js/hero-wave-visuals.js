@@ -133,7 +133,10 @@ export function heroBarrelGeometry(wave, player = null) {
       top: 0,
       horizon: HORIZON_Y,
       fold: HORIZON_Y,
-      bottom: LOGICAL_HEIGHT,
+      // This is a sky opening, not an eraser for the ocean. Extending the
+      // cutout below sea level repainted a wrapped panorama over the backwater
+      // and produced the large yellow bite at the break's left edge.
+      bottom: HORIZON_Y,
     },
   };
 }

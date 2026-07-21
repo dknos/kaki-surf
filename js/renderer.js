@@ -392,15 +392,23 @@ export class KakiRenderer {
     // paste across the barrel, rider, or falling-water curtain.
     if (allowsBackgroundTraffic) {
       drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings);
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "background");
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "water");
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "water");
     }
     ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Aircraft and birds own authored sky altitudes. Horizontal parallax is
+    // still projected from camera.worldX inside drawWorldTraffic, but the
+    // vertical world camera must never drag them down into the water.
+    if (allowsBackgroundTraffic) {
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky");
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky");
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky");
+    }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, worldOffset.x, worldOffset.y);
     this.drawBackWater(simulation);
-    if (allowsBackgroundTraffic) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "background");
+    if (allowsBackgroundTraffic) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "water");
     this.drawWave(simulation);
     // The continuous break owns the entire playable foreground. Near and
     // playfield-front traffic is deliberately omitted so boats cannot float on

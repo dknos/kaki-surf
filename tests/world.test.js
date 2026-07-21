@@ -17,7 +17,7 @@ import {
   sweptCircleContact,
   worldXForScreenX,
 } from "../js/world-collision.js";
-import { trafficScreenDirection, watercraftClearsBreaker } from "../js/world-visuals.js";
+import { trafficPassMatches, trafficScreenDirection, watercraftClearsBreaker } from "../js/world-visuals.js";
 import { stableTrafficWorldDelta, WorldSimulation } from "../js/world.js";
 
 const STEP = 1 / 120;
@@ -79,6 +79,15 @@ test("catalog fixes bounded layer pools and only exposes the final three powerup
   for (const kind of ["propPlane", "seaplane", "helicopter", "bannerPlane"]) {
     assert.equal(TRAFFIC_CATALOG[kind].aircraft, true);
   }
+});
+
+test("sky traffic is isolated from vertically projected water traffic", () => {
+  assert.equal(trafficPassMatches("skyTraffic", "sky"), true);
+  assert.equal(trafficPassMatches("waterBack", "sky"), false);
+  assert.equal(trafficPassMatches("horizon", "sky"), false);
+  assert.equal(trafficPassMatches("skyTraffic", "water"), false);
+  assert.equal(trafficPassMatches("waterBack", "water"), true);
+  assert.equal(trafficPassMatches("horizon", "water"), true);
 });
 
 test("watercraft stay in water bands and face their projected screen motion", () => {
