@@ -13,6 +13,7 @@ QA_DIR = ROOT / "docs" / "images" / "qa"
 SHEET_PATH = ROOT / "docs" / "images" / "qa-contact-sheet.png"
 
 SCENES = (
+    ("coreSurfLab", "Core Surf Lab / live deterministic line"),
     ("menu", "Production menu and board cards"),
     ("results", "Results and run highlights"),
     ("settingsSimple", "Settings / Simple selected"),
@@ -22,6 +23,9 @@ SCENES = (
     ("neutral", "Neutral right-hand ride"),
     ("leftTravel", "Left travel / switch stance"),
     ("rightTravel", "Right travel"),
+    ("downhillRight", "Wake / downhill right"),
+    ("downhillLeft", "Wake / downhill left"),
+    ("uphill", "Wake / carried climb"),
     ("reversal", "Committed deep cutback"),
     ("downhill", "Downhill tuck / physical speed"),
     ("curlEarly", "Incoming curl / early darkening"),
@@ -67,7 +71,9 @@ SCENES = (
     ("sharkNearMiss", "Shark Thread near miss"),
     ("sharkCollision", "Shark collision"),
     ("whaleDistant", "Distant whale shadow"),
+    ("whaleBreachStart", "Whale breach / water takeoff"),
     ("whaleBreach", "Whale breach"),
+    ("whaleBreachReturn", "Whale breach / water return"),
     ("whaleRamp", "Whale swell ramp"),
     ("whaleRide", "Whale Ride"),
     ("whaleRideLeft", "Whale Ride / Left"),
@@ -171,7 +177,6 @@ def normalize_capture(path: Path) -> Image.Image:
         normalized = Image.new("RGB", (1280, 720), BACKGROUND)
         normalized.paste(fitted, ((1280 - fitted.width) // 2, (720 - fitted.height) // 2))
 
-    save_indexed(normalized, path)
     return normalized
 
 
@@ -240,10 +245,10 @@ def main() -> None:
         for scene, _ in SCENES
     }
     save_indexed(captures["menu"], ROOT / "docs" / "images" / "menu.png")
-    save_indexed(captures["maxSpeed"], ROOT / "docs" / "images" / "ride.png")
+    save_indexed(captures["neutral"], ROOT / "docs" / "images" / "ride.png")
     build_sheet(captures).save(SHEET_PATH, optimize=True)
 
-    print(f"Normalized {len(captures)} QA captures to 1280x720")
+    print(f"Read and normalized {len(captures)} QA captures in memory")
     print(f"Wrote {SHEET_PATH.relative_to(ROOT)}")
 
 

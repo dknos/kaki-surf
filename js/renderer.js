@@ -1,7 +1,9 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
+import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
+import { persistentHudContract } from "./hud-contract.js";
 import { drawPixelText } from "./pixel-font.js";
-import { drawBoardSprite, drawBoardWake, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
+import { drawBoardSprite, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
 import {
   advanceWavePresentationClocks,
   createWavePresentationClocks,
@@ -16,12 +18,12 @@ import {
   isHeroBarrelWave,
 } from "./hero-wave-visuals.js";
 import {
-  drawActivePowerupHud,
   drawCarrierEvent,
   drawWorldFoamGates,
   drawWorldPowerups,
   drawWorldTraffic,
   drawWorldWildlife,
+  drawWorldWildlifeContact,
 } from "./world-visuals.js";
 
 const PARTICLE_COUNT = 176;
@@ -64,6 +66,8 @@ export class KakiRenderer {
     this.calloutQueue = [];
     this.calloutSequence = 0;
     this.particleCursor = 0;
+    this.particleSerial = 0;
+    this.wakeScratch = [];
     this.calloutGap = 0;
     this.cameraY = 0;
     this.shake = 0;
@@ -73,8 +77,6 @@ export class KakiRenderer {
     this.sprayClock = 0;
     this.time = 0;
     this.pumpRelease = 0;
-    this.turboPulse = 0;
-    this.turboRefillAmount = 0;
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     this.wavePresentationClocks = createWavePresentationClocks();
@@ -91,6 +93,7 @@ export class KakiRenderer {
     this.calloutQueue.length = 0;
     this.calloutSequence = 0;
     this.particleCursor = 0;
+    this.particleSerial = 0;
     this.calloutGap = 0;
     this.cameraY = 0;
     this.shake = 0;
@@ -99,8 +102,6 @@ export class KakiRenderer {
     this.freeze = 0;
     this.sprayClock = 0;
     this.pumpRelease = 0;
-    this.turboPulse = 0;
-    this.turboRefillAmount = 0;
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     this.currentBoard = simulation?.board ?? null;
@@ -109,6 +110,7 @@ export class KakiRenderer {
 
   onEvent(event, simulation) {
     const player = simulation.player;
+    this.currentPlayer = player;
     this.currentBoard = simulation.board;
     const payload = event.payload ?? {};
     const ridingY = simulation.wave.ridingY(player.x, player.face);
@@ -119,33 +121,30 @@ export class KakiRenderer {
         });
         break;
       case "pump":
-        this.spawnSpray(player.x - 6, ridingY, 6 + Math.round((payload.strength ?? 0.5) * 8), 0.8 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.75);
+        this.spawnContactSpray(player, 6 + Math.round((payload.strength ?? 0.5) * 8), 0.8 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.75);
         this.impact = Math.max(this.impact, (payload.efficiency ?? payload.strength ?? 0.5) * 0.7);
         this.pumpRelease = 0.2;
         break;
       case "turboStart":
         this.spawnSeamGlints(player.x, ridingY, 11);
-        this.spawnSpray(player.x - player.travelDirection * 9, ridingY, 12, 1.4);
+        this.spawnContactSpray(player, 12, 1.4, this.palette.gold);
         this.impact = Math.max(this.impact, 0.75);
         this.shake = Math.max(this.shake, 0.7);
-        this.turboPulse = Math.max(this.turboPulse, 0.42);
         break;
       case "turboRefill":
         this.spawnSparkles(player.x, ridingY - 8, 11);
-        this.turboPulse = 0.95;
-        this.turboRefillAmount = Number(payload.amount) || 0;
         break;
       case "powerLineEnter":
         this.spawnSeamGlints(player.x, ridingY, 9);
         break;
       case "fullPower":
         this.spawnSeamGlints(player.x, ridingY, 18);
-        this.spawnSpray(player.x - 9, ridingY, 12, 1.35);
+        this.spawnContactSpray(player, 12, 1.35);
         this.impact = Math.max(this.impact, 0.9);
         if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.055);
         break;
       case "powerLineLeave":
-        this.spawnSpray(player.x - 8, ridingY, 4, 0.55);
+        this.spawnContactSpray(player, 4, 0.55);
         break;
       case "maneuver":
       case "maneuverStart":
@@ -157,20 +156,20 @@ export class KakiRenderer {
         const id = payload.id ?? event.type;
         const tube = isTubeId(id);
         const force = id === "floater" ? 1.15 : tube ? 0.65 : 1.35;
-        this.spawnSpray(player.x, ridingY, tube ? 5 : 13, force);
+        this.spawnContactSpray(player, tube ? 5 : 13, force);
         this.shake = Math.max(this.shake, id === "snap" || id === "cutback" ? 0.95 : 0.45);
         break;
       }
       case "tubeExit":
         if (payload.reason === "complete") break;
         this.spawnSeamGlints(player.x, ridingY, 9);
-        this.spawnSpray(player.x, ridingY, 8, 0.82);
+        this.spawnContactSpray(player, 8, 0.82);
         if ((payload.duration ?? 0) >= TUNING.tubeCleanExitTime) {
           this.freeze = this.settings.reducedMotion ? 0 : 0.022;
         }
         break;
       case "tubeFail":
-        this.spawnSpray(player.x, ridingY, 14, 1.4);
+        this.spawnContactSpray(player, 14, 1.4);
         this.impact = Math.max(this.impact, 1.1);
         break;
       case "trickStarted":
@@ -191,11 +190,11 @@ export class KakiRenderer {
         if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.055);
         break;
       case "lip":
-        this.spawnSpray(player.x, simulation.wave.crestY(player.x), 8, 1.25);
+        this.spawnSpray(player.tailX, player.tailY, 8, 1.25);
         this.shake = Math.max(this.shake, 0.8);
         break;
       case "launch":
-        this.spawnSpray(player.x, simulation.wave.crestY(player.x), 17, 1.6);
+        this.spawnSpray(player.tailX, player.tailY, 17, 1.6);
         this.shake = Math.max(this.shake, 1.25);
         break;
       case "apex":
@@ -205,7 +204,7 @@ export class KakiRenderer {
       case "land": {
         this.lastLandingQuality = payload.quality ?? "clean";
         const strength = payload.quality === "perfect" ? 2.3 : payload.quality === "wobble" || payload.quality === "sketchy" ? 1.3 : 1.8;
-        this.spawnSpray(player.x, simulation.wave.ridingY(player.x, player.face), 22, strength);
+        this.spawnContactSpray(player, 22, strength);
         this.shake = Math.max(this.shake, strength);
         this.impact = Math.max(this.impact, strength * 0.65);
         this.freeze = this.settings.reducedMotion ? 0 : payload.quality === "perfect" ? 0.045 : 0.025;
@@ -234,7 +233,7 @@ export class KakiRenderer {
       case "switch":
       case "directionReversed":
       case "directionChange":
-        this.spawnSpray(player.x, ridingY, 15, 1.25);
+        this.spawnContactSpray(player, 15, 1.25);
         this.shake = Math.max(this.shake, 0.65);
         this.pushCallout("DEEP CUTBACK", payload.switchStance || payload.switch ? "SWITCH STANCE" : "MOMENTUM CARRIED", "risk");
         break;
@@ -244,13 +243,13 @@ export class KakiRenderer {
         this.pushCallout("DOLPHIN RIDE", "STEER FOR THE FINAL BREACH", "perfect");
         break;
       case "whaleMounted":
-        this.spawnSpray(player.x, ridingY, 24, 2.2);
+        this.spawnContactSpray(player, 24, 2.2);
         this.shake = Math.max(this.shake, 2.2);
         this.freeze = this.settings.reducedMotion ? 0 : 0.038;
         this.pushCallout("WHALE RIDE", "THE BIGGEST AIR", "perfect");
         break;
       case "animalDismount":
-        this.spawnSpray(player.x, ridingY, 26, 2.35);
+        this.spawnSpray(player.tailX, player.tailY, 26, 2.35);
         this.shake = Math.max(this.shake, 2.35);
         break;
       case "sharkThread":
@@ -296,10 +295,10 @@ export class KakiRenderer {
     this.flash = Math.max(0, this.flash - dt);
     this.impact = Math.max(0, this.impact - dt * 3.8);
     this.pumpRelease = Math.max(0, this.pumpRelease - dt);
-    this.turboPulse = Math.max(0, this.turboPulse - dt);
     this.shake = Math.max(0, this.shake - dt * 7.5);
 
     const player = simulation.player;
+    this.currentPlayer = player;
     advanceWavePresentationClocks(
       this.wavePresentationClocks,
       simulation.wave,
@@ -328,31 +327,19 @@ export class KakiRenderer {
     if (this.activeCallout.life <= 0 && this.calloutGap <= 0) this.activateNextCallout();
 
     const riding = player.state === "riding" || player.state === "lip" || player.state === "landing" || player.state === "wobble";
-    if (riding && player.speed > 54) {
-      this.sprayClock += dt * (player.speed - 48) * 0.18;
+    const motionSpeed = Number(player.motionSpeed ?? player.speed ?? 0);
+    if (riding && motionSpeed > 22 && !player.animalMount) {
+      this.sprayClock += dt * (motionSpeed - 18) * 0.1;
       while (this.sprayClock >= 1) {
         this.sprayClock -= 1;
-        const y = simulation.wave.ridingY(player.x, player.face);
-        this.spawnParticle(player.x - 12, y + 1, -16 - player.speed * 0.08, -8 - Math.random() * 13, 0.3, this.palette.foam, 1, 52, 0.9);
+        this.spawnContactSpray(player, 1, 0.72);
       }
     }
     if (riding && player.turboActive) {
       this.turboSparkClock += dt * 22;
       while (this.turboSparkClock >= 1) {
         this.turboSparkClock -= 1;
-        const direction = Math.sign(player.travelDirection) || 1;
-        const y = simulation.wave.ridingY(player.x, player.face);
-        this.spawnParticle(
-          player.x - direction * 13,
-          y - 1,
-          -direction * (28 + player.speed * 0.08),
-          -7 - Math.random() * 10,
-          0.24,
-          this.palette.gold,
-          1,
-          44,
-          0.88,
-        );
+        this.spawnContactSpray(player, 1, 1.15, this.palette.gold);
       }
     } else {
       this.turboSparkClock = 0;
@@ -406,14 +393,15 @@ export class KakiRenderer {
     drawWorldPowerups(ctx, simulation, this.visualAssets, palette, alpha);
     drawWorldFoamGates(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
     this.drawParticles(false);
+    this.drawTrajectoryWake(simulation);
     this.drawSurfer(simulation, alpha);
-    if (heroBarrel) this.drawWaveFront(simulation);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true, this.settings);
+    if (heroBarrel) this.drawWaveFront(simulation);
+    drawWorldWildlifeContact(ctx, simulation, palette, alpha, this.settings);
     this.drawParticles(true);
     ctx.restore();
     this.drawHud(simulation);
-    drawActivePowerupHud(ctx, simulation, this.visualAssets, palette);
-    this.drawCallouts();
+    if (!simulation.coreSurfLab) this.drawCallouts();
 
     if (this.flash > 0) {
       ctx.globalAlpha = clamp(this.flash * 2.8, 0, 0.28);
@@ -555,7 +543,7 @@ export class KakiRenderer {
     const p = this.palette;
     const player = simulation.player;
     const speedCap = rideSpeedCapFor(simulation);
-    const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
+    const speedRatio = clamp(Number(player?.motionSpeed ?? player?.speed ?? 0) / speedCap, 0, 1);
     const momentum = clamp(Number(player?.waveMomentum ?? 0), 0, 1);
     if (isHeroBarrelWave(simulation.wave)) {
       drawHeroBackWater(
@@ -667,7 +655,7 @@ export class KakiRenderer {
     if (isHeroBarrelWave(simulation.wave)) return;
     const player = simulation.player;
     const speedCap = rideSpeedCapFor(simulation);
-    const speedRatio = clamp(Number(player?.speed ?? 0) / speedCap, 0, 1);
+    const speedRatio = clamp(Number(player?.motionSpeed ?? player?.speed ?? 0) / speedCap, 0, 1);
     const intensity = smoothstep(0.68, 0.98, speedRatio);
     if (intensity <= 0.03 || player?.state === "complete") return;
 
@@ -712,6 +700,44 @@ export class KakiRenderer {
     this.ctx.fillRect(x + 3, y + 2, Math.max(2, size - 1), 2);
   }
 
+  drawTrajectoryWake(simulation) {
+    const samples = simulation.player?.wakeSamples;
+    if (!Array.isArray(samples)) return;
+    const scratch = this.wakeScratch;
+    scratch.length = 0;
+    for (const sample of samples) {
+      if (sample.active && sample.age < WAKE_SAMPLE_LIFETIME) scratch.push(sample);
+    }
+    if (scratch.length < 2) return;
+    scratch.sort((a, b) => b.age - a.age);
+    const camera = Number(simulation.cameraWorldX) || 0;
+    const ctx = this.ctx;
+    const p = this.palette;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (let index = 1; index < scratch.length; index += 1) {
+      const previous = scratch[index - 1];
+      const sample = scratch[index];
+      const x0 = previous.worldX - camera;
+      const x1 = sample.worldX - camera;
+      const distance = Math.hypot(x1 - x0, sample.y - previous.y);
+      if (distance > 42) continue;
+      const life = clamp(1 - Math.max(previous.age, sample.age) / WAKE_SAMPLE_LIFETIME, 0, 1);
+      const speed = clamp((previous.speed + sample.speed - 28) / 150, 0, 1);
+      ctx.globalAlpha = (this.settings.highContrast ? 0.9 : 0.32 + speed * 0.42) * life;
+      ctx.strokeStyle = index % 4 === 0 ? p.foam : p.foamShade;
+      ctx.lineWidth = Math.max(1, Math.round(1 + speed * 2.4 * life));
+      ctx.beginPath();
+      ctx.moveTo(Math.round(x0), Math.round(previous.y));
+      const bendX = (x0 + x1) * 0.5;
+      const bendY = (previous.y + sample.y) * 0.5 - Math.min(2, distance * 0.06);
+      ctx.quadraticCurveTo(Math.round(bendX), Math.round(bendY), Math.round(x1), Math.round(sample.y));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   drawSurfer(simulation, alpha) {
     const player = simulation.player;
     const wave = simulation.wave;
@@ -730,7 +756,7 @@ export class KakiRenderer {
 
     if (player.state === "airborne") this.drawLandingGuide(simulation);
     if (player.state === "wipeout") {
-      const direction = Math.sign(player.travelDirection ?? 1) || 1;
+      const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? 1) || 1;
       drawBoardSprite(this.ctx, x + direction * 12, y + 5, resolvedBoardAngle(player), simulation.board, this.palette, {
         compression: 1,
         direction,
@@ -743,10 +769,9 @@ export class KakiRenderer {
     }
 
     const boardAngle = resolvedBoardAngle(player);
-    const direction = Math.sign(player.travelDirection ?? player.takeoffDirection ?? 1) || 1;
+    const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? player.takeoffDirection ?? 1) || 1;
     const mounted = Boolean(player.animalMount || player.mountKind || player.mountType);
     if (!mounted) {
-      drawBoardWake(this.ctx, x, y + 2, boardAngle, simulation.board, player, this.palette, this.time, this.settings.reducedMotion);
       drawBoardSprite(this.ctx, x, y + 1, boardAngle, simulation.board, this.palette, {
         compression: player.compression,
         direction,
@@ -806,6 +831,11 @@ export class KakiRenderer {
 
   drawHud(simulation) {
     if (!simulation.started) return;
+    const contract = persistentHudContract(simulation);
+    if (contract.coreLab) {
+      if (contract.telemetry) this.drawCoreSurfTelemetry(simulation);
+      return;
+    }
     const ctx = this.ctx;
     const p = this.palette;
     const score = String(Math.round(simulation.score.total)).padStart(6, "0");
@@ -813,141 +843,47 @@ export class KakiRenderer {
     const seconds = timed ? Math.ceil(simulation.timeRemaining) : null;
     const multiplier = simulation.currentMultiplier();
     const player = simulation.player;
-    const guide = player.speedPotential ?? waveGuideAt(simulation.wave, player, simulation.board);
-    const speedCap = rideSpeedCapFor(simulation);
-    const speedTier = speedTierFor(player, simulation);
 
     panel(ctx, 5, 5, 90, 19, p.deepInk, p.waterDeep);
     drawPixelText(ctx, "SCORE", 10, 9, { color: p.foamShade, shadow: p.ink });
     drawPixelText(ctx, score, 89, 9, { scale: 2, spacing: 1, align: "right", color: p.white, shadow: p.ink });
 
-    this.drawSpeedMeter(player, speedCap);
-    this.drawTurboMeter(player);
-
-    panel(ctx, 166, 5, 52, 19, p.deepInk, p.waterDeep);
     if (timed) {
-      drawPixelText(ctx, `${seconds}`, 192, 9, { scale: 2, spacing: 1, align: "center", color: seconds <= 10 ? p.danger : p.sun, shadow: p.ink });
+      panel(ctx, 323, 5, 56, 19, p.deepInk, p.waterDeep);
+      drawPixelText(ctx, "TIME", 328, 11, { color: p.foamShade, shadow: p.ink });
+      drawPixelText(ctx, `${seconds}`, 373, 9, { scale: 2, spacing: 1, align: "right", color: seconds <= 10 ? p.danger : p.sun, shadow: p.ink });
     } else {
-      drawPixelText(ctx, "SET", 174, 11, { color: p.foamShade, shadow: p.ink });
-      drawPixelText(ctx, `${simulation.endlessSet}`, 210, 9, { scale: 2, spacing: 1, align: "right", color: simulation.endlessSet >= simulation.tuning.endlessMaxSet ? p.danger : p.sun, shadow: p.ink });
+      panel(ctx, 300, 5, 79, 19, p.deepInk, p.waterDeep);
+      drawPixelText(ctx, "PAWS", 305, 9, { color: p.foamShade, shadow: p.ink });
+      for (let index = 0; index < simulation.tuning.maxWipeouts; index += 1) {
+        drawPaw(ctx, 338 + index * 12, 10, index < simulation.tuning.maxWipeouts - simulation.wipeouts ? p.gold : p.danger, p.ink);
+      }
     }
 
-    panel(ctx, 288, 5, 91, 19, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, "PAWS", 293, 9, { color: p.foamShade, shadow: p.ink });
-    for (let index = 0; index < simulation.tuning.maxWipeouts; index += 1) {
-      drawPaw(ctx, 338 + index * 12, 10, index < simulation.tuning.maxWipeouts - simulation.wipeouts ? p.gold : p.danger, p.ink);
-    }
-
-    panel(ctx, 6, 190, 122, 20, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, speedTier.name, 11, 194, { color: speedTier.color === "gold" ? p.gold : speedTier.color === "danger" ? p.danger : p.foamShade, shadow: p.ink });
-    ctx.fillStyle = p.ink;
-    ctx.fillRect(69, 195, 51, 7);
-    ctx.fillStyle = speedTier.level >= 4 ? p.gold : speedTier.level <= 0 ? p.danger : p.foamShade;
-    ctx.fillRect(71, 197, Math.round(47 * speedTier.fill), 3);
-
-    panel(ctx, 294, 190, 84, 20, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, "FLOW", 299, 195, { color: p.foamShade, shadow: p.ink });
-    drawPixelText(ctx, `X${multiplier.toFixed(1)}`, 371, 195, { align: "right", color: multiplier > 2.2 ? p.gold : p.white, shadow: p.ink });
-
-    if (player.state === "airborne") {
-      this.drawAerialHud(simulation);
-      this.drawLandingHud(simulation);
-    } else if (player.tubeRide?.active) {
-      this.drawTubeHud(player.tubeRide);
-    } else if ((player.charge ?? 0) > 0.02) {
-      panel(ctx, 144, 190, 96, 20, p.deepInk, p.waterDeep);
-      drawPixelText(ctx, "PUMP", 150, 195, { color: p.foamShade, shadow: p.ink });
-      ctx.fillStyle = p.ink;
-      ctx.fillRect(182, 195, 50, 7);
-      ctx.fillStyle = guide.pumpEfficiency > 0.6 ? p.gold : p.foamShade;
-      ctx.fillRect(184, 197, Math.round(46 * clamp(player.charge, 0, 1)), 3);
-    }
-
-    if (simulation.assists.steering || simulation.assists.landing) {
-      drawPixelText(ctx, "ASSIST", 270, 198, { align: "center", color: p.foamShade, shadow: p.ink });
+    const comboActive = contract.fields.includes("combo");
+    if (comboActive) {
+      panel(ctx, 143, 190, 98, 20, p.deepInk, p.waterDeep, 0.9);
+      drawPixelText(ctx, "COMBO", 149, 195, { color: p.foamShade, shadow: p.ink });
+      drawPixelText(ctx, `X${multiplier.toFixed(1)}`, 234, 195, { align: "right", color: multiplier > 2.2 ? p.gold : p.white, shadow: p.ink });
     }
     this.drawTeachingOverlay(simulation);
   }
 
-  drawTubeHud(tube) {
-    const ctx = this.ctx;
-    const p = this.palette;
-    panel(ctx, 136, 190, 116, 20, p.deepInk, p.waterDeep, 0.94);
-    drawPixelText(ctx, `TUBE ${Number(tube.time ?? 0).toFixed(1)}S`, 142, 195, {
-      color: p.gold,
-      shadow: p.ink,
-    });
-    drawPixelText(ctx, `+${Math.round(Number(tube.score) || 0)}`, 245, 195, {
-      align: "right",
-      color: p.white,
-      shadow: p.ink,
-    });
-  }
-
-  drawSpeedMeter(player, speedCap) {
-    const ctx = this.ctx;
-    const p = this.palette;
-    const speedRatio = clamp(Number(player?.speed ?? 0) / Math.max(1, speedCap), 0, 1);
-    panel(ctx, 101, 5, 58, 19, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, "SPEED", 106, 8, { color: speedRatio >= 0.94 ? p.gold : p.foamShade, shadow: p.ink });
-    ctx.fillStyle = p.ink;
-    ctx.fillRect(106, 17, 48, 4);
-    ctx.fillStyle = speedRatio >= 0.94 ? p.gold : speedRatio >= 0.62 ? p.crest : p.foamShade;
-    ctx.fillRect(107, 18, Math.round(46 * speedRatio), 2);
-    if (speedRatio >= 0.94) {
-      ctx.fillStyle = p.gold;
-      ctx.fillRect(153, 8, 2, 2);
-      ctx.fillRect(152, 9, 4, 1);
-    }
-  }
-
-  drawTurboMeter(player) {
-    const ctx = this.ctx;
-    const p = this.palette;
-    const level = clamp(Number(player?.turbo) || 0, 0, 1);
-    const active = Boolean(player?.turboActive);
-    const pulse = this.turboPulse > 0;
-    panel(ctx, 224, 5, 58, 19, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, "TURBO", 229, 8, {
-      color: active || pulse ? p.gold : level <= 0.02 ? p.danger : p.foamShade,
-      shadow: p.ink,
-    });
-    if (pulse && this.turboRefillAmount > 0) {
-      drawPixelText(ctx, `+${Math.round(this.turboRefillAmount * 100)}`, 277, 8, {
-        align: "right",
-        color: p.gold,
-        shadow: p.ink,
-      });
-    }
-    ctx.fillStyle = p.ink;
-    ctx.fillRect(229, 17, 48, 4);
-    ctx.fillStyle = active ? p.gold : level <= 0.02 ? p.danger : p.crest;
-    ctx.fillRect(230, 18, Math.round(46 * level), 2);
-  }
-
-  drawAerialHud(simulation) {
+  drawCoreSurfTelemetry(simulation) {
     const ctx = this.ctx;
     const p = this.palette;
     const player = simulation.player;
-    const provisional = provisionalView(simulation);
-    const x = (player.airX ?? player.x) < 192 ? 246 : 7;
-    panel(ctx, x, 29, 131, 27, p.deepInk, p.waterDeep, 0.9);
-    drawPixelText(ctx, provisional.name, x + 65, 34, { align: "center", color: p.gold, shadow: p.ink });
-    drawPixelText(ctx, `+${Math.round(provisional.score)}`, x + 65, 45, { align: "center", color: p.white, shadow: p.ink });
-  }
-
-  drawLandingHud(simulation) {
-    const ctx = this.ctx;
-    const p = this.palette;
-    const player = simulation.player;
-    const preview = player.landingPreview ?? simulation.tricks?.landingPreview ?? {};
-    const target = Number(preview.targetAngle ?? simulation.wave.slopeAt(player.airX, player.landingFace));
-    const current = Number(preview.boardAngle ?? preview.currentAngle ?? player.boardAngle);
-    const error = Number.isFinite(preview.error) ? preview.error : Math.abs(normalizeAngle(current - target));
-    panel(ctx, 139, 190, 106, 20, p.deepInk, p.waterDeep);
-    drawPixelText(ctx, "LAND", 145, 195, { color: p.foamShade, shadow: p.ink });
-    drawAlignmentBands(ctx, 178, 196, 53, error, p);
-    drawTrendArrow(ctx, 234, 196, preview.improving, p);
+    if (simulation.coreSurfLabTelemetry === false) return;
+    panel(ctx, 5, 5, 374, 25, p.deepInk, p.waterDeep, 0.84);
+    drawPixelText(ctx, "CORE SURF", 10, 9, { color: p.gold, shadow: p.ink });
+    drawPixelText(ctx, `X ${Math.round(player.x)}  FACE ${player.face.toFixed(2)}  SPEED ${Math.round(player.motionSpeed)}`, 374, 9, {
+      align: "right", color: p.white, shadow: p.ink,
+    });
+    const velocity = `${signedInt(player.motionVX)},${signedInt(player.motionVY)}`;
+    const heading = `${Math.round(player.motionHeading * 180 / Math.PI)}D`;
+    drawPixelText(ctx, `VEL ${velocity}  SLOPE ${signedFixed(player.slopeDrive)}  BOARD ${heading}`, 192, 20, {
+      align: "center", color: p.foamShade, shadow: p.ink,
+    });
   }
 
   drawTeachingOverlay(simulation) {
@@ -957,22 +893,19 @@ export class KakiRenderer {
     const player = simulation.player;
     if (player.state === "wipeout" || player.state === "complete") return;
     const text = qaText || lesson.text;
-    const subtext = qaText
-      ? "DROP = SPEED / LIP = AIR"
-      : lesson.hint;
     const playerX = player.state === "airborne" ? player.airX : player.x;
-    const x = playerX < LOGICAL_WIDTH * 0.5 ? 197 : 6;
-    const width = 181;
-    const progress = qaText ? 0.18 : clamp(Number(lesson.progress) || 0, 0, 1);
-    const step = qaText ? "SURF SCHOOL" : `SURF SCHOOL ${lesson.index}/${lesson.total}`;
-    panel(this.ctx, x, 150, width, 38, this.palette.deepInk, this.palette.waterDeep, 0.92);
-    drawPixelText(this.ctx, step, x + 6, 154, { color: this.palette.foamShade, shadow: this.palette.ink });
-    drawPixelText(this.ctx, text, x + width / 2, 164, { align: "center", color: this.palette.white, shadow: this.palette.ink });
-    drawPixelText(this.ctx, subtext, x + width / 2, 174, { align: "center", color: this.palette.gold, shadow: this.palette.ink });
-    this.ctx.fillStyle = this.palette.ink;
-    this.ctx.fillRect(x + 6, 183, width - 12, 3);
-    this.ctx.fillStyle = this.palette.crest;
-    this.ctx.fillRect(x + 7, 184, Math.round((width - 14) * progress), 1);
+    const x = playerX < LOGICAL_WIDTH * 0.5 ? 221 : 7;
+    const width = 156;
+    const arrow = lesson?.id === "drop" ? "V"
+      : lesson?.id === "carve" ? "^"
+        : lesson?.id === "land" ? "//"
+          : ">";
+    panel(this.ctx, x, 164, width, 18, this.palette.deepInk, this.palette.waterDeep, 0.82);
+    drawPixelText(this.ctx, `${arrow} ${text}`, x + width / 2, 169, {
+      align: "center",
+      color: this.palette.white,
+      shadow: this.palette.ink,
+    });
   }
 
   drawCallouts() {
@@ -1096,23 +1029,63 @@ export class KakiRenderer {
     const profile = getBoardVisualProfile(this.currentBoard);
     const adjustedCount = Math.max(1, Math.round(count * (this.settings.reducedMotion ? 0.45 : 1)));
     for (let index = 0; index < adjustedCount; index += 1) {
-      const direction = index % 2 ? -1 : 1;
       const heavy = profile.spray === "heavy";
       const round = profile.spray === "round";
+      const sequence = this.particleSerial + index;
+      const jitterX = signedNoise(sequence * 5 + 1) * 6;
+      const jitterY = signedNoise(sequence * 5 + 2) * 2;
+      const turbulence = signedNoise(sequence * 5 + 3) * (heavy ? 18 : 26) * force;
+      const motion = this.currentPlayer ?? {};
+      const velocity = wakeParticleVelocity(
+        motion.motionVX,
+        motion.motionVY,
+        turbulence,
+        clamp(0.28 + force * 0.12, 0.28, 0.62),
+      );
       this.spawnParticle(
-        x + (Math.random() - 0.5) * 12,
-        y + (Math.random() - 0.5) * 4,
-        direction * (5 + Math.random() * (heavy ? 19 : 28)) * force - 9,
-        -(10 + Math.random() * (heavy ? 25 : 34)) * force,
-        0.32 + Math.random() * 0.32,
+        x + jitterX,
+        y + jitterY,
+        velocity.vx,
+        velocity.vy,
+        0.32 + positiveNoise(sequence * 5 + 4) * 0.32,
         index % 4 === 0 ? this.palette.foamShade : this.palette.foam,
-        round || (heavy && index % 3 === 0) || Math.random() > 0.82 ? 2 : 1,
+        round || (heavy && index % 3 === 0) || positiveNoise(sequence * 5 + 5) > 0.82 ? 2 : 1,
         66,
         0.9,
         "spray",
         index % 3 === 0,
       );
     }
+    this.particleSerial += adjustedCount;
+  }
+
+  spawnContactSpray(player, count, force = 1, color = null) {
+    if (!player || player.state === "airborne") return;
+    const amount = Math.max(1, Math.round(count * (this.settings.reducedMotion ? 0.5 : 1)));
+    for (let index = 0; index < amount; index += 1) {
+      const sequence = this.particleSerial + index;
+      const turbulence = signedNoise(sequence * 7 + 3) * 11 * force;
+      const velocity = wakeParticleVelocity(
+        player.motionVX,
+        player.motionVY,
+        turbulence,
+        clamp(0.3 + force * 0.08, 0.3, 0.55),
+      );
+      this.spawnParticle(
+        player.tailX + signedNoise(sequence * 7 + 1) * 2,
+        player.tailY + signedNoise(sequence * 7 + 2),
+        velocity.vx,
+        velocity.vy,
+        0.22 + positiveNoise(sequence * 7 + 4) * 0.18,
+        color ?? (index % 3 === 0 ? this.palette.foamShade : this.palette.foam),
+        index % 5 === 0 ? 2 : 1,
+        48,
+        0.86,
+        "wake",
+        index % 4 === 0,
+      );
+    }
+    this.particleSerial += amount;
   }
 
   spawnSeamGlints(x, y, count) {
@@ -1141,8 +1114,22 @@ export class KakiRenderer {
   spawnWipeout(x, y) {
     this.spawnSpray(x, y, 35, 1.8);
     for (let index = 0; index < 10; index += 1) {
-      this.spawnParticle(x - 10 + Math.random() * 20, y + Math.random() * 8, -4 + Math.random() * 8, -9 - Math.random() * 14, 0.72, this.palette.white, index % 3 === 0 ? 2 : 1, 16, 0.4, "bubble", true);
+      const sequence = this.particleSerial + index;
+      this.spawnParticle(
+        x + signedNoise(sequence * 5 + 1) * 10,
+        y + positiveNoise(sequence * 5 + 2) * 8,
+        signedNoise(sequence * 5 + 3) * 4,
+        -9 - positiveNoise(sequence * 5 + 4) * 14,
+        0.72,
+        this.palette.white,
+        index % 3 === 0 ? 2 : 1,
+        16,
+        0.4,
+        "bubble",
+        true,
+      );
     }
+    this.particleSerial += 10;
   }
 
   spawnParticle(x, y, vx, vy, life, color, size, gravity, drag, kind = "spray", foreground = false) {
@@ -1499,58 +1486,28 @@ function rideSpeedCapFor(simulation) {
   return Math.max(1, tuningMax * boardMax);
 }
 
-function speedTierFor(player, simulation) {
-  const explicit = String(player.speedTier ?? "").toUpperCase().replace(/_/g, " ");
-  const names = ["STALLING", "GLIDING", "FAST", "FLYING", "BLASTING"];
-  const maxSpeed = Math.max(90, (simulation.tuning?.maxSpeed ?? 138) * (simulation.board?.maxSpeed ?? 1));
-  const fill = clamp(((player.speed ?? 0) - 34) / (maxSpeed - 34), 0, 1);
-  let level = Math.min(4, Math.floor(fill * 5));
-  if (names.includes(explicit)) level = names.indexOf(explicit);
-  return { name: names[level], level, fill, color: level === 0 ? "danger" : level >= 3 ? "gold" : "foam" };
-}
-
-function provisionalView(simulation) {
-  const player = simulation.player;
-  const view = simulation.tricks?.viewData ?? simulation.tricks?.view ?? simulation.tricks?.provisional ?? {};
-  const name = player.provisionalTrickName ?? view.name ?? view.trickName ?? "FLOATY POP";
-  const score = player.provisionalScore ?? view.score ?? view.value ?? 0;
-  return { name: String(name).toUpperCase().slice(0, 22), score: Number(score) || 0 };
-}
-
 function resolvedBoardAngle(player) {
   if (Number.isFinite(player.boardAngle)) return player.boardAngle;
   return Number(player.bodyAngle ?? 0) + Number(player.boardRelativeAngle ?? 0);
 }
 
-function normalizeAngle(angle) {
-  let value = (angle + Math.PI) % (Math.PI * 2);
-  if (value < 0) value += Math.PI * 2;
-  return value - Math.PI;
+function positiveNoise(seed) {
+  const value = Math.sin((Number(seed) + 1) * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
 }
 
-function drawAlignmentBands(ctx, x, y, width, error, p) {
-  ctx.fillStyle = p.foamShade;
-  ctx.fillRect(x, y, width, 5);
-  ctx.fillStyle = p.white;
-  ctx.fillRect(x + Math.round(width * 0.2), y, Math.round(width * 0.6), 5);
-  ctx.fillStyle = p.gold;
-  ctx.fillRect(x + Math.round(width * 0.39), y - 1, Math.round(width * 0.22), 7);
-  const marker = clamp(Math.round((error / 1.18) * (width / 2)), 0, width / 2);
-  ctx.fillStyle = error < 0.13 ? p.gold : error < 0.48 ? p.white : p.danger;
-  ctx.fillRect(Math.round(x + width / 2 + marker - 1), y - 2, 3, 9);
+function signedNoise(seed) {
+  return positiveNoise(seed) * 2 - 1;
 }
 
-function drawTrendArrow(ctx, x, y, improving, p) {
-  ctx.fillStyle = improving ? p.gold : p.danger;
-  if (improving) {
-    ctx.fillRect(x + 2, y - 2, 2, 2);
-    ctx.fillRect(x + 1, y, 4, 2);
-    ctx.fillRect(x, y + 2, 6, 2);
-  } else {
-    ctx.fillRect(x, y - 2, 6, 2);
-    ctx.fillRect(x + 1, y, 4, 2);
-    ctx.fillRect(x + 2, y + 2, 2, 2);
-  }
+function signedInt(value) {
+  const rounded = Math.round(Number(value) || 0);
+  return rounded >= 0 ? `+${rounded}` : String(rounded);
+}
+
+function signedFixed(value) {
+  const number = Number(value) || 0;
+  return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
 }
 
 function createParticle() {

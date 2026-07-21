@@ -148,29 +148,6 @@ function poseName(value) {
   return Object.keys(POSES).find((key) => key.toLowerCase() === normalized) ?? null;
 }
 
-export function drawBoardWake(ctx, x, y, angle, board, player, palette, time = 0, reducedMotion = false) {
-  const profile = getBoardVisualProfile(board);
-  const speed = clamp(Number(player?.speed ?? 0), 34, 170);
-  const flow = clamp((speed - 42) / 105, 0, 1);
-  const length = Math.round((7 + flow * 25) * profile.wake);
-  const step = reducedMotion ? 7 : 4;
-  const snapped = snapAngle(angle);
-  const pulse = reducedMotion ? 0 : Math.floor(time * (6 + flow * 12)) % step;
-  ctx.save();
-  ctx.translate(Math.round(x), Math.round(y));
-  ctx.rotate(snapped);
-  ctx.scale(Math.sign(player?.travelDirection ?? 1) || 1, 1);
-  ctx.fillStyle = palette.foamShade;
-  for (let offset = 5 + pulse; offset < length; offset += step) {
-    const size = profile.spray === "round" ? 2 : 1;
-    ctx.fillRect(-profile.half - offset, 1 + ((offset / step) & 1), Math.max(1, 4 - Math.floor(offset / 11)), size);
-  }
-  ctx.fillStyle = palette.foam;
-  ctx.fillRect(-profile.half - Math.min(length, 16), 0, Math.min(length, 16), 1);
-  if (profile.spray === "heavy" && flow > 0.55) ctx.fillRect(-profile.half - length, 3, Math.round(length * 0.48), 1);
-  ctx.restore();
-}
-
 export function drawBoardSprite(ctx, x, y, angle, board, palette, options = {}) {
   const id = board?.id ?? "foamPuff";
   const profile = getBoardVisualProfile(board);

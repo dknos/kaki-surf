@@ -1,6 +1,6 @@
 # Visual audit
 
-Date: 2026-07-20.
+Date: 2026-07-21.
 
 ## Baseline reviewed before this pass
 
@@ -27,8 +27,8 @@ The current code and assets are structured to address those points:
 - the Twilight barrel now travels visibly during its collision-safe opening grace, while mirrored edge-joined background strips and diagonal face flecks provide layered leftward parallax from the first ride frames without introducing horizontal speed rails or reversal ping-pong;
 - rider, board, wake, and air carry use signed travel direction; wildlife, pickups, and parallax keep their authored trajectories under Twilight's forward-only camera instead of flipping when Kaki turns;
 - far/mid/near boats, birds, aircraft, banners, wildlife, powerups, and a festival carrier fill the coast with bounded simulation state; every catalogued hull renders in a horizon/water-back band behind the wave, race craft stay small and distant, and intended screen travel survives camera reversals;
-- Speed has physical tiers and redundant motion/audio cues, while Flow owns the style/combo presentation;
-- Simple controls reduce the primary surface to Action plus context Trick, with optional spin, earned Turbo, and conditional Special;
+- Speed has physical tiers and redundant motion/audio cues driven by the canonical board velocity, while Flow is compact style/combo feedback only;
+- Simple controls reduce the primary surface to line choice, Action, and context Trick; spin keys and manual Turbo appear only when Advanced Controls are deliberately selected;
 - held Simple Trick or Advanced T in Twilight's critical pocket now produces a scored Tube Tuck/Soul Arch with intentionally reduced steering, live tube HUD, entry/hold hysteresis, pocket grace, deliberate re-arm, coherent exit feedback, and a short foreground fade; large air receives a clamped vertical camera pan that keeps the horizon and landing guide coherent;
 - generated atlases use compact silhouettes and local fallbacks so presentation can degrade without hiding gameplay state;
 - gameplay callouts use one active message plus a bounded priority queue, minimum readable beats, duplicate suppression, and stale-hint expiry, preventing new events from overlapping or surfacing late.
@@ -53,7 +53,7 @@ Exact provenance and prompts are in [Grok asset provenance](./GROK-ASSET-PROVENA
 
 ## Final visual status
 
-The completed production matrix contains 122 deterministic 1280 x 720 Chromium captures, including six locked Twilight travelling-break stages, separate right/left whale rides, and dedicated tube-pocket, big-air-camera, and Turbo fixtures. The refreshed 1200 x 10938 [production contact sheet](./images/qa-contact-sheet.png) contains the full set. Six additional focused responsive captures cover the tube and air fixtures at 1280 x 720, 844 x 390, and 390 x 844.
+The completed production matrix contains 128 deterministic 1280 x 720 Chromium captures. It now includes the isolated Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, and whale takeoff/apex/return alongside the existing production states. The refreshed 1200 x 11466 [production contact sheet](./images/qa-contact-sheet.png) contains the full set. Six additional focused responsive captures cover the tube and air fixtures at 1280 x 720, 844 x 390, and 390 x 844.
 
 The final review confirmed:
 
@@ -61,15 +61,15 @@ The final review confirmed:
 - the Gather/Pitch/Pour/Deep/Maximum/Collapse sequence advances the staggered columns left-to-right while each column head falls downward and its trail remains fixed; the rider can traverse at least 220 logical pixels, briefly occupy Twilight's pocket, and launch into the existing vertical camera without reversing any water animation;
 - desktop, landscape-phone, and portrait-phone fixtures keep the tube rider, big-air rider, horizon, and landing guide visible; portrait preserves the complete 16:9 shot with deliberate letterboxing;
 - dolphin, shark, whale, boards, carrier, pickups, boats, birds, and aircraft retain readable silhouettes at 384 x 216;
-- whales forced during big air remain ocean-registered and receive a surface shadow, wake, and state-specific foam instead of inheriting the rider's sky position;
+- whale breach art, collision, foam, and masking share per-phase water metadata; takeoff and return use the same canonical surface anchor, while random production whale encounters remain disabled;
 - mounted whales and Kaki now flip together after stable left/right direction commits, and the animal-assisted dismount inherits that active direction;
 - left/right travel, reversal, switch landing, wake, monotonic water contours, stable traffic travel, and reverse-parallax scenes remain directionally coherent;
 - wildlife and pickup telegraphs stay readable in normal, High Contrast, and Reduced Motion scenes;
-- the normal HUD separates physical Speed, earned Turbo fuel, and Flow, with no stale POWER meter or seam-required teaching; Turbo feedback uses a compact top instrument and short signed tail sparks rather than a horizontal rail;
+- the normal HUD shows only score, time or paws, and a compact active combo; speed is communicated through the trajectory wake, spray, pose, camera, parallax, audio, and water read instead of extra meters;
 - Simple and Advanced settings plus both touch layouts fit the 1280 x 720 landscape capture without clipping their primary controls;
 - Fleet Airshow remains horizon spectacle while its generated foam gates stay distinct from hazards;
 - a temporarily absent dolphin atlas produced a readable local fallback and no launch failure.
 
-The review also drove concrete iteration: bird/aircraft QA heights were corrected, cramped banner messages gained flexible cloth, wave-atlas rectangles and the water barcode were removed, hulls were constrained behind the break, and race craft moved to the distant horizon. The latest pass retires the pasted full-wave textures from the runtime manifest, consolidates all shipped conditions onto one collision-registered column break, restores the real world behind it, widens riding/air bounds, strengthens bidirectional traversal, starts the catch edge at x=30, and adds a trick-recharged Turbo presentation without reintroducing direction-flipping water lines. The canonical gallery is the 122-scene matrix described above; focused post-change captures and release validation are recorded separately. This is local browser evidence until the GitHub Pages cache is verified after push.
+The review also drove concrete iteration: the rider now has one path vector, continuous base-speed attraction was replaced by carried energy, all board-contact effects were consolidated into a historical trajectory wake, and the wave gained collision-queried crest, trough, contour, pocket, and power-seam structure. Whale frames now composite rear spray, body, rider, foreground water, and contact foam around one water anchor. The canonical gallery is the 128-scene matrix described above; this remains local browser evidence until a release is pushed and GitHub Pages is verified.
 
 See [QA matrix](./QA.md) for the scene coverage and [Validation results](./TEST-RESULTS.md) for automated and browser totals.

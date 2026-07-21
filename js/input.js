@@ -36,7 +36,7 @@ export const KEY_BINDINGS = Object.freeze({
 });
 
 const ADVANCED_ACTIONS = Object.freeze(["edge", "turbo", "trick1", "trick2", "trick3", "trick4"]);
-const SIMPLE_ACTIONS = Object.freeze(["edge", "turbo", "trick", "special", "spinLeft", "spinRight"]);
+const SIMPLE_ACTIONS = Object.freeze(["edge", "trick"]);
 const STEP_ACTIONS = Object.freeze([
   "edge",
   "turbo",

@@ -737,7 +737,7 @@ export class KakiSurfGame {
     const simple = this.settings.controlMode !== "advanced";
     this.host.dataset.controlMode = simple ? "simple" : "advanced";
     if (this.elements.touchSpecial) {
-      this.elements.touchSpecial.hidden = simple && !this.simulation.player.animalSpecialReady;
+      this.elements.touchSpecial.hidden = simple;
     }
   }
 
@@ -918,6 +918,50 @@ export class KakiSurfGame {
       }, true);
       this.showLayer("results");
       this.elements.topControls.hidden = true;
+      return;
+    }
+
+    if (scene === "coreSurfLab") {
+      this.qaFreeze = false;
+      this.settings.controlMode = "simple";
+      this.input.setControlMode?.("simple");
+      if ("enabled" in this.input) this.input.enabled = true;
+      this.host.dataset.controlMode = "simple";
+      this.host.dataset.coreSurfLab = "true";
+      this.selectedBoard = "foamPuff";
+      this.selectedCondition = "twilightGlass";
+      this.selectedMode = "endless";
+      this.host.dataset.condition = this.selectedCondition;
+      this.simulation.reset({
+        board: this.selectedBoard,
+        condition: this.selectedCondition,
+        mode: this.selectedMode,
+        controlMode: "simple",
+        tutorialEnabled: false,
+        worldQa: { quiet: true },
+        coreSurfLab: true,
+      });
+      this.simulation.begin();
+      Object.assign(this.simulation.player, {
+        state: "riding",
+        stateTime: 1,
+        x: 196,
+        previousX: 196,
+        face: 0.34,
+        previousFace: 0.34,
+        speed: 72,
+        travelVelocity: 16,
+        lateralVelocity: 16,
+      });
+      this.simulation.wave.curlX = -520;
+      this.simulation.wave.pressure = 0.46;
+      this.simulation.syncCanonicalMotion(0, true);
+      this.renderer.resetRunPresentation?.(this.simulation);
+      this.state = "running";
+      this.showLayer(null);
+      this.elements.topControls.hidden = true;
+      this.elements.touchControls.hidden = true;
+      this.elements.canvas.focus({ preventScroll: true });
       return;
     }
 
@@ -1194,6 +1238,31 @@ export class KakiSurfGame {
         player.travelVelocity = 24;
         player.speed = 104;
         break;
+      case "downhillRight":
+        player.travelDirection = 1;
+        player.travelVelocity = 24;
+        player.face = 0.48;
+        player.faceVelocity = 0.62;
+        player.speed = 118;
+        player.trickPose = "downFaceCarve";
+        break;
+      case "downhillLeft":
+        player.travelDirection = -1;
+        player.travelVelocity = -24;
+        player.face = 0.48;
+        player.faceVelocity = 0.62;
+        player.speed = 118;
+        player.switchStance = true;
+        player.trickPose = "downFaceCarve";
+        break;
+      case "uphill":
+        player.travelDirection = 1;
+        player.travelVelocity = 24;
+        player.face = 0.5;
+        player.faceVelocity = -0.56;
+        player.speed = 106;
+        player.trickPose = "highLineCarve";
+        break;
       case "reversal":
         player.travelDirection = -1;
         player.travelVelocity = -31;
@@ -1417,6 +1486,12 @@ export class KakiSurfGame {
       default:
         break;
     }
+    const qaMotion = this.simulation.syncCanonicalMotion(0, false);
+    if (["riding", "lip", "landing", "wobble"].includes(player.state)) {
+      player.boardAngle = qaMotion.spriteAngle;
+      player.bodyAngle = qaMotion.spriteAngle;
+    }
+    primeQaWake(this.simulation, scene === "reversal" ? 0.9 : 0);
   }
 
   destroy() {
@@ -1482,7 +1557,7 @@ function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve and rotate with arrows or WASD, use Space or Z for action, F or X for a context trick, hold Shift for trick-recharged Turbo, and press T for an available animal special."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. In Simple Controls, carve with arrows or WASD, use Space or A for action, and F or X for one context trick."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="pause-run" aria-label="Pause surfing">II</button>
@@ -1518,7 +1593,7 @@ function gameMarkup() {
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
           </dl>
-          <p class="controls-line"><b>CARVE + SPIN</b> ARROWS / STICK <b>ACTION</b> SPACE / A <b>TRICK</b> F / X <b>TURBO</b> SHIFT / L3 <b>SPECIAL</b> T / Y</p>
+          <p class="controls-line"><b>CHOOSE + CARVE</b> ARROWS / WASD <b>ACTION</b> SPACE / A <b>TRICK</b> F / X</p>
         </div>
 
         <div class="game-layer compact-layer" data-layer="pause" hidden>
@@ -1557,7 +1632,7 @@ function gameMarkup() {
             <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" aria-label="Optional clockwise spin or advanced trick two"><b>E</b><span>SPIN</span></button>
             <button class="touch-trick" type="button" data-control="trick" aria-label="Context trick"><b>TRICK</b><span>TAP / HOLD</span></button>
             <button class="touch-turbo" type="button" data-control="turbo" aria-label="Hold Turbo boost; successful landed tricks refill it"><b>TURBO</b><span>HOLD</span></button>
-            <button class="touch-special" type="button" data-control="special" aria-label="Animal special ability" hidden><b>SPECIAL</b><span>READY</span></button>
+            <button class="touch-special" type="button" data-control="special" aria-label="Advanced Twist trick; Action or Trick dismounts a ridden animal" hidden><b>T</b><span>TWIST</span></button>
             <button class="touch-action" type="button" data-control="edge" aria-label="Action: compress, pump, and pop"><b>ACTION</b><span>HOLD / RELEASE</span></button>
           </div>
         </div>
@@ -1581,7 +1656,7 @@ function gameMarkup() {
           </section>
           <section aria-labelledby="access-heading">
             <h3 id="access-heading">ACCESS</h3>
-            <label><span>CONTROLS</span><select data-setting="controlMode" aria-label="Control mode"><option value="simple">SIMPLE · ACTION + TRICK</option><option value="advanced">ADVANCED · Q E F T</option></select></label>
+            <label><span>CONTROLS</span><select data-setting="controlMode" aria-label="Control mode"><option value="simple">SIMPLE · ACTION + TRICK</option><option value="advanced">ADVANCED · Q E F T + TURBO</option></select></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedMotion"><span>REDUCED MOTION</span></label>
             <label><span>SCREEN SHAKE <output data-setting-output="screenShake">70%</output></span><input type="range" min="0" max="1" step="0.05" data-setting="screenShake" aria-label="Screen shake intensity"></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedFlash"><span>FLASH REDUCTION</span></label>
@@ -1603,6 +1678,34 @@ function gameMarkup() {
   `;
 }
 
+function primeQaWake(simulation, curve = 0) {
+  const player = simulation.player;
+  const contact = ["riding", "lip", "landing", "wobble"].includes(player.state)
+    && !player.animalMount;
+  for (const sample of player.wakeSamples ?? []) sample.active = false;
+  if (!contact || !Array.isArray(player.wakeSamples)) return;
+  const count = Math.min(player.wakeSamples.length, 42);
+  const perpendicularX = -player.motionVY / Math.max(1, player.motionSpeed);
+  const perpendicularY = player.motionVX / Math.max(1, player.motionSpeed);
+  for (let index = 0; index < count; index += 1) {
+    const age = (count - index - 1) / 60;
+    const bend = Math.sin((index / Math.max(1, count - 1)) * Math.PI) * curve * 18;
+    const sample = player.wakeSamples[index];
+    sample.active = true;
+    sample.worldX = player.tailX + simulation.cameraWorldX
+      - player.motionVX * age
+      + perpendicularX * bend;
+    sample.y = player.tailY - player.motionVY * age + perpendicularY * bend;
+    sample.vx = -player.motionVX;
+    sample.vy = -player.motionVY;
+    sample.sourceVX = player.motionVX;
+    sample.sourceVY = player.motionVY;
+    sample.speed = player.motionSpeed;
+    sample.age = age;
+  }
+  player.wakeSampleCursor = count % player.wakeSamples.length;
+}
+
 export function qaWorldOverride(scene) {
   const wildlife = {
     dolphinApproach: { kind: "dolphin", phase: "approach", screenX: 176, y: 128, direction: 1 },
@@ -1611,15 +1714,17 @@ export function qaWorldOverride(scene) {
     sharkApproach: { kind: "shark", phase: "telegraph", screenX: 190, y: 133, direction: 1 },
     sharkNearMiss: { kind: "shark", phase: "crossing", screenX: 222, y: 134, direction: 1 },
     sharkCollision: { kind: "shark", phase: "crossing", screenX: 232, y: 128, direction: 1 },
-    whaleDistant: { kind: "whale", phase: "distant", screenX: 270, y: 116, direction: -1 },
-    whaleBreach: { kind: "whale", phase: "breach", screenX: 270, y: 112, direction: -1 },
-    whaleRamp: { kind: "whale", phase: "ramp", screenX: 244, y: 126, direction: -1 },
-    whaleRide: { kind: "whale", phase: "mounted", screenX: 232, y: 137, direction: 1 },
-    whaleRideLeft: { kind: "whale", phase: "mounted", screenX: 232, y: 137, direction: -1 },
-    whaleSplash: { kind: "whale", phase: "splash", screenX: 248, y: 126, direction: 1 },
+    whaleDistant: { kind: "whale", phase: "distant", phaseTime: 0.8, screenX: 270, y: 136, direction: -1 },
+    whaleBreachStart: { kind: "whale", phase: "breach", phaseTime: 0, screenX: 270, y: 136, direction: -1 },
+    whaleBreach: { kind: "whale", phase: "breach", phaseTime: 0.725, screenX: 270, y: 136, direction: -1 },
+    whaleBreachReturn: { kind: "whale", phase: "breach", phaseTime: 1.45, screenX: 270, y: 136, direction: -1 },
+    whaleRamp: { kind: "whale", phase: "ramp", phaseTime: 0.8, screenX: 244, y: 136, direction: -1 },
+    whaleRide: { kind: "whale", phase: "mounted", phaseTime: 1.1, screenX: 232, y: 137, direction: 1 },
+    whaleRideLeft: { kind: "whale", phase: "mounted", phaseTime: 1.1, screenX: 232, y: 137, direction: -1 },
+    whaleSplash: { kind: "whale", phase: "splash", phaseTime: 0.45, screenX: 248, y: 136, direction: 1 },
     dolphinReduced: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
     sharkHighContrast: { kind: "shark", phase: "telegraph", screenX: 190, y: 133, direction: 1 },
-    whaleReduced: { kind: "whale", phase: "breach", screenX: 270, y: 112, direction: -1 },
+    whaleReduced: { kind: "whale", phase: "breach", phaseTime: 0.725, screenX: 270, y: 136, direction: -1 },
     dolphinGates: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
     starSave: { kind: "shark", phase: "crossing", screenX: 222, y: 132, direction: 1 },
   }[scene];

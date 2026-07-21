@@ -3,6 +3,7 @@ import { drawPixelText } from "./pixel-font.js";
 import { drawAtlasFrame } from "./asset-drawing.js";
 import { isBoatKind, WORLD_LAYER_CONFIG } from "./world-catalog.js";
 import { projectWorldX } from "./world-collision.js";
+import { whaleForegroundMask, whaleFrameMetadata } from "./whale-contract.js";
 
 export { drawAtlasFrame } from "./asset-drawing.js";
 
@@ -30,7 +31,6 @@ const POWERUP_HALO = Object.freeze({
   starFoam: "starHalo",
 });
 
-const ACTIVE_POWERUP_KINDS = Object.freeze(["mangoRush", "moonPop", "starFoam"]);
 const CARRIER_ACTIVITY_PHASES = new Set(["deckActivity", "launch", "airshow"]);
 const BIRD_SCATTER_PHASES = new Set(["scatter", "dodge"]);
 const DROP_DRAW_PHASES = new Set(["dropApproach", "dropDrop"]);
@@ -208,16 +208,23 @@ export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, f
   world.forEachWildlife((entity) => {
     const front = entity.phase === "dismount" || entity.phase === "splash";
     if (front !== foreground) return;
-    const x = projectWorldX(lerp(entity.previousWorldX, entity.worldX, alpha), camera, 1);
-    const y = lerp(entity.previousY, entity.y, alpha);
+    let x = projectWorldX(lerp(entity.previousWorldX, entity.worldX, alpha), camera, 1);
+    let y = lerp(entity.previousY, entity.y, alpha);
     const [family, frame] = wildlifeFrame(entity);
-    const scale = entity.kind === "whale" ? 1 : entity.kind === "dolphin" ? 0.9 : 0.82;
+    let scale = entity.kind === "whale" ? 1 : entity.kind === "dolphin" ? 0.9 : 0.82;
+    let rotation = 0;
     if (entity.kind === "whale") {
-      drawWhaleWaterContact(ctx, simulation, entity, x, y, palette, settings);
+      const metadata = whaleFrameMetadata(entity);
+      drawWhaleRearSpray(ctx, entity, x, metadata, palette, settings);
+      x += metadata.drawAnchor.x;
+      y = metadata.drawAnchor.y;
+      scale = metadata.phaseScale;
+      rotation = metadata.rotation;
     }
     const drawn = drawAtlasFrame(ctx, assets, family, frame, x, y, {
       flipX: entity.direction < 0,
       scale,
+      rotation,
       alpha: entity.phase === "distant" ? 0.48 : 1,
     });
     if (!drawn) drawWildlifeFallback(ctx, entity, x, y, palette);
@@ -239,21 +246,52 @@ export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, f
   });
 }
 
-function drawWhaleWaterContact(ctx, simulation, entity, x, y, palette, settings = {}) {
-  const crest = Number(simulation?.wave?.crestY?.(x));
-  const waterY = clamp(
-    Math.max(y + 18, Number.isFinite(crest) ? crest + 24 : 106),
-    104,
-    178,
-  );
+export function drawWorldWildlifeContact(ctx, simulation, palette, alpha = 1, settings = {}) {
+  const world = simulation?.world;
+  if (!world?.forEachWildlife) return;
+  const camera = interpolatedCamera(world, alpha);
+  world.forEachWildlife((entity) => {
+    if (entity.kind !== "whale") return;
+    const metadata = whaleFrameMetadata(entity);
+    const baseX = projectWorldX(lerp(entity.previousWorldX, entity.worldX, alpha), camera, 1);
+    const x = baseX + metadata.foamOrigin.x;
+    const waterY = metadata.foamOrigin.y;
+    const mask = whaleForegroundMask(metadata);
+    const width = mask.halfWidth;
+    const rippleSeed = Number(entity.eventSeed) || 0;
+    ctx.save();
+    // This is the foreground water mask. It deliberately covers the lower
+    // body before contact foam is added, so no phase can hover over its anchor.
+    ctx.fillStyle = palette.waterDeep;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x - width), Math.round(waterY + 2));
+    for (let step = 0; step <= 8; step += 1) {
+      const px = x - width + width * 2 * step / 8;
+      const ripple = ((step * 7 + rippleSeed) % 5) - 2;
+      ctx.lineTo(Math.round(px), Math.round(waterY + ripple));
+    }
+    ctx.lineTo(Math.round(x + width - 5), Math.round(waterY + mask.depth));
+    ctx.lineTo(Math.round(x - width + 7), Math.round(waterY + mask.depth - 1));
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = palette.waterLight;
+    ctx.globalAlpha = 0.34;
+    ctx.fillRect(Math.round(x - width + 5), Math.round(waterY + 2), Math.round(width * 0.54), 1);
+    ctx.fillRect(Math.round(x + 2), Math.round(waterY + 3), Math.round(width * 0.64), 1);
+    drawWhaleContactFoam(ctx, entity, x, waterY, palette, settings);
+    ctx.restore();
+  });
+}
+
+function drawWhaleContactFoam(ctx, entity, x, waterY, palette, settings = {}) {
   const phase = String(entity.phase ?? "distant");
   const foamy = WHALE_FOAM_PHASES.has(phase) || phase === "ramp" || phase === "mounted";
   const pulse = settings.reducedMotion ? 0 : Math.round(Math.sin(entity.phaseTime * 5) * 2);
-  ctx.save();
-  ctx.fillStyle = palette.deepInk;
-  ctx.globalAlpha = phase === "distant" ? 0.28 : 0.42;
-  ctx.fillRect(Math.round(x - 30), Math.round(waterY), 60, 3);
-  ctx.fillRect(Math.round(x - 20), Math.round(waterY + 3), 40, 2);
+  ctx.fillStyle = palette.waterLight;
+  ctx.globalAlpha = phase === "distant" ? 0.18 : 0.36;
+  ctx.fillRect(Math.round(x - 28), Math.round(waterY), 20, 1);
+  ctx.fillRect(Math.round(x + 5), Math.round(waterY + 1), 25, 1);
   if (foamy) {
     ctx.fillStyle = palette.foamShade;
     ctx.globalAlpha = 0.76;
@@ -263,6 +301,20 @@ function drawWhaleWaterContact(ctx, simulation, entity, x, y, palette, settings 
     ctx.globalAlpha = 0.82;
     ctx.fillRect(Math.round(x - 22), Math.round(waterY - 4), 13, 2);
     ctx.fillRect(Math.round(x + 14 + pulse), Math.round(waterY - 3), 10, 2);
+  }
+}
+
+function drawWhaleRearSpray(ctx, entity, x, metadata, palette, settings = {}) {
+  if (!WHALE_FOAM_PHASES.has(entity.phase)) return;
+  const amount = settings.reducedMotion ? 3 : 6;
+  ctx.save();
+  ctx.fillStyle = palette.foamShade;
+  ctx.globalAlpha = 0.58;
+  for (let index = 0; index < amount; index += 1) {
+    const direction = entity.direction || 1;
+    const dx = direction * (-18 + index * 7);
+    const lift = 4 + ((index * 5 + Math.floor(entity.phaseTime * 12)) % 13);
+    ctx.fillRect(Math.round(x + dx), Math.round(metadata.foamOrigin.y - lift), index % 3 === 0 ? 2 : 1, 2);
   }
   ctx.restore();
 }
@@ -289,28 +341,6 @@ export function drawWorldPowerups(ctx, simulation, assets, palette, alpha = 1) {
       });
     }
   });
-}
-
-export function drawActivePowerupHud(ctx, simulation, assets, palette) {
-  const bonuses = simulation?.world?.bonuses;
-  if (!bonuses) return;
-  let slot = 0;
-  for (const kind of ACTIVE_POWERUP_KINDS) {
-    const bonus = bonuses[kind];
-    if (!bonus?.active) continue;
-    const x = 246 + slot * 25;
-    const y = 15;
-    ctx.fillStyle = palette.deepInk;
-    ctx.fillRect(x - 11, y - 11, 22, 22);
-    const drawn = drawAtlasFrame(ctx, assets, "powerups", kind, x, y, { scale: 0.78 });
-    if (!drawn) drawPowerupFallback(ctx, kind, x, y, palette, 0.72);
-    ctx.fillStyle = palette.foamShade;
-    const fill = kind === "mangoRush"
-      ? clamp(bonus.remaining / 4.5, 0, 1)
-      : clamp(bonus.charges, 0, 1);
-    ctx.fillRect(x - 9, y + 9, Math.round(18 * fill), 2);
-    slot += 1;
-  }
 }
 
 function interpolatedCamera(world, alpha) {

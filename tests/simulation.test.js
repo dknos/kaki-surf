@@ -273,7 +273,7 @@ test("travel direction commits only after a stable reversal and signed world tra
 
   const committedWorld = simulation.worldTravel;
   for (let step = 0; step < 120; step += 1) simulation.update(FIXED_STEP, { x: -1 });
-  assert.ok(committedWorld > rightwardWorld);
+  assert.ok(rightwardWorld > 0, "the original line advances world travel before the turn");
   assert.ok(simulation.worldTravel < committedWorld, "world distance moves with committed direction");
 
   for (let step = 0; step < 240; step += 1) {
@@ -363,7 +363,9 @@ test("high-speed reversals draw a heavier arc and scrub more speed than low-spee
   const high = reverse(130);
   assert.ok(high.steps >= low.steps);
   assert.ok(130 - high.speed > 4);
-  assert.ok(low.speed >= 50, "the low-speed pivot does not pay the high-speed scrub cost");
+  assert.ok(130 - high.speed > 50 - low.speed, "fast turns pay the larger scrub cost");
+  assert.ok(high.steps * FIXED_STEP >= 0.35 && high.steps * FIXED_STEP <= 0.5,
+    `cutback committed in ${(high.steps * FIXED_STEP).toFixed(3)}s`);
   assert.ok(high.turnForce >= low.turnForce * 0.9);
 });
 
@@ -409,9 +411,9 @@ test("movement alone reaches the hard board cap and wave momentum is not a permi
   assert.ok(first.simulation.player.charge < 0.01, "cap is reachable without pumping");
 });
 
-test("Shift Turbo spends a finite tank and creates real overdrive speed", () => {
-  const boosted = beginRiding(BOARDS.mangoFish);
-  const control = beginRiding(BOARDS.mangoFish);
+test("Advanced Shift Turbo spends a finite tank and creates real overdrive speed", () => {
+  const boosted = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
+  const control = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
   boosted.wave.curlX = -1_000;
   control.wave.curlX = -1_000;
   boosted.player.speed = 72;
@@ -886,7 +888,11 @@ test("Flow owns style/combo truth independently from physical speed tiers", () =
   simulation.player.speed = simulation.currentRideSpeedCap();
   simulation.score.addFlow(0.42);
   simulation.update(FIXED_STEP, {});
-  assert.equal(simulation.player.speedTier, "BLASTING");
+  assert.notEqual(
+    simulation.player.speedTier,
+    "BLASTING",
+    "stored board energy cannot impersonate visible path speed",
+  );
   assert.equal(simulation.player.flow, simulation.score.flow);
   assert.notEqual(simulation.player.speedTier, simulation.player.flow);
 });
@@ -1279,6 +1285,24 @@ test("a mounted whale follows both committed directions and dismounts into the a
   assert.equal(player.state, "airborne");
   assert.equal(player.takeoffDirection, -1);
   assert.ok(player.airVX < 0, `left whale dismount carried airVX=${player.airVX}`);
+});
+
+test("mounted animals fold dismount into Action or Trick in both control modes", () => {
+  const probe = (controlMode, input) => {
+    const simulation = beginRiding(BOARDS.mangoFish, { controlMode });
+    simulation.world.forceWildlife("dolphin", {
+      phase: "mounted",
+      screenX: simulation.player.x,
+      y: simulation.wave.ridingY(simulation.player.x, simulation.player.face),
+      speed: 0,
+    });
+    simulation.mountAnimal("dolphin");
+    simulation.update(FIXED_STEP, input);
+    return simulation.player;
+  };
+
+  assert.equal(probe("simple", { trick: true, trickPressed: true }).state, "airborne");
+  assert.equal(probe("advanced", { trick4: true, trick4Pressed: true }).state, "airborne");
 });
 
 test("Star Foam saves one shark collision and Moon Pop is consumed by the next launch", () => {

@@ -8,6 +8,14 @@ import {
   TUNING,
 } from "./config.js";
 import { clamp, damp, shortestAngle, smoothstep, TAU } from "./math.js";
+import {
+  boardTailContact,
+  createWakeSample,
+  deriveAirMotion,
+  deriveCanonicalMotion,
+  WAKE_SAMPLE_CAPACITY,
+  WAKE_SAMPLE_LIFETIME,
+} from "./motion.js";
 import { ScoreSystem } from "./scoring.js";
 import { SurfSchool } from "./tutorial.js";
 import { AerialTrickSession, normalizeTrickInput } from "./tricks.js";
@@ -149,6 +157,7 @@ export class SurfSimulation {
     mode = this.mode,
     seed = this.seed,
     worldQa = null,
+    coreSurfLab = false,
   } = {}) {
     this.seed = Number.isFinite(seed) ? seed >>> 0 : this.seed;
     this.board = typeof board === "string" ? BOARDS[board] ?? BOARDS.foamPuff : board;
@@ -159,6 +168,8 @@ export class SurfSimulation {
         : CONDITIONS.goldenCoast;
     this.mode = resolveRunMode(mode);
     this.modeId = this.mode.id;
+    this.coreSurfLab = Boolean(coreSurfLab);
+    this.coreSurfLabTelemetry = true;
     this.controlMode = normalizeControlMode(controlMode);
     this.assists = {
       steering: Boolean(assists.steering),
@@ -220,7 +231,13 @@ export class SurfSimulation {
 
     input = normalizeTrickInput(input, this._normalizedInput);
     this.captureSimpleControls(dt, input);
-    if (input.specialPressed && this.player.animalMount) {
+    const contextualDismount = input.edgePressed
+      || input.trickPressed
+      || input.trick1Pressed
+      || input.trick2Pressed
+      || input.trick3Pressed
+      || input.trick4Pressed;
+    if ((input.specialPressed || contextualDismount) && this.player.animalMount) {
       this.world.releaseMountedAnimal(this.player.animalMount, "special");
     }
 
@@ -268,9 +285,13 @@ export class SurfSimulation {
       dt,
       waveSpeed,
       this.tuning.curlSpeed * this.endlessThreatScale,
-      waveSpeed * player.travelDirection,
+      waveSpeed * player.motionDirection,
       threatContext,
     );
+    if (this.coreSurfLab) {
+      this.wave.curlX = -520;
+      this.wave.pressure = 0.46;
+    }
     this.worldTravel = this.wave.worldTravel;
     player.worldTravel = this.worldTravel;
     // Legacy level profiles still use their signed travel camera. Twilight's
@@ -302,10 +323,13 @@ export class SurfSimulation {
 
     this.applyTurboAcceleration(dt);
     this.applyAnimalRideTuning(dt);
+    this.syncCanonicalMotion(dt, true);
+    this.updateWakeHistory(dt);
     this.updateWorld(dt, previousWorldTravel, previousCameraWorldX);
+    if (this.coreSurfLab) this.score.reset();
 
     this.updateComboCue();
-    player.speedTier = speedTierForSpeed(player.speed);
+    player.speedTier = speedTierForSpeed(player.motionSpeed || player.speed);
     player.flow = this.score.flow;
     this.updateTutorialSignals(dt, input);
 
@@ -315,7 +339,7 @@ export class SurfSimulation {
   }
 
   updateEndlessEscalation() {
-    if (this.mode.timed) return;
+    if (this.mode.timed || this.coreSurfLab) return;
     const duration = Math.max(1, Number(this.tuning.endlessSetDuration) || 36);
     const maxSet = Math.max(1, Math.floor(Number(this.tuning.endlessMaxSet) || 1));
     const nextSet = Math.min(maxSet, Math.floor(this.activeTime / duration) + 1);
@@ -354,13 +378,13 @@ export class SurfSimulation {
     context.previousWorldTravel = previousWorldTravel;
     context.cameraWorldX = this.cameraWorldX;
     context.previousCameraWorldX = previousCameraWorldX;
-    context.direction = player.travelDirection;
+    context.direction = player.motionDirection;
     context.player.collisionX = airborne ? player.airX : player.x;
     context.player.previousCollisionX = airborne ? player.previousAirX : player.previousX;
     context.player.collisionY = currentY;
     context.player.previousCollisionY = this._worldPreviousPlayerY;
-    context.player.vx = airborne ? player.airVX : player.travelVelocity;
-    context.player.vy = airborne ? player.airVY : player.faceVelocity * this.wave.faceDepth(player.x);
+    context.player.vx = player.motionVX;
+    context.player.vy = player.motionVY;
     context.player.radius = 7;
     context.player.state = player.state;
     context.player.allowWhaleRide = player.state !== "wipeout" && !this.complete;
@@ -381,6 +405,81 @@ export class SurfSimulation {
     this.world.consumeInteractions((signal) => this.handleWorldInteraction(signal));
     this.world.consumeEvents((signal) => this.handleWorldEvent(signal));
     this._worldPreviousPlayerY = currentY;
+  }
+
+  /** Keep every presentation consumer on the same physical motion. */
+  syncCanonicalMotion(dt = 0, alignBoard = false) {
+    const player = this.player;
+    const airborne = player.state === "airborne" || player.state === "wipeout";
+    const gradient = airborne ? null : this.wave.surfaceGradientAt(player.x, player.face);
+    const motion = airborne
+      ? deriveAirMotion(player.airVX, player.airVY, player.motionDirection)
+      : deriveCanonicalMotion(
+        player.travelVelocity,
+        player.faceVelocity,
+        gradient,
+        player.motionDirection,
+      );
+    player.motionVX = motion.vx;
+    player.motionVY = motion.vy;
+    player.motionSpeed = motion.speed;
+    player.motionHeading = motion.heading;
+    player.motionDirection = motion.direction;
+    player.downhillComponent = motion.downhill;
+    player.uphillComponent = motion.uphill;
+    if (!airborne) {
+      player.slopeDrive = motion.downhill - motion.uphill;
+      player.surfaceGradientX = gradient.x;
+      player.surfaceGradientFace = gradient.face;
+      if (alignBoard) {
+        // The board is the physical tangent indicator. Keep it exact; body
+        // lean may ease for character appeal, but the board cannot lag behind
+        // the path and briefly point across its own wake.
+        player.boardAngle = motion.spriteAngle;
+        player.bodyAngle = damp(player.bodyAngle, motion.spriteAngle, 11, dt);
+      }
+      const surfaceY = this.wave.ridingY(player.x, player.face);
+      const tail = boardTailContact(
+        player.x,
+        surfaceY + 1,
+        motion.heading,
+        boardHalfLength(this.board),
+      );
+      player.tailX = tail.x;
+      player.tailY = tail.y;
+    }
+    return motion;
+  }
+
+  updateWakeHistory(dt) {
+    const player = this.player;
+    for (const sample of player.wakeSamples) {
+      if (!sample.active) continue;
+      sample.age += dt;
+      if (sample.age >= WAKE_SAMPLE_LIFETIME) sample.active = false;
+    }
+
+    const contact = ["riding", "lip", "landing", "wobble"].includes(player.state)
+      && !player.animalMount;
+    if (!contact || player.motionSpeed < 8) {
+      player.wakeSampleClock = 0;
+      return;
+    }
+    player.wakeSampleClock += dt;
+    const interval = 1 / 60;
+    if (player.wakeSampleClock + 1e-9 < interval) return;
+    player.wakeSampleClock %= interval;
+    const sample = player.wakeSamples[player.wakeSampleCursor];
+    sample.active = true;
+    sample.worldX = player.tailX + this.cameraWorldX;
+    sample.y = player.tailY;
+    sample.vx = -player.motionVX;
+    sample.vy = -player.motionVY;
+    sample.sourceVX = player.motionVX;
+    sample.sourceVY = player.motionVY;
+    sample.speed = player.motionSpeed;
+    sample.age = 0;
+    player.wakeSampleCursor = (player.wakeSampleCursor + 1) % player.wakeSamples.length;
   }
 
   upcomingWildlife() {
@@ -405,7 +504,10 @@ export class SurfSimulation {
     const player = this.player;
     const rideable = ["riding", "lip", "landing", "wobble"].includes(player.state);
     const wasActive = Boolean(player.turboActive);
-    const requested = Boolean(input.turbo) && rideable && !player.animalMount;
+    const requested = this.controlMode === "advanced"
+      && Boolean(input.turbo)
+      && rideable
+      && !player.animalMount;
     const drain = finiteTuning(
       this.tuning.turboDrainPerSecond,
       TUNING.turboDrainPerSecond,
@@ -834,14 +936,8 @@ export class SurfSimulation {
         this.emit("powerLineLeave", { zone: speedPotential.zone });
       }
     }
-    const gradient = typeof this.wave.surfaceGradientAt === "function"
-      ? this.wave.surfaceGradientAt(player.x, player.face)
-      : { x: Math.tan(this.wave.slopeAt(player.x, player.face)), face: this.wave.faceDepth(player.x) };
-    const verticalRate = gradient.x * player.travelVelocity + gradient.face * player.faceVelocity;
-    const pathRate = Math.hypot(player.travelVelocity, gradient.face * player.faceVelocity, 1);
-    player.slopeDrive = clamp(verticalRate / pathRate, -1, 1);
-    player.surfaceGradientX = gradient.x;
-    player.surfaceGradientFace = gradient.face;
+    const motion = this.syncCanonicalMotion();
+    player.slopeDrive = motion.downhill - motion.uphill;
 
     const previousWaveMomentum = Number.isFinite(player.waveMomentum)
       ? clamp(player.waveMomentum, 0, 1)
@@ -922,25 +1018,25 @@ export class SurfSimulation {
     const pocketRisk = Number.isFinite(speedPotential.risk)
       ? speedPotential.risk
       : this.wave.pocketRisk(player.x);
-    const targetSpeed = this.tuning.speed * this.board.acceleration
-      + speedPotential.pocket * 4;
-    const glideResponse = player.maneuver.id === "floater"
-      ? 0.42
-      : finiteTuning(this.tuning.rideSpeedResponse, TUNING.rideSpeedResponse);
-    player.speed = damp(player.speed, targetSpeed, glideResponse * 0.62, dt);
     const worldModifiers = this.world.getModifiers();
+    // Speed is carried energy. Gravity does the meaningful work; a quiet
+    // traverse loses only a little, while climbing and reversals spend what
+    // the previous drop earned. There is no invisible attraction to a target.
+    const traverseRatio = 1 - Math.abs(player.slopeDrive);
+    const passiveDrag = finiteTuning(this.tuning.rideEnergyDrag, TUNING.rideEnergyDrag)
+      * (player.maneuver.id === "floater" ? 0.45 : 1)
+      * (0.78 + traverseRatio * 0.22);
     player.speed += (
       finiteTuning(this.tuning.downhillAcceleration, TUNING.downhillAcceleration)
         * Math.max(0, player.slopeDrive)
       - finiteTuning(this.tuning.uphillSpeedCost, TUNING.uphillSpeedCost)
         * Math.max(0, -player.slopeDrive)
         * worldModifiers.uphillLossScale
-      + finiteTuning(this.tuning.traverseDrive, TUNING.traverseDrive)
-        * (1 - Math.abs(player.slopeDrive))
+      - passiveDrag
     ) * this.board.acceleration * dt;
     player.speed += this.tuning.wavePush
       * speedPotential.acceleration
-      * 0.22
+      * 0.08
       * this.board.acceleration
       * dt;
     if (player.landingCarryTimer > 0) {
@@ -964,11 +1060,11 @@ export class SurfSimulation {
       });
     }
 
-    const carveLean = inputY * 0.24 + player.faceVelocity * 0.16;
-    const horizontalLean = inputX * 0.08;
+    const finalMotion = this.syncCanonicalMotion();
+    const carveLean = inputY * 0.09 + player.faceVelocity * 0.05;
     const surfaceAngle = this.wave.slopeAt(player.x, player.face);
-    player.boardAngle = damp(player.boardAngle, surfaceAngle + carveLean + horizontalLean, 10.5, dt);
-    player.bodyAngle = damp(player.bodyAngle, player.boardAngle - carveLean * 0.42, 8.5, dt);
+    player.boardAngle = finalMotion.spriteAngle;
+    player.bodyAngle = damp(player.bodyAngle, finalMotion.spriteAngle - carveLean * 0.25, 11, dt);
     updateLandingPreview(player, surfaceAngle, this.landingBands(), false);
 
     const multiplier = this.currentMultiplier();
@@ -2324,6 +2420,18 @@ function createPlayer() {
     slopeDrive: 0,
     surfaceGradientX: 0,
     surfaceGradientFace: 0,
+    motionVX: 12,
+    motionVY: 0,
+    motionSpeed: 12,
+    motionHeading: 0,
+    motionDirection: 1,
+    downhillComponent: 0,
+    uphillComponent: 0,
+    tailX: 195,
+    tailY: 128,
+    wakeSamples: Array.from({ length: WAKE_SAMPLE_CAPACITY }, createWakeSample),
+    wakeSampleCursor: 0,
+    wakeSampleClock: 0,
     boardAngle: 0,
     bodyAngle: 0,
     trickPose: "neutral",
@@ -2431,6 +2539,23 @@ function resetPlayer(
   player.slopeDrive = 0;
   player.surfaceGradientX = 0;
   player.surfaceGradientFace = 0;
+  player.motionVX = 12;
+  player.motionVY = 0;
+  player.motionSpeed = 12;
+  player.motionHeading = 0;
+  player.motionDirection = 1;
+  player.downhillComponent = 0;
+  player.uphillComponent = 0;
+  player.tailX = player.x - 17;
+  player.tailY = 128;
+  player.wakeSampleCursor = 0;
+  player.wakeSampleClock = 0;
+  for (const sample of player.wakeSamples) {
+    sample.active = false;
+    sample.age = 0;
+    sample.sourceVX = 0;
+    sample.sourceVY = 0;
+  }
   player.boardAngle = 0;
   player.bodyAngle = 0;
   player.trickPose = "neutral";
@@ -2705,6 +2830,12 @@ function finiteOr(value, fallback, min, max) {
 
 function finiteTuning(value, fallback) {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function boardHalfLength(board) {
+  if (board?.id === "moonLog") return 22;
+  if (board?.id === "mangoFish") return 16;
+  return 17;
 }
 
 export { EMPTY_INPUT };

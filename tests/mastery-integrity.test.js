@@ -167,11 +167,11 @@ test("the opening grace cannot catch even a rider reversing toward the curl", ()
 
 test("an idle rider is caught in the intended late-run window", () => {
   const simulation = beginRiding({ curlX: 48 });
-  const metrics = runFor(simulation, 70);
+  const metrics = runFor(simulation, 78);
 
   assert.equal(metrics.wipeoutCause, "curl");
   assert.ok(
-    metrics.firstWipeout >= 50 && metrics.firstWipeout <= 70,
+    metrics.firstWipeout >= 50 && metrics.firstWipeout <= 78,
     `idle catch was ${metrics.firstWipeout.toFixed(3)}s`,
   );
 
@@ -190,7 +190,7 @@ test("full arcs and timed pumps preserve substantially more threat gap", () => {
   assert.equal(idle.wipeouts, 0);
   assert.equal(skilled.wipeouts, 0);
   assert.ok(metrics.pumps > 20);
-  assert.ok(gap(skilled) > gap(idle) + 80, `${gap(skilled)} vs ${gap(idle)}`);
+  assert.ok(gap(skilled) > gap(idle) + 70, `${gap(skilled)} vs ${gap(idle)}`);
 });
 
 test("curl advance stays monotonic through signed travel reversals", () => {

@@ -8,6 +8,8 @@ function rider(overrides = {}) {
     state: "riding",
     faceVelocity: 0,
     slopeDrive: 0,
+    turnForce: 0,
+    reversalCount: 0,
     rotationAccum: 0,
     charge: 0,
     landingPreview: { error: 1, bands: { recovery: 0.8 } },
@@ -27,7 +29,7 @@ test("Surf School never advances from elapsed time alone", () => {
   assert.equal(school.snapshot().progress, 0);
 });
 
-test("Surf School requires the ordered drop, carve, launch, rotation, trick, and landing actions", () => {
+test("Surf School requires the ordered drop, climb, cutback, launch, trick, and landing actions", () => {
   const school = new SurfSchool({ enabled: true });
   const player = rider();
   const step = (input = {}, dt = 1 / 120) => school.update(dt, {
@@ -43,15 +45,15 @@ test("Surf School requires the ordered drop, carve, launch, rotation, trick, and
 
   Object.assign(player, { faceVelocity: -0.28, slopeDrive: -0.4 });
   for (let index = 0; index < 32; index += 1) step({ y: -1 });
+  assert.equal(school.snapshot().id, "cutback");
+
+  Object.assign(player, { turnForce: 1, reversalCount: 1 });
+  step({ x: -1 });
   assert.equal(school.snapshot().id, "launch");
 
   school.observe("launch", { strength: 1 });
   player.state = "airborne";
   step();
-  assert.equal(school.snapshot().id, "rotate");
-
-  player.rotationAccum = Math.PI;
-  step({ x: 1 });
   assert.equal(school.snapshot().id, "trick");
 
   school.observe("trickStarted", { id: "frontRailGrab" });
@@ -77,6 +79,8 @@ test("a wipeout clears stale airborne milestones without erasing completed lesso
   for (let index = 0; index < 32; index += 1) {
     school.update(1 / 120, { elapsed: 2, player, input: { y: -1 } });
   }
+  Object.assign(player, { turnForce: 1, reversalCount: 1 });
+  school.update(1 / 120, { elapsed: 2, player, input: { x: -1 } });
   school.observe("launch");
   school.observe("trickStarted");
   school.observe("wipeout");

@@ -188,7 +188,7 @@ export class SurfAudio {
     const player = simulation.player;
     const risk = player.speedPotential?.risk ?? simulation.wave.pocketRisk(player.x);
     const potential = player.speedPotential?.potential ?? 0.5;
-    const speed = Number(player.speed ?? 0);
+    const speed = Number(player.motionSpeed ?? player.speed ?? 0);
     const combo = Number(simulation.score?.combo ?? simulation.currentMultiplier?.() ?? 1);
     const airborne = player.state === "airborne";
     const tubeActive = Boolean(player.tubeRide?.active);
