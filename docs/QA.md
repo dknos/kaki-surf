@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **200/200 tests pass** and **33 JavaScript modules pass syntax checking**.
+Current result: **201/201 tests pass** and **33 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 

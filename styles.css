@@ -403,6 +403,15 @@ canvas:focus-visible,
   color: var(--gold);
 }
 
+.build-version {
+  display: inline-block;
+  margin-left: 0.45em;
+  color: var(--foam-shadow);
+  font-size: 0.68em;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
 .compact-layer {
   display: grid;
   place-items: center;

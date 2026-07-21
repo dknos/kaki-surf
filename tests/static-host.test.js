@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
+import { GAME_VERSION, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
 import { GENERATED_ASSET_MANIFEST } from "../js/asset-manifest.js";
 import { createKakiSurf } from "../js/integration-adapter.js";
 
@@ -101,6 +101,15 @@ test("browser entry points do not depend on bundler or generated build output", 
 
   const packageJson = JSON.parse(read(path.join(ROOT, "package.json")));
   assert.equal(packageJson.type, "module", "the static host should execute source files as native modules");
+});
+
+test("the main menu exposes the package version as a quiet build stamp", () => {
+  const packageJson = JSON.parse(read(path.join(ROOT, "package.json")));
+  const gameSource = read(path.join(ROOT, "js", "game.js"));
+
+  assert.equal(GAME_VERSION, packageJson.version);
+  assert.match(gameSource, /class="build-version"/);
+  assert.match(gameSource, /class="build-version"[^>]*>v\$\{GAME_VERSION\}<\/span>/);
 });
 
 test("integration adapter preserves the lifecycle surface and local dynamic import", () => {
