@@ -2,7 +2,7 @@
 
 Date: 2026-07-20.
 
-This document distinguishes automated truth from browser-capture evidence. The deterministic gallery and capture pipeline contain 120 checked-in browser states: six locked Twilight travelling-break stages plus dedicated rideable-tube and big-air-camera scenes. The refreshed [contact sheet](./images/qa-contact-sheet.png) contains the complete normalized set.
+This document distinguishes automated truth from browser-capture evidence. The deterministic gallery and capture pipeline contain 120 checked-in browser states: six locked Twilight travelling-break stages plus dedicated rideable-tube and big-air-camera scenes. The refreshed [contact sheet](./images/qa-contact-sheet.png) contains the complete normalized set. A separate real-input chase sequence under `images/qa-chase` proves the temporal behavior that static fixtures cannot: lead the barrel offscreen, cut back across the face, then let the break pursue back.
 
 ## Automated gate
 
@@ -14,14 +14,14 @@ npm run check
 git diff --check
 ```
 
-Current result: **176/176 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
+Current result: **179/179 tests pass** and **30 JavaScript modules pass syntax checking**. Detailed coverage is in [Validation results](./TEST-RESULTS.md).
 
 ## Browser capture matrix
 
 | Group | Required scenes | What must be visible | Status |
 | --- | --- | --- | --- |
 | Entry/UI | Endless/Score Attack selector, menu, settings Simple, settings Advanced, six-step Surf School, results | Immediate start action before customization on portrait; mode-specific labels and records; Twilight travelling break and Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or overlapping long result rows | Pass |
-| Core ride | Neutral, right travel, left travel, committed reversal, downhill, all-condition column break, six Twilight stages, rideable tube, max speed, pump | Rider-facing and wake follow signed travel while the fixed-grid break never mirrors; held steering crosses most of the screen, Gather/Pitch/Pour/Deep/Maximum/Collapse advances gravity heads left-to-right while revealed contrail tiles stay fixed, the passed area reveals the real world, and one visible edge owns collision; held Trick sustains the Twilight pocket pose and tube score | Pass |
+| Core ride | Neutral, right travel, left travel, committed reversal, downhill, all-condition column break, six Twilight stages, dynamic chase, rideable tube, max speed, pump | Rider-facing and wake follow signed travel while the fixed-grid break never mirrors; held steering crosses most of the screen, forward speed can send the break completely offscreen, a cutback leaves the camera fixed, and independent pressure brings the barrel back; Gather/Pitch/Pour/Deep/Maximum/Collapse advances gravity heads left-to-right while revealed foam stays fixed, the passed area reveals the real world, and one visible edge owns collision; held Trick sustains the Twilight pocket pose and tube score | Pass |
 | Air/landing | Small/medium/huge air, dedicated Twilight big-air camera, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Clamped upward camera framing reveals more sky with no horizon seam; Reduced Motion stays fixed; board/body separation, nearest valid landing tangent, signed landing direction, and queued single-message callouts remain legible | Pass |
 | Wildlife | Dolphin approach/ride/dismount/gates, shark telegraph/near miss/contact, whale distant/breach/ramp/ride/splash, reduced variants | Minimum danger telegraph, friendly mount readability, no harmful animal reward, coherent phase silhouettes | Pass |
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, active HUD, expiration, consumption, protected event, plane drop | Unique silhouettes and labels; active effect reads without obscuring Speed/Flow; consumption and harmless misses are visible | Pass |
@@ -42,6 +42,8 @@ Current result: **176/176 tests pass** and **30 JavaScript modules pass syntax c
 - Verify the world never renders a pickup or hazard that the simulation has already culled.
 - Verify far traffic remains behind the wave, ordinary mid-watercraft disappear before entering the curl/player zone, and near traffic stays decorative without covering actionable telegraphs.
 - Verify every boat hull intersects its assigned waterline and preserves intended travel through camera reversals; only deliberate wake-race craft may remain visible ahead of the breaker.
+- On Twilight, hold Right until the camera advances and the barrel clears the left edge, then hold Left: Kaki must cross the screen while the camera and scenery remain fixed, and the break must eventually pursue back from the left.
+- Force a whale while the rider is high in the air and verify its anchor, shadow, wake, and splash remain registered to the ocean rather than inheriting the rider's airborne Y.
 - Trigger several callouts rapidly and verify only one message is visible at a time; danger may follow a readable minimum beat while stale hints expire instead of surfacing late.
 - Verify Speed tiers read `STALLING`, `GLIDING`, `FAST`, `FLYING`, `BLASTING`; Flow remains a separate combo/style indicator.
 - Verify Surf School waits for each real drop, carve, launch, rotation, trick, and landing action and never teaches the narrow seam as a requirement.
@@ -54,12 +56,14 @@ Current result: **176/176 tests pass** and **30 JavaScript modules pass syntax c
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 120 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 117 unique bitmaps. The repeated deterministic pairs are Golden Coast/Foam Puff, Stormbreak/Foam Puff, and Twilight Foam Puff/traffic. Staged Twilight frames, the dedicated tube and big-air fixtures, and the dolphin, cargo ship, fishing boat, sailboat, speedboat, and carrier scenes remain distinct; the craft fixtures stay visibly staged behind the break in the safe far-right water band. Rebuild deterministically with:
+The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 120 identifiers. Every capture is normalized to 1280 x 720; the assembled contact sheet is 1200 x 10674. An exact-hash scan reports 115 unique bitmaps. Intentional shared states are Dolphin Ride/Gates, Golden Coast/Foam Puff, Stormbreak/Foam Puff, and the Twilight Foam Puff/condition/traffic trio. The six staged Twilight frames, dedicated tube and big-air fixtures, and the cargo ship, fishing boat, sailboat, speedboat, and carrier scenes remain distinct; the craft fixtures stay visibly staged behind the break in the safe far-right water band. Rebuild deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py
 ```
 
 Future scene changes must update `js/qa-gallery.js`, `tools/qa/capture-browser.sh`, and `tools/qa/build-contact-sheet.py` together so captions, counts, and files cannot drift.
+
+The temporal chase evidence is rebuilt separately with `node tools/qa/capture-chase.mjs` while a CDP Chromium instance and local static server are running. Its JSON records player x, forward camera x, and visible break x at all three checkpoints.
 
 This checkpoint is local: it verifies checked-in files, native tests, and local Chromium captures. It does not claim that the GitHub Pages CDN has received or served the same revision; deployment verification belongs to the release step after push.

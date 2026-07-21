@@ -1,0 +1,29 @@
+{
+  "lead": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 1.5583333333333302,
+    "travelDirection": 1,
+    "playerX": 316,
+    "cameraWorldX": 70.89080164142302,
+    "breakX": -40.890801641423025
+  },
+  "cutback": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 4.441666666666677,
+    "travelDirection": -1,
+    "playerX": 199.33577224808116,
+    "cameraWorldX": 75.2884536601249,
+    "breakX": -45.2884536601249
+  },
+  "return": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 30.174999999998928,
+    "travelDirection": 1,
+    "playerX": 50,
+    "cameraWorldX": 75.2884536601249,
+    "breakX": 20.090736255623654
+  }
+}

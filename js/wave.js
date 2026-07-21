@@ -156,9 +156,14 @@ export class GameplayWave {
         const relief = clamp(
           skill * TUNING.curlSkillRelief + speedRelief * TUNING.curlSpeedRelief,
           0,
-          TUNING.curlMaxRelief,
+          Number.isFinite(threatProfile.maxRelief)
+            ? threatProfile.maxRelief
+            : TUNING.curlMaxRelief,
         );
-        const advance = TUNING.curlThreatMaxSpeed * paceScale * escalation * (1 - relief);
+        const maximumThreatSpeed = Number.isFinite(threatProfile.maxSpeed)
+          ? threatProfile.maxSpeed
+          : TUNING.curlThreatMaxSpeed;
+        const advance = maximumThreatSpeed * paceScale * escalation * (1 - relief);
         // The threat can slow when Kaki surfs well, but it never moves backward
         // merely because the rider reverses direction.
         this.curlX += Math.max(0, advance) * dt;

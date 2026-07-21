@@ -6,6 +6,7 @@ import { projectWavePoint, sampleWaveSection } from "./wave.js";
 const HORIZON_Y = 79;
 const WATERFALL_FRAMES = Object.freeze(["pourA", "pourB", "pourC"]);
 const CHURN_OFFSETS = Object.freeze([0, 8, 3, 14, 6, 19, 11, 24, 4, 16, 27, 9]);
+const CREST_STEPS = Object.freeze([0, -1, 0, 1, 0, -2, -1, 0, 2, 1, 0, 1, -1, 0, -1, 1, 0, 2, 0, -1]);
 const BREAK_COLUMN_STEP = 3;
 const RENDER_BREAK_COLUMNS = [];
 
@@ -49,7 +50,11 @@ export function heroBarrelGeometry(wave, player = null) {
   const growth = section.growth;
   const collapse = stage.collapseMix;
   const opening = section.aperture * (1 - collapse * 0.18);
-  const contactX = clamp(canonicalContactX(wave), 30, LOGICAL_WIDTH + 26);
+  // Contact is allowed to leave the viewport. A fast forward line advances
+  // the camera and can put the pursuing barrel completely offscreen; clamping
+  // it to x=30 was the hidden reason the previous build always looked like a
+  // static framed set piece.
+  const contactX = clamp(canonicalContactX(wave), -LOGICAL_WIDTH, LOGICAL_WIDTH + 26);
   const sampledX = clamp(contactX, 0, LOGICAL_WIDTH);
   const powerFace = clamp(Number(wave?.powerFaceAt?.(sampledX) ?? 0.58), 0.3, 0.7);
   const powerY = clamp(Number(wave?.ridingY?.(sampledX, powerFace) ?? 144), 124, 166);
@@ -70,7 +75,8 @@ export function heroBarrelGeometry(wave, player = null) {
   const tubeDepth = clamp(0.22 + growth * 0.64 - collapse * 0.16, 0.18, 0.88);
 
   const riderX = clamp(Number(player?.x ?? 208), 0, LOGICAL_WIDTH);
-  const focusX = clamp(riderX, Math.max(36, contactX + 8), LOGICAL_WIDTH - 18);
+  const focusMinX = Math.min(LOGICAL_WIDTH - 18, Math.max(36, contactX + 8));
+  const focusX = clamp(riderX, focusMinX, LOGICAL_WIDTH - 18);
   const focusFace = clamp(Number(wave?.powerFaceAt?.(focusX) ?? powerFace), 0.3, 0.7);
   const focusY = clamp(Number(wave?.ridingY?.(focusX, focusFace) ?? powerY), 126, 172);
   const apertureTop = curtainTopY + 2;
@@ -479,16 +485,18 @@ function drawLongFaceCrest(ctx, g, p, settings) {
   const highContrast = Boolean(settings?.highContrast);
   ctx.save();
 
-  // One structural crest runs across the long surfable face. It is broken into
-  // fixed packets rather than animated horizontal lines, so reversing Kaki can
-  // never make the ocean reverse or ping-pong.
-  for (let index = 0, x = startX; x < LOGICAL_WIDTH + 8; index += 1, x += 12) {
-    const seed = positiveModulo(index * 17 + Math.round(startX), 13);
-    const width = 6 + seed % 7;
-    const y = Math.round(crestY + seed % 3 - 1);
-    ctx.fillStyle = index < 4 || seed % 5 === 0 ? p.foamShade : p.waterLight;
-    ctx.globalAlpha = highContrast ? 0.94 : index < 5 ? 0.7 : 0.44;
-    ctx.fillRect(Math.round(x), y, width, index < 3 ? 2 : 1);
+  // One irregular connected crest defines the long face. Short overlapping
+  // pixels rise and dip like the original surf line; there are no repeated
+  // dashed rails whose direction could flip with Kaki.
+  const crestOffset = positiveModulo(Math.round(startX / 3), CREST_STEPS.length);
+  for (let index = 0, x = startX; x < LOGICAL_WIDTH + 5; index += 1, x += 3) {
+    const step = CREST_STEPS[(index + crestOffset) % CREST_STEPS.length];
+    const y = Math.round(crestY + step);
+    const seed = positiveModulo(index * 17 + crestOffset * 7, 19);
+    ctx.fillStyle = seed % 7 === 0 ? p.foam : seed % 3 === 0 ? p.foamShade : p.waterLight;
+    ctx.globalAlpha = highContrast ? 0.96 : seed % 7 === 0 ? 0.76 : 0.54;
+    ctx.fillRect(Math.round(x), y, 4, seed % 11 === 0 ? 2 : 1);
+    if (seed % 13 === 0) ctx.fillRect(Math.round(x + 1), y - 2, 2, 1);
   }
 
   // Sparse hooked face marks establish the upright wave plane without laying

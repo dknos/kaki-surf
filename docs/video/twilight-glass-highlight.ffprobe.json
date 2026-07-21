@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-21T00:14:39.917Z",
+  "generatedAt": "2026-07-21T01:00:32.819Z",
   "source": {
     "duration": 27.3,
     "mimeType": "video/webm;codecs=vp9,opus",
-    "size": 8996833,
+    "size": 8006715,
     "capturedAudio": true,
     "audioContextState": "running",
     "width": 384,
@@ -33,9 +33,9 @@
       }
     ],
     "format": {
-      "duration": "27.313000",
-      "size": "9709435",
-      "bit_rate": "2843901"
+      "duration": "27.306833",
+      "size": "8630228",
+      "bit_rate": "2528371"
     }
   }
 }

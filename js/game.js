@@ -296,6 +296,11 @@ export class KakiSurfGame {
       assists: { ...this.simulation.assists },
       controlMode: this.simulation.controlMode,
       travelDirection: this.simulation.player.travelDirection,
+      playerX: this.simulation.player.state === "airborne"
+        ? this.simulation.player.airX
+        : this.simulation.player.x,
+      cameraWorldX: this.simulation.cameraWorldX,
+      breakX: this.simulation.wave.contactX(),
       world: this.simulation.world.snapshot(),
     };
   }
@@ -1222,11 +1227,13 @@ export class KakiSurfGame {
       case "heroMax-twilightGlass":
       case "heroCollapse-twilightGlass": { // Fixed rider pose isolates the hero barrel's authored animation stages.
         const heroStage = {
-          "heroGather-twilightGlass": { pressure: 0.12, curlX: 42 },
-          "heroPitch-twilightGlass": { pressure: 0.34, curlX: 58 },
-          "heroOpen-twilightGlass": { pressure: 0.58, curlX: 76 },
-          "heroDeep-twilightGlass": { pressure: 0.78, curlX: 96 },
-          "heroMax-twilightGlass": { pressure: 0.94, curlX: 102 },
+          // The six fixtures now tell the actual chase story: fully offscreen,
+          // first re-entry, open pocket, deep pursuit, hero barrel, catch.
+          "heroGather-twilightGlass": { pressure: 0.12, curlX: -230 },
+          "heroPitch-twilightGlass": { pressure: 0.34, curlX: -122 },
+          "heroOpen-twilightGlass": { pressure: 0.58, curlX: -66 },
+          "heroDeep-twilightGlass": { pressure: 0.78, curlX: 20 },
+          "heroMax-twilightGlass": { pressure: 0.94, curlX: 76 },
           "heroCollapse-twilightGlass": { pressure: 1, curlX: 120 },
         }[scene];
         const heroX = 208;

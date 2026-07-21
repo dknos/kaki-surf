@@ -203,6 +203,19 @@ test("Twilight's passing curtain advances right without following rider directio
   assert.equal(new Set(samples).size, samples.length, "each advancing contact reveals more horizon");
 });
 
+test("the hero barrel may leave the viewport instead of sticking to a minimum screen x", () => {
+  const wave = new GameplayWave(0x54574c47, "heroBarrel");
+  wave.curlX = -230;
+  wave.pressure = 0.72;
+  const player = { x: 286, face: 0.58, state: "riding", curlTimer: 0, travelDirection: 1 };
+  const geometry = heroBarrelGeometry(wave, player);
+
+  assert.equal(geometry.contactX, wave.contactX());
+  assert.ok(geometry.contactX < -100, `contact was pinned onscreen at ${geometry.contactX}`);
+  assert.ok(heroBreakColumns(wave, player).every((column) => column.x < 0), "all active break columns remain offscreen");
+  assert.equal(heroPassedSkyWindow(wave, player).right, 0);
+});
+
 test("the advancing break uses fixed staggered columns with gravity-falling heads", () => {
   const wave = new GameplayWave(0x54574c47, "heroBarrel");
   wave.curlX = 36;

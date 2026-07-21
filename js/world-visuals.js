@@ -201,7 +201,7 @@ export function drawCarrierEvent(ctx, simulation, assets, palette, settings = {}
   }
 }
 
-export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, foreground = false) {
+export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, foreground = false, settings = {}) {
   const world = simulation?.world;
   if (!world?.forEachWildlife) return;
   const camera = interpolatedCamera(world, alpha);
@@ -212,6 +212,9 @@ export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, f
     const y = lerp(entity.previousY, entity.y, alpha);
     const [family, frame] = wildlifeFrame(entity);
     const scale = entity.kind === "whale" ? 1 : entity.kind === "dolphin" ? 0.9 : 0.82;
+    if (entity.kind === "whale") {
+      drawWhaleWaterContact(ctx, simulation, entity, x, y, palette, settings);
+    }
     const drawn = drawAtlasFrame(ctx, assets, family, frame, x, y, {
       flipX: entity.direction < 0,
       scale,
@@ -234,6 +237,34 @@ export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, f
       drawDangerWake(ctx, x, y, palette, entity.phaseTime);
     }
   });
+}
+
+function drawWhaleWaterContact(ctx, simulation, entity, x, y, palette, settings = {}) {
+  const crest = Number(simulation?.wave?.crestY?.(x));
+  const waterY = clamp(
+    Math.max(y + 18, Number.isFinite(crest) ? crest + 24 : 106),
+    104,
+    178,
+  );
+  const phase = String(entity.phase ?? "distant");
+  const foamy = WHALE_FOAM_PHASES.has(phase) || phase === "ramp" || phase === "mounted";
+  const pulse = settings.reducedMotion ? 0 : Math.round(Math.sin(entity.phaseTime * 5) * 2);
+  ctx.save();
+  ctx.fillStyle = palette.deepInk;
+  ctx.globalAlpha = phase === "distant" ? 0.28 : 0.42;
+  ctx.fillRect(Math.round(x - 30), Math.round(waterY), 60, 3);
+  ctx.fillRect(Math.round(x - 20), Math.round(waterY + 3), 40, 2);
+  if (foamy) {
+    ctx.fillStyle = palette.foamShade;
+    ctx.globalAlpha = 0.76;
+    ctx.fillRect(Math.round(x - 34 - pulse), Math.round(waterY - 2), 24, 2);
+    ctx.fillRect(Math.round(x + 9), Math.round(waterY - 1), 28 + pulse, 2);
+    ctx.fillStyle = palette.foam;
+    ctx.globalAlpha = 0.82;
+    ctx.fillRect(Math.round(x - 22), Math.round(waterY - 4), 13, 2);
+    ctx.fillRect(Math.round(x + 14 + pulse), Math.round(waterY - 3), 10, 2);
+  }
+  ctx.restore();
 }
 
 export function drawWorldPowerups(ctx, simulation, assets, palette, alpha = 1) {

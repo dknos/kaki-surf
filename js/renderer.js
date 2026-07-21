@@ -354,13 +354,13 @@ export class KakiRenderer {
     // the wave face or appear inside the tube.
     this.drawMaxSpeedFeedback(simulation);
     this.drawImpactCavity(simulation);
-    drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, false);
+    drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, false, this.settings);
     drawWorldPowerups(ctx, simulation, this.visualAssets, palette, alpha);
     drawWorldFoamGates(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
     this.drawParticles(false);
     this.drawSurfer(simulation, alpha);
     if (heroBarrel) this.drawWaveFront(simulation);
-    drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true);
+    drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true, this.settings);
     this.drawParticles(true);
     ctx.restore();
     this.drawHud(simulation);

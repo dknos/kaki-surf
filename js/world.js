@@ -1327,11 +1327,19 @@ export class WorldSimulation {
         : definition.phases.breach + definition.phases.ramp * 0.35;
     const defaultX = this.context.player.x - direction * Math.abs(speed) * approachTime;
     const screenX = finite(options.screenX, finite(options.x, defaultX));
-    const screenY = clamp(
-      finite(options.y, this.context.player.y + finite(options.yOffset)),
-      36,
-      190,
+    const waterlineY = clamp(finite(this.context.waterlineY, 79), 64, 100);
+    const requestedY = finite(
+      options.y,
+      kind === "whale"
+        ? waterlineY + 38 + finite(options.yOffset)
+        : this.context.player.y + finite(options.yOffset),
     );
+    // Whale encounters originate from the ocean, never from Kaki's current
+    // aerial height. Breach art may rise above this anchor, but its body/wake
+    // remains registered to a band below the horizon.
+    const screenY = kind === "whale"
+      ? clamp(requestedY, waterlineY + 28, Math.min(172, waterlineY + 72))
+      : clamp(requestedY, 36, 190);
     const sharkCandidate = {
       x: screenX,
       y: screenY,
@@ -2225,6 +2233,7 @@ function createStepContext() {
     paceBeatsBest: false,
     lastWipeoutAge: Infinity,
     giantTrickAge: Infinity,
+    waterlineY: 79,
     curlScreenX: NaN,
     curlApproaching: false,
   };
@@ -2271,6 +2280,7 @@ function copyStepContext(target, source, previousCameraFallback) {
   target.paceBeatsBest = Boolean(context.paceBeatsBest);
   target.lastWipeoutAge = finite(context.lastWipeoutAge, Infinity);
   target.giantTrickAge = finite(context.giantTrickAge, Infinity);
+  target.waterlineY = clamp(finite(context.waterlineY, 79), 64, 100);
   target.curlScreenX = Number.isFinite(context.curlScreenX)
     ? context.curlScreenX
     : Number.isFinite(context.curlX) ? context.curlX : NaN;

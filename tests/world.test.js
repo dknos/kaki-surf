@@ -32,6 +32,7 @@ function context(overrides = {}) {
     paceBeatsBest: overrides.paceBeatsBest ?? false,
     lastWipeoutAge: overrides.lastWipeoutAge ?? Infinity,
     giantTrickAge: overrides.giantTrickAge ?? Infinity,
+    waterlineY: overrides.waterlineY ?? 79,
     curlScreenX: overrides.curlScreenX,
     curlApproaching: overrides.curlApproaching ?? false,
     player: {
@@ -315,6 +316,24 @@ test("dolphin, shark, and whale phase machines publish sparse deterministic inte
   assert.ok(whaleInteractions.some((record) => record.type === "whaleMounted"));
   runFor(whale, 4.3, playerContext, { interactions: whaleInteractions });
   assert.ok(whaleInteractions.some((record) => record.type === "animalDismount" && record.reason === "whale"));
+});
+
+test("whales stay registered to the ocean even when requested during big air", () => {
+  const world = new WorldSimulation({ seed: 0x0cea51de, condition: "twilightGlass" });
+  const skyContext = context({
+    waterlineY: 79,
+    player: { x: 224, y: 38, state: "airborne" },
+  });
+  world.update(STEP, skyContext);
+  const whale = world.forceWildlife("whale", {
+    phase: "distant",
+    screenX: 270,
+    y: 38,
+    speed: 0,
+  });
+
+  assert.ok(whale.y >= 107, `whale anchor escaped into the sky at y=${whale.y}`);
+  assert.ok(whale.y <= 151, `whale anchor sank below the encounter band at y=${whale.y}`);
 });
 
 test("Mango Rush, Moon Pop, and Star Foam collect, modify, consume, expire, and reset independently", () => {

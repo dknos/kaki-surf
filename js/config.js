@@ -115,9 +115,11 @@ export const WAVE_STYLES = Object.freeze({
     renderer: "heroBarrel",
     bounds: Object.freeze({
       // The long level is a real side scroller: Kaki may use nearly the full
-      // face instead of being trapped in a narrow central presentation slot.
-      ridingX: Object.freeze([72, 338]),
+      // face before the camera begins following forward. The camera never
+      // chases a cutback back toward the curl; Kaki crosses the screen first.
+      ridingX: Object.freeze([50, 350]),
       airX: Object.freeze([50, 352]),
+      cameraX: Object.freeze([74, 316]),
     }),
     surface: Object.freeze({
       // The reference horizon is y=78..80, the sustainable ride band is
@@ -156,6 +158,11 @@ export const WAVE_STYLES = Object.freeze({
       proximityFarGap: 100,
       temporalPressureScale: 0.84,
       contactOrigin: true,
+      // Screen-space pursuit is faster than the classic fixed-frame threat,
+      // because a fast rider can now advance the camera and push the barrel
+      // completely offscreen. Escalation eventually closes that earned lead.
+      maxSpeed: 38,
+      maxRelief: 0.34,
     }),
     pocket: Object.freeze({
       nearOffset: 0,

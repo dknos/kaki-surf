@@ -97,6 +97,7 @@ export class SurfSimulation {
     this.modeId = this.mode.id;
     this.controlMode = normalizeControlMode(controlMode);
     this.worldTravel = 0;
+    this.cameraWorldX = 0;
     this.player = createPlayer();
     this.aerialSession = null;
     this.lastWipeoutAt = -Infinity;
@@ -157,6 +158,7 @@ export class SurfSimulation {
     this.aerialSession = null;
     this.eventCount = 0;
     this.worldTravel = 0;
+    this.cameraWorldX = 0;
     this.lastWipeoutAt = -Infinity;
     this.lastGiantTrickAt = -Infinity;
     resetRunHighlights(this.highlights);
@@ -187,6 +189,7 @@ export class SurfSimulation {
 
     const player = this.player;
     const previousWorldTravel = this.worldTravel;
+    const previousCameraWorldX = this.cameraWorldX;
     // Presentation tails are lifecycle state, not riding-only state. Aging
     // them here prevents a tube veil from freezing in the air and reappearing
     // after the next landing.
@@ -232,6 +235,10 @@ export class SurfSimulation {
     );
     this.worldTravel = this.wave.worldTravel;
     player.worldTravel = this.worldTravel;
+    // Legacy level profiles still use their signed travel camera. Twilight's
+    // long face opts into a forward-only dead-zone camera below, so a cutback
+    // moves Kaki across the screen instead of reversing every world object.
+    if (!this.wave.profile.bounds?.cameraX) this.cameraWorldX = this.worldTravel;
 
     switch (player.state) {
       case "entry":
@@ -256,7 +263,7 @@ export class SurfSimulation {
     }
 
     this.applyAnimalRideTuning(dt);
-    this.updateWorld(dt, previousWorldTravel);
+    this.updateWorld(dt, previousWorldTravel, previousCameraWorldX);
 
     this.updateComboCue();
     player.speedTier = speedTierForSpeed(player.speed);
@@ -297,7 +304,7 @@ export class SurfSimulation {
     });
   }
 
-  updateWorld(dt, previousWorldTravel) {
+  updateWorld(dt, previousWorldTravel, previousCameraWorldX = this.cameraWorldX) {
     const player = this.player;
     const airborne = player.state === "airborne" || player.state === "wipeout";
     const context = this._worldContext;
@@ -306,6 +313,8 @@ export class SurfSimulation {
       : this.wave.ridingY(player.x, player.face);
     context.worldTravel = this.worldTravel;
     context.previousWorldTravel = previousWorldTravel;
+    context.cameraWorldX = this.cameraWorldX;
+    context.previousCameraWorldX = previousCameraWorldX;
     context.direction = player.travelDirection;
     context.player.collisionX = airborne ? player.airX : player.x;
     context.player.previousCollisionX = airborne ? player.previousAirX : player.previousX;
@@ -325,7 +334,8 @@ export class SurfSimulation {
     context.paceBeatsBest = Boolean(this.paceBeatsBest);
     context.lastWipeoutAge = this.elapsed - this.lastWipeoutAt;
     context.giantTrickAge = this.elapsed - this.lastGiantTrickAt;
-    context.curlScreenX = this.wave.curlX;
+    context.waterlineY = clamp(this.wave.crestY(airborne ? player.airX : player.x), 70, 92);
+    context.curlScreenX = this.wave.contactX();
     context.curlApproaching = this.wave.pressure >= 0.56;
 
     this.world.update(dt, context);
@@ -1124,6 +1134,7 @@ export class SurfSimulation {
     player.airVX *= 1 - dt * 0.09;
     player.airX += player.airVX * dt;
     player.airY += player.airVY * dt;
+    this.advanceForwardCamera("airX");
     const [airMinX, airMaxX] = this.wave.profile.bounds.airX;
     player.airX = clamp(player.airX, airMinX, airMaxX);
     player.landingFace = clamp(
@@ -1441,6 +1452,7 @@ export class SurfSimulation {
 
   constrainRidingX() {
     const player = this.player;
+    this.advanceForwardCamera("x");
     const [ridingMinX, ridingMaxX] = this.wave.profile.bounds.ridingX;
     const nextX = clamp(player.x, ridingMinX, ridingMaxX);
     if (nextX !== player.x) {
@@ -1450,6 +1462,30 @@ export class SurfSimulation {
       if (pushingOut) player.travelVelocity = 0;
       player.x = nextX;
     }
+  }
+
+  /**
+   * California Games-style forward camera dead zone. Kaki crosses most of the
+   * visible face before the camera follows. Only forward overflow advances the
+   * camera; a cutback traverses the screen toward the independently pursuing
+   * barrel instead of instantly dragging the whole world backward.
+   */
+  advanceForwardCamera(positionKey = "x") {
+    const cameraBounds = this.wave.profile.bounds.cameraX;
+    if (!cameraBounds) return 0;
+    const maxX = Number(cameraBounds[1]);
+    const current = Number(this.player[positionKey]);
+    if (!Number.isFinite(maxX) || !Number.isFinite(current) || current <= maxX) return 0;
+    const shift = current - maxX;
+    this.player[positionKey] = maxX;
+    const previousKey = positionKey === "airX" ? "previousAirX" : "previousX";
+    this.player[previousKey] = Math.min(Number(this.player[previousKey]) || maxX, maxX);
+    this.cameraWorldX += shift;
+    // curlX is the break's projected screen coordinate. Moving the camera
+    // forward pushes the world-space barrel left and can take it fully out of
+    // frame; GameplayWave's own update keeps pursuing to screen-right.
+    this.wave.curlX -= shift;
+    return shift;
   }
 
   querySpeedPotential(input = EMPTY_INPUT) {
@@ -2055,6 +2091,8 @@ function createWorldStepContext() {
   return {
     worldTravel: 0,
     previousWorldTravel: 0,
+    cameraWorldX: 0,
+    previousCameraWorldX: 0,
     direction: 1,
     player: {
       collisionX: 212,
@@ -2078,6 +2116,7 @@ function createWorldStepContext() {
     paceBeatsBest: false,
     lastWipeoutAge: Infinity,
     giantTrickAge: Infinity,
+    waterlineY: 79,
     curlScreenX: 0,
     curlApproaching: false,
   };

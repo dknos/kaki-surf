@@ -44,6 +44,7 @@ function simulationSnapshot(simulation) {
     timeRemaining: simulation.timeRemaining,
     complete: simulation.complete,
     wipeouts: simulation.wipeouts,
+    cameraWorldX: simulation.cameraWorldX,
     wave: {
       time: simulation.wave.time,
       travel: simulation.wave.travel,
@@ -304,6 +305,42 @@ test("held steering traverses the long face in both directions like a side scrol
   assert.ok(leftmost <= 90, `left traverse reached only ${leftmost}`);
   assert.ok(rightmost - leftmost >= 220, "the rider can use most of the visible wave face");
   assert.equal(player.travelDirection, -1);
+});
+
+test("Twilight lets a fast rider scroll the barrel fully offscreen before it pursues back", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, { condition: CONDITIONS.twilightGlass });
+  const player = simulation.player;
+  simulation.wave.curlX = -66;
+  player.x = 260;
+  player.previousX = 260;
+  player.face = simulation.wave.powerFaceAt(player.x);
+  player.previousFace = player.face;
+  player.speed = 118;
+
+  for (let step = 0; step < 480; step += 1) simulation.update(FIXED_STEP, { x: 1 });
+  assert.equal(player.x, WAVE_STYLES.heroBarrel.bounds.cameraX[1], "the rider settles into the forward camera dead zone");
+  assert.ok(simulation.cameraWorldX > 70, `camera advanced only ${simulation.cameraWorldX}`);
+  assert.ok(simulation.wave.contactX() < 0, `barrel remained visible at ${simulation.wave.contactX()}`);
+
+  const leadCamera = simulation.cameraWorldX;
+  for (let step = 0; step < 600 && player.x > 190; step += 1) {
+    simulation.update(FIXED_STEP, { x: -1 });
+  }
+  assert.equal(player.travelDirection, -1);
+  assert.ok(player.x < 220, `cutback reached only ${player.x}`);
+  const cutbackCamera = simulation.cameraWorldX;
+  assert.ok(cutbackCamera >= leadCamera, "residual forward momentum may only advance the camera");
+  assert.ok(cutbackCamera - leadCamera < 3, "the camera stops promptly once the cutback takes hold");
+  assert.equal(simulation.world.context.cameraWorldX, cutbackCamera, "scenery does not reverse when Kaki reverses");
+
+  const offscreenContact = simulation.wave.contactX();
+  simulation.wave.time = 54;
+  for (let step = 0; step < 720 && simulation.wave.contactX() < 0 && player.state !== "wipeout"; step += 1) {
+    simulation.update(FIXED_STEP, { x: -1 });
+  }
+  assert.ok(simulation.wave.contactX() > offscreenContact + 40, "the independent break closes the earned lead");
+  assert.ok(simulation.wave.contactX() >= 0, "the pursuing barrel re-enters from the left");
+  assert.equal(simulation.cameraWorldX, cutbackCamera, "barrel pursuit, not a backward camera, owns the catch-up");
 });
 
 test("high-speed reversals draw a heavier arc and scrub more speed than low-speed pivots", () => {
@@ -864,10 +901,11 @@ test("wave profiles preserve classic travel bounds and frame Twilight's authored
   simulation.reset({ condition: "twilightGlass" });
   simulation.player.x = 999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 338);
+  assert.equal(simulation.player.x, WAVE_STYLES.heroBarrel.bounds.cameraX[1]);
+  assert.ok(simulation.cameraWorldX > 600, "forward overflow advances the level camera");
   simulation.player.x = -999;
   simulation.constrainRidingX();
-  assert.equal(simulation.player.x, 72);
+  assert.equal(simulation.player.x, 50);
 
   simulation.reset({ condition: "goldenCoast" });
   simulation.player.x = 999;
@@ -897,7 +935,8 @@ test("Twilight aerial collision uses the visible hero lip contact", () => {
   player.previousAirY = 20;
   player.airVY = -20;
   simulation.update(FIXED_STEP, {});
-  assert.equal(player.airX, 352, "Twilight aerials stay inside the expanded side-scroller landing window");
+  assert.equal(player.airX, WAVE_STYLES.heroBarrel.bounds.cameraX[1], "forward aerial overflow advances the level camera");
+  assert.ok(simulation.cameraWorldX > 80);
 
   simulation.wave.curlX = 100;
   assert.equal(simulation.wave.contactX(), 196);

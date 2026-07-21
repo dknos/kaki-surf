@@ -22,8 +22,9 @@ The current code and assets are structured to address those points:
 - Golden Coast and Stormbreak keep their `classic` physics while Twilight keeps `heroBarrel` tube rules, but all three use `js/hero-wave-visuals.js` so the retired mini-curl, white shelf, and detached-slab compositor cannot appear in a shipped level;
 - the rejected full-wave isolation field, tube cutout, lower rail, and pasted image boundary are absent from the live compositor; real sky and low backwater are repainted behind the passed whitewater instead of a white or opaque rectangle;
 - fixed contrail packets, a broad broken crest, a collision-registered foamy leading ridge, and live churn create downward-only motion while pressure advances the same edge left-to-right;
-- Twilight removes the full-screen speed-line field. Its sparse horizon/depth marks and seven accumulated presentation clocks never reverse when the rider turns; the waterfall clock is driven by fixed-step wave time so its motion always reads top-to-bottom;
-- rider, board, wake, air carry, wildlife, pickups, and parallax use signed travel direction;
+- Twilight removes the full-screen speed-line field. Its crest is a connected irregular pixel edge rather than a repeating row of horizontal dashes; sparse depth marks and seven accumulated presentation clocks never reverse when the rider turns, while the waterfall clock is driven by fixed-step wave time so its motion always reads top-to-bottom;
+- Twilight's rider owns nearly the full screen and a forward-only camera dead zone. Fast right travel can send the break completely offscreen; cutting left moves Kaki across the face without pulling scenery backward, while the barrel continues its own escalating pursuit;
+- rider, board, wake, and air carry use signed travel direction; wildlife, pickups, and parallax keep their authored trajectories under Twilight's forward-only camera instead of flipping when Kaki turns;
 - far/mid/near boats, birds, aircraft, banners, wildlife, powerups, and a festival carrier fill the coast with bounded simulation state; every catalogued hull renders in a horizon/water-back band behind the wave, race craft stay small and distant, and intended screen travel survives camera reversals;
 - Speed has physical tiers and redundant motion/audio cues, while Flow owns the style/combo presentation;
 - Simple controls reduce the primary surface to Action plus context Trick, with optional spin and conditional Special;
@@ -59,6 +60,7 @@ The final review confirmed:
 - the Gather/Pitch/Pour/Deep/Maximum/Collapse sequence advances the staggered columns left-to-right while each column head falls downward and its trail remains fixed; the rider can traverse at least 220 logical pixels, briefly occupy Twilight's pocket, and launch into the existing vertical camera without reversing any water animation;
 - desktop, landscape-phone, and portrait-phone fixtures keep the tube rider, big-air rider, horizon, and landing guide visible; portrait preserves the complete 16:9 shot with deliberate letterboxing;
 - dolphin, shark, whale, boards, carrier, pickups, boats, birds, and aircraft retain readable silhouettes at 384 x 216;
+- whales forced during big air remain ocean-registered and receive a surface shadow, wake, and state-specific foam instead of inheriting the rider's sky position;
 - left/right travel, reversal, switch landing, wake, monotonic water contours, stable traffic travel, and reverse-parallax scenes remain directionally coherent;
 - wildlife and pickup telegraphs stay readable in normal, High Contrast, and Reduced Motion scenes;
 - the normal HUD says Speed and Flow, with no stale POWER meter or seam-required teaching;
