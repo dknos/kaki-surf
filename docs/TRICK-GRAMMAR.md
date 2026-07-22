@@ -63,7 +63,7 @@ The un-suffixed field is held state. `Pressed` and `Released` are one-shot edges
 
 `normalizeTrickInput(input, target)` also accepts `action` as an alias for `edge` and the migration fields `style`, `stylePressed`, and `styleReleased` as aliases for `trick1`. It preserves both mode contracts; `SurfSimulation` decides which actions are active from `controlMode`.
 
-Simple Controls are the default. They activate `edge`, `turbo`, `trick`, `special`, `spinLeft`, and `spinRight`. A Simple Trick press is buffered by simulation, then mapped to an eligible manifest entry once airborne: hold for a grab, tap for the next discrete/variety option, and use an unused grab as a fallback when a large move misses its gate. Optional spin impulses coexist with ordinary horizontal body-spin input. Late descent receives board-specific auto-level toward the nearest regular or opposite-facing landing tangent.
+Simple Controls are the default. They activate `edge`, `turbo`, `trick`, `special`, `spinLeft`, and `spinRight`. A quick grounded Trick tap switches regular/goofy stance; a deliberate pocket hold owns Tube Tuck. An aerial Trick press is buffered and mapped to an eligible manifest entry: hold for a grab, tap for the next discrete/variety option, and use an unused grab as a fallback when a large move misses its gate. Optional spin impulses coexist with ordinary horizontal body-spin input. Late descent receives board-specific auto-level toward the nearest regular or opposite-facing landing tangent. Any trick still held at board contact causes a wipeout.
 
 Advanced Controls activate `edge`, the common `turbo` action, and `trick1` through `trick4`, preserving the original direct catalog mapping:
 
@@ -71,9 +71,9 @@ The built-in physical mapping is:
 
 | Action | Keyboard | Standard gamepad | Touch cluster |
 | --- | --- | --- | --- |
-| `trick1` | Q, legacy X/C | X or left bumper | Left / Rail |
-| `trick2` | E | Y or right bumper | Top / Tail |
-| `trick3` | F | B | Bottom / Flip |
+| `trick1` | Q, legacy X/C | X or left bumper | Left / Frontside |
+| `trick2` | E | Y or right bumper | Top / Stalefish |
+| `trick3` | F | B | Bottom / Varial |
 | `trick4` | T | Left trigger or right-stick press | Right / Twist |
 
 ## Advanced context switch on the wave
@@ -84,7 +84,7 @@ In Advanced mode, `SurfSimulation.updateRidingManeuvers` consumes the same logic
 | --- | --- | --- | --- |
 | `trick1` | Snap | Absolute face velocity at least `SCORE.carveMinVelocity` (0.28) and cooldown clear | `CARVE FIRST` |
 | `trick2` | Cutback | Absolute face velocity at least 0.2, cooldown clear, risk at most 0.9, and at least 24 units from curl | `CARVE FIRST` or `TOO DEEP` |
-| `trick3` | Floater | Face at most 0.14 or state `lip`, with cooldown clear | `NEED LIP` or `TIME THE LIP` |
+| `trick3` | Regular/goofy stance on the face; Floater at the lip | Grounded press, or state `lip` with cooldown clear | `NEED LIP` or `TIME THE LIP` |
 | `trick4` | Tube Tuck; Moon Log Soul Arch | Held while zone is critical or risk is at least 0.58, with face from 0.16 through 0.76 | `FIND POCKET` |
 
 Invalid inputs emit `trickRejected` with the action, move ID, hint, and `context: "wave"`. They also emit the short callout, do not start the move, and award no maneuver score. Valid T is evaluated continuously while held; the other maneuvers use one logical press and a cooldown.
@@ -93,10 +93,10 @@ Invalid inputs emit `trickRejected` with the action, move ID, hint, and `context
 
 | Action | ID | Category | Input model | Core gates and identity |
 | --- | --- | --- | --- | --- |
-| Q / `trick1` | `frontRailGrab` | `grab` | Hold | 0.075 s entry; lowest risk; duration and apex bonus |
-| E / `trick2` | `tailGrab` | `grab` | Hold | 0.14 s entry; higher base/duration value; trim multiplier; late-hold risk |
-| F / `trick3` | `boardVarial` | `board` | Discrete | Start after 0.08 s; 4 px height; 0.44 s total air; one board-relative turn |
-| T / `trick4` | `kakiTwist` | `signature` | Discrete | Start after 0.28 s; 18 px height; 0.78 s total air; body/board counter-rotation |
+| Q / `trick1` | `frontRailGrab` | `grab` | Hold | Frontside Grab; 0.12 s entry; lowest risk; duration and apex bonus |
+| E / `trick2` | `tailGrab` | `grab` | Hold | Stalefish Grab; 0.20 s entry; 12 px height; trim multiplier; late-hold risk |
+| F / `trick3` | `boardVarial` | `board` | Discrete | Start after 0.08 s; 28 px height; 0.58 s total air; one board-relative turn |
+| T / `trick4` | `kakiTwist` | `signature` | Discrete | Start after 0.34 s; 70 px height; 1.08 s total air; body/board counter-rotation |
 
 Every catalog definition includes identity/display fields and the following tuning fields as applicable:
 
@@ -224,9 +224,9 @@ Examples produced by `formatTrickName` include:
 | --- | --- |
 | No trick, no named rotation | `FLOATY POP` |
 | No trick, one full turn | `360 AIR SPIN` |
-| Front Rail, no spin | `FRONT RAIL GRAB` |
-| Front Rail, half turn | `180 FRONT RAIL` |
-| Tail Grab plus Varial, full turn | `360 TAIL GRAB + VARIAL` |
+| Frontside Grab, no spin | `FRONTSIDE GRAB` |
+| Frontside Grab, half turn | `180 FRONTSIDE GRAB` |
+| Stalefish plus Varial, full turn | `360 STALEFISH + VARIAL` |
 | Perfect single Varial, one and a half turns | `PERFECT 540 VARIAL` |
 | Kaki Twist, two turns | `720 KAKI TWIST` |
 

@@ -42,7 +42,7 @@ export class ScoreSystem {
 
   multiplier(risk, boardStyle = 1, assists = false) {
     const assistFactor = assists ? 0.82 : 1;
-    return clamp(this.combo * (1 + risk * 0.7) * boardStyle * assistFactor, 0.72, 6.5);
+    return clamp(this.combo * (1 + risk * 0.7) * boardStyle * assistFactor, 0.72, 10);
   }
 
   add(bucket, points, multiplier = 1) {
@@ -164,11 +164,14 @@ export class ScoreSystem {
     this.add("style", result.buckets.style);
     this.add("landings", result.buckets.landings);
 
-    const landingFlow = quality === "perfect" ? 0.34 : quality === "clean" ? 0.2 : 0.05;
+    const landingFlow = quality === "perfect" ? 0.22 : quality === "clean" ? 0.12 : 0.03;
+    const completedTricks = result.entries.length;
+    const halfTurns = Math.abs(result.rotationDegrees) / 180;
+    const trickFlow = Math.min(0.48, completedTricks * 0.105 + halfTurns * 0.028);
     if (quality === "wobble" || quality === "sketchy") {
       this.flow *= 0.55;
     }
-    this.addFlow(landingFlow * (0.4 + decay * 0.6));
+    this.addFlow((landingFlow + trickFlow) * (0.4 + decay * 0.6));
     if (decay < 1) this.addFlow(-(1 - decay) * 0.38);
 
     this.pushHistory(result.signature);

@@ -792,6 +792,15 @@ export class SurfSimulation {
       resetContextTrick(state);
       return;
     }
+    const quickGroundTap = input.trickReleased
+      && ["riding", "landing", "wobble"].includes(this.player.state)
+      && !this.player.tubeRide.active
+      && state.held < finiteTuning(this.tuning.simpleGrabHold, TUNING.simpleGrabHold);
+    if (quickGroundTap) {
+      this.toggleRidingStance();
+      resetContextTrick(state);
+      return;
+    }
     if (input.trickPressed) {
       state.requestId += 1;
       state.pending = true;
@@ -815,6 +824,19 @@ export class SurfSimulation {
       state.pending = false;
       state.released = false;
     }
+  }
+
+  toggleRidingStance() {
+    const player = this.player;
+    player.ridingStance = player.ridingStance === "goofy" ? "regular" : "goofy";
+    player.stanceSwitches += 1;
+    this.emit("stanceSwitch", { stance: player.ridingStance });
+    this.emit("callout", {
+      text: player.ridingStance === "goofy" ? "GOOFY STANCE" : "REGULAR STANCE",
+      subtext: "FRONT FOOT SWITCHED",
+      tone: "flow",
+    });
+    return player.ridingStance;
   }
 
   updateSimpleAerialTrick(dt, input, context) {
@@ -917,14 +939,47 @@ export class SurfSimulation {
 
   updateRiding(dt, input) {
     const player = this.player;
+    if (this.controlMode === "advanced"
+      && player.state === "riding"
+      && input.trick3Pressed
+      && !player.tubeRide.active) {
+      this.toggleRidingStance();
+      // F is the board-trick key in the air and the stance key on the face.
+      // Consume this edge so it cannot also award a grounded Floater.
+      input.trick3 = false;
+      input.trick3Pressed = false;
+    }
     const earlyEase = smoothstep(0, this.tuning.entryGrace, this.elapsed);
     const earlyGrip = 1.22 - earlyEase * 0.22;
     const steeringAssist = this.assists.steering ? 1.2 : 1;
     const carveAccel = this.tuning.carveAcceleration * this.board.grip * earlyGrip * steeringAssist;
     const preliminaryPotential = this.querySpeedPotential(input);
-    const steeringScale = this.controlMode === "advanced"
+    const maneuverSteeringScale = this.controlMode === "advanced"
       ? this.updateRidingManeuvers(dt, input, preliminaryPotential)
       : this.updateSimpleRidingManeuver(dt, input, preliminaryPotential);
+    const preloadDuration = finiteTuning(
+      this.tuning.tuckPreloadDuration,
+      TUNING.tuckPreloadDuration,
+    );
+    const previousPreload = player.tuckPreloadTime;
+    if (input.edge) {
+      player.tuckPreloadTime = Math.min(preloadDuration, previousPreload + dt);
+      const preloadProgress = preloadDuration > 0
+        ? (player.tuckPreloadTime - previousPreload) / preloadDuration
+        : 0;
+      player.speed = Math.min(
+        player.speed
+          + finiteTuning(this.tuning.tuckPreloadSpeedBoost, TUNING.tuckPreloadSpeedBoost)
+            * preloadProgress,
+        this.currentRideSpeedCap(),
+      );
+    } else {
+      player.tuckPreloadTime = 0;
+    }
+    const tuckSteeringScale = input.edge && previousPreload < preloadDuration
+      ? finiteTuning(this.tuning.tuckPreloadSteeringScale, TUNING.tuckPreloadSteeringScale)
+      : 1;
+    const steeringScale = maneuverSteeringScale * tuckSteeringScale;
     const inputY = (Math.abs(input.y) < 0.02 ? 0 : input.y) * steeringScale;
     const inputX = (Math.abs(input.x) < 0.02 ? 0 : input.x) * steeringScale;
 
@@ -1221,6 +1276,8 @@ export class SurfSimulation {
       turboActive: turboAtLaunch,
       turboOverdrive: turboOverdriveAtLaunch,
       launchScale: worldModifiers.launchScale,
+      waveMomentum: launchMomentum,
+      mangoRushActive: worldModifiers.mangoRushRemaining > 0,
     });
     const launchMultiplier = this.currentMultiplier() * (this.tuning.scoreAir / 1.25);
     const launchRisk = this.wave.pocketRisk(player.x);
@@ -1235,7 +1292,8 @@ export class SurfSimulation {
       * this.board.launch
       * launchEnergy
       * worldModifiers.launchScale
-      * aerialProfile.turboLiftMultiplier;
+      * aerialProfile.turboLiftMultiplier
+      * aerialProfile.momentumLiftMultiplier;
     player.launchY = player.airY;
     player.maxAirHeight = 0;
     player.aerialAltitude = 0;
@@ -1282,6 +1340,8 @@ export class SurfSimulation {
         launchSpeed: player.speed,
         speedRatio,
         waveMomentum: launchMomentum,
+        momentumLiftMultiplier: aerialProfile.momentumLiftMultiplier,
+        boostStack: aerialProfile.boostStack,
         seamDrive: player.speedPotential.seamDrive,
         slopeDrive: player.slopeDrive,
         uphillApproach,
@@ -1476,7 +1536,7 @@ export class SurfSimulation {
     }
 
     if (player.airVY > 0 && player.airY >= surfaceY - 1) {
-      this.resolveLanding(dt, surfaceY);
+      this.resolveLanding(dt, surfaceY, input);
       return;
     }
 
@@ -1487,8 +1547,15 @@ export class SurfSimulation {
     }
   }
 
-  resolveLanding(dt, surfaceY) {
+  resolveLanding(dt, surfaceY, input = EMPTY_INPUT) {
     const player = this.player;
+    const heldTrick = this.controlMode === "simple"
+      ? input.trick
+      : input.trick1 || input.trick2 || input.trick3 || input.trick4;
+    if (heldTrick) {
+      this.triggerWipeout("RELEASE THE TRICK!", "heldTrickLanding");
+      return;
+    }
     const surfaceAngle = this.wave.slopeAt(player.airX, player.landingFace);
     const alignment = nearestLandingAlignment(
       player.boardAngle,
@@ -1915,9 +1982,14 @@ export class SurfSimulation {
   }
 
   updateSimpleRidingManeuver(dt, input, potential) {
+    const committedHold = input.trick
+      && this.player.contextTrick.held >= finiteTuning(
+        this.tuning.simpleGrabHold,
+        TUNING.simpleGrabHold,
+      );
     const tubeScale = this.updateTubeRide(dt, {
-      held: input.trick,
-      pressed: input.trickPressed,
+      held: committedHold,
+      pressed: committedHold && input.trickPressed,
     }, potential);
     if (tubeScale !== null) return tubeScale;
     return 1;
@@ -2372,7 +2444,7 @@ export class SurfSimulation {
   }
 
   currentMultiplier() {
-    return Math.min(7.5, this.score.multiplier(
+    return Math.min(10, this.score.multiplier(
       this.wave.pocketRisk(this.player.x),
       this.board.style,
       this.assists.steering || this.assists.landing,
@@ -2516,6 +2588,8 @@ function createPlayer() {
     directionIntent: 1,
     directionCommit: 0,
     switchStance: false,
+    ridingStance: "regular",
+    stanceSwitches: 0,
     reversalCount: 0,
     travelVelocity: 12,
     worldTravel: 0,
@@ -2552,6 +2626,7 @@ function createPlayer() {
     skillMomentum: 0,
     compression: 0,
     charge: 0,
+    tuckPreloadTime: 0,
     lastPumpAt: -1e6,
     lastQualifiedCarveAt: -1e6,
     carveArcSign: 0,
@@ -2662,6 +2737,8 @@ function resetPlayer(
   player.directionIntent = 1;
   player.directionCommit = 0;
   player.switchStance = false;
+  player.ridingStance = "regular";
+  player.stanceSwitches = 0;
   player.reversalCount = 0;
   player.travelVelocity = 12;
   player.worldTravel = 0;
@@ -2704,6 +2781,7 @@ function resetPlayer(
   player.skillMomentum = 0;
   player.compression = 0;
   player.charge = 0;
+  player.tuckPreloadTime = 0;
   player.lastPumpAt = -1e6;
   player.lastQualifiedCarveAt = -1e6;
   resetCarveArcState(player);

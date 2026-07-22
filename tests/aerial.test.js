@@ -2,15 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  AIR_PROJECTION,
   AERIAL_MILESTONES,
   AERIAL_PANORAMA,
   aerialAltitudeForFlight,
   aerialCameraTarget,
+  aerialCloudLayerPresence,
   aerialPanoramaCropX,
   aerialPanoramaCropY,
   aerialZoneForAltitude,
   projectAirY,
   qualifyAerialLaunch,
+  riderScaleForProjectedY,
 } from "../js/aerial.js";
 import { BOARDS, FIXED_STEP } from "../js/config.js";
 import { SurfSimulation } from "../js/simulation.js";
@@ -53,6 +56,37 @@ test("launch qualification separates beach, cloud, upper atmosphere, and earned 
   assert.equal(space.spaceQualified, true);
   assert.ok(space.turboLiftMultiplier > wastedTurbo.turboLiftMultiplier);
   assert.ok(space.turboLiftMultiplier > 1.35, "a qualified Turbo lip adds material real lift");
+});
+
+test("carried momentum unlocks extra height only when real boosts are stacked", () => {
+  const line = { ...STRONG_LINE, turboActive: true, turboOverdrive: 1 };
+  const noMomentum = qualifyAerialLaunch({
+    ...line,
+    launchScale: 1.18,
+    mangoRushActive: true,
+    waveMomentum: 0.4,
+  });
+  const turboMomentum = qualifyAerialLaunch({ ...line, waveMomentum: 1 });
+  const fullStack = qualifyAerialLaunch({
+    ...line,
+    launchScale: 1.18,
+    mangoRushActive: true,
+    waveMomentum: 1,
+  });
+
+  assert.equal(noMomentum.momentumLiftMultiplier, 1, "powerups cannot replace a carried line");
+  assert.ok(turboMomentum.momentumLiftMultiplier > 1.08, "Turbo converts full momentum into extra lift");
+  assert.ok(fullStack.momentumLiftMultiplier > 1.23, "Moon Pop, Mango Rush, Turbo, and momentum earn maximum lift");
+  assert.ok(fullStack.expectedHeight > turboMomentum.expectedHeight);
+});
+
+test("cloud layer fades in smoothly without changing panorama shelves", () => {
+  assert.equal(aerialCloudLayerPresence(0.2), 0);
+  assert.equal(aerialCloudLayerPresence(0.58), 1);
+  const samples = [0.24, 0.3, 0.4, 0.5, 0.58].map(aerialCloudLayerPresence);
+  for (let index = 1; index < samples.length; index += 1) {
+    assert.ok(samples[index] >= samples[index - 1]);
+  }
 });
 
 test("canonical altitude rises nonlinearly and anticipates the wave on descent", () => {
@@ -135,11 +169,56 @@ test("high-air projection is natural below the threshold and monotonic above it"
   for (let index = 1; index < projected.length; index += 1) {
     assert.ok(projected[index] < projected[index - 1], `${natural[index]} must remain visibly above ${natural[index - 1]}`);
   }
-  assert.ok(projectAirY(-1e9) > 8, "unsupported height approaches but never crosses the rider top bound");
-  assert.ok(projectAirY(-122) >= 16, "the authored maximum remains inside the complete-rider band");
-  assert.ok(projectAirY(-35) - projectAirY(-40) > 0.7,
+  assert.ok(projectAirY(-1e9) > AIR_PROJECTION.minimumY, "unsupported height approaches but never crosses the rider top bound");
+  assert.ok(projectAirY(AIR_PROJECTION.supportedMinimumY) >= AIR_PROJECTION.supportedFinalY,
+    "the authored maximum remains inside the complete-rider band");
+  assert.ok(projectAirY(-35) - projectAirY(-40) > 0.3,
     "five physical pixels near a real apex must remain visibly separated");
-  assert.ok(71 - projectAirY(-122) >= 40, "the supported maximum air retains at least 40 pixels of visible rise");
+  assert.ok(71 - projectAirY(AIR_PROJECTION.supportedMinimumY) >= 50,
+    "the supported maximum air retains a large visible rise");
+  const maximumScale = riderScaleForProjectedY(
+    projectAirY(AIR_PROJECTION.supportedMinimumY),
+  );
+  assert.ok(maximumScale * 44 <= projectAirY(AIR_PROJECTION.supportedMinimumY),
+    "the complete rider silhouette remains inside the canvas at maximum authored air");
+});
+
+test("a full momentum and powerup stack materially raises the physical apex", () => {
+  const launch = ({ momentum, bonuses = [] }) => {
+    const simulation = new SurfSimulation({ seed: 0xf01157ac, controlMode: "advanced" });
+    simulation.reset({ board: BOARDS.moonLog, controlMode: "advanced", worldQa: { quiet: true } });
+    simulation.begin();
+    for (const bonus of bonuses) simulation.world.activateBonus(bonus);
+    Object.assign(simulation.player, {
+      state: "lip",
+      face: 0.01,
+      faceVelocity: -0.82,
+      slopeDrive: -0.82,
+      speed: 154,
+      charge: 0.92,
+      waveMomentum: momentum,
+      turboActive: true,
+      turboOverdrive: 1,
+    });
+    Object.assign(simulation.player.speedPotential, { pocket: 0.78, seamDrive: 0.86 });
+    simulation.wave.curlX = -520;
+    simulation.launch({ x: 0 });
+    const initialVY = simulation.player.airVY;
+    const lift = simulation.player.trickManifest.launchData.momentumLiftMultiplier;
+    for (let step = 0; step < 720 && simulation.player.state === "airborne"; step += 1) {
+      simulation.update(FIXED_STEP, {});
+      simulation.consumeEvents(() => {});
+    }
+    return { height: simulation.player.maxAirHeight, initialVY, lift };
+  };
+
+  const ordinaryBoosted = launch({ momentum: 0.4 });
+  const fullStack = launch({ momentum: 1, bonuses: ["moonPop", "mangoRush"] });
+  assert.equal(ordinaryBoosted.lift, 1);
+  assert.ok(fullStack.lift > 1.23);
+  assert.ok(fullStack.height > 380, `full stack reached only ${fullStack.height.toFixed(1)}px`);
+  assert.ok(fullStack.height > ordinaryBoosted.height * 1.9);
+  assert.ok(fullStack.initialVY < ordinaryBoosted.initialVY);
 });
 
 test("only a strong Turbo lip launch reaches orbit in the fixed-step simulation", () => {

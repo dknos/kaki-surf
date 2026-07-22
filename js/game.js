@@ -346,6 +346,8 @@ export class KakiSurfGame {
       assists: { ...this.simulation.assists },
       controlMode: this.simulation.controlMode,
       travelDirection: this.simulation.player.travelDirection,
+      ridingStance: this.simulation.player.ridingStance,
+      stanceSwitches: this.simulation.player.stanceSwitches,
       playerX: this.simulation.player.state === "airborne"
         ? this.simulation.player.airX
         : this.simulation.player.x,
@@ -366,6 +368,7 @@ export class KakiSurfGame {
       ? Number(player.airY) || 0
       : simulation.wave.ridingY(playerWorldX, player.face);
     const riderFrameOffsetY = this.renderer.riderFrameOffsetY(simulation, 1);
+    const riderProjection = this.renderer.riderProjection?.(simulation, 1);
     const stageOffsetY = Number(this.renderer.lastStageOffset?.y) || 0;
     const waveCrestScreenY = simulation.wave.ridingY(simulation.wave.contactX(), 0) + stageOffsetY;
     const waterlineScreenY = 79 + stageOffsetY;
@@ -382,6 +385,7 @@ export class KakiSurfGame {
       playerScreenY: naturalPlayerY + riderFrameOffsetY,
       naturalPlayerY,
       riderFrameOffsetY,
+      riderScale: riderProjection?.riderScale ?? 1,
       finalPlayerScreenY: naturalPlayerY + riderFrameOffsetY,
       stageOffsetY,
       hudOffsetY: 0,
@@ -395,6 +399,9 @@ export class KakiSurfGame {
       backdropFrameDelta: (backdrop?.frameDelta ?? 0) * 424,
       maximumPerFrameBackdropDelta: (backdrop?.maximumFrameDelta ?? 0) * 424,
       maxAirHeight: player.maxAirHeight,
+      waveMomentum: player.waveMomentum,
+      momentumLiftMultiplier: Number(player.trickManifest?.launchData?.momentumLiftMultiplier) || 1,
+      aerialBoostStack: Number(player.trickManifest?.launchData?.boostStack) || 0,
       aerialAltitude: player.aerialAltitude,
       airVY: player.airVY,
       rotation: player.rotationAccum,
@@ -402,6 +409,16 @@ export class KakiSurfGame {
       turbo: player.turbo,
       turboActive: player.turboActive,
       direction: player.travelDirection,
+      ridingStance: player.ridingStance,
+      trickPose: player.trickPose,
+      wipeoutCause: player.wipeoutCause,
+      wipeouts: simulation.wipeouts,
+      multiplier: simulation.currentMultiplier(),
+      trickSequence: (player.trickManifest?.sequence ?? []).map((entry) => ({
+        id: entry.id,
+        complete: entry.complete,
+        progress: entry.poseProgress,
+      })),
     };
   }
 
@@ -1322,10 +1339,10 @@ export class KakiSurfGame {
         player.travelDirection = -1;
         break;
       case "frontRail":
-        makeAirborne("frontRailGrab", "FRONT RAIL GRAB", Math.PI * 0.42);
+        makeAirborne("frontRailGrab", "FRONTSIDE GRAB", Math.PI * 0.42);
         break;
       case "tailGrab":
-        makeAirborne("tailGrab", "360 TAIL GRAB", Math.PI * 2);
+        makeAirborne("tailGrab", "360 STALEFISH", Math.PI * 2);
         break;
       case "varial":
         makeAirborne("boardVarial", "BOARD VARIAL", Math.PI * 0.2, Math.PI * 0.72);
@@ -1335,7 +1352,7 @@ export class KakiSurfGame {
         this.renderer.onEvent({ type: "trickStart", payload: { id: "kakiTwist" } }, this.simulation);
         break;
       case "combo360":
-        makeAirborne("tailGrab", "360 TAIL GRAB + VARIAL", Math.PI * 2, Math.PI * 0.28);
+        makeAirborne("tailGrab", "360 STALEFISH + VARIAL", Math.PI * 2, Math.PI * 0.28);
         break;
       case "combo540":
         makeAirborne("boardVarial", "PERFECT 540 VARIAL", Math.PI * 3, Math.PI * 0.58);
@@ -1422,6 +1439,14 @@ export class KakiSurfGame {
         player.travelDirection = 1;
         player.travelVelocity = 24;
         player.speed = 104;
+        break;
+      case "regularStance":
+        player.ridingStance = "regular";
+        player.trickPose = "neutral";
+        break;
+      case "goofyStance":
+        player.ridingStance = "goofy";
+        player.trickPose = "neutral";
         break;
       case "downhillRight":
         player.travelDirection = 1;
@@ -1747,7 +1772,7 @@ function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. In Simple Controls, carve with arrows or WASD, use Space or A for action, hold Shift for Turbo, and use F or X for one context trick."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve with arrows or WASD. Hold Space or A for a half-second tuck preload, hold Shift for Turbo, and use F or X for tricks. Tap Trick on the wave to switch regular and goofy stance; release tricks before landing."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="pause-run" aria-label="Pause surfing">II</button>
@@ -1783,7 +1808,7 @@ function gameMarkup() {
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
           </dl>
-          <p class="controls-line"><b>CHOOSE + CARVE</b> ARROWS / WASD <b>ACTION</b> SPACE / A <b>TURBO</b> SHIFT / L3 <b>TRICK</b> F / X</p>
+          <p class="controls-line"><b>CARVE</b> ARROWS / WASD <b>PRELOAD</b> HOLD SPACE / A <b>TURBO</b> SHIFT / L3 <b>TRICKS</b> Q FRONT · E STALE · F VARIAL / STANCE · T TWIST</p>
         </div>
 
         <div class="game-layer compact-layer" data-layer="pause" hidden>
@@ -1819,12 +1844,12 @@ function gameMarkup() {
             <span class="touch-stick__label" aria-hidden="true">CARVE · SPIN</span>
           </div>
           <div class="touch-actions">
-            <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" aria-label="Optional counterclockwise spin or advanced trick one"><b>Q</b><span>SPIN</span></button>
-            <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" aria-label="Optional clockwise spin or advanced trick two"><b>E</b><span>SPIN</span></button>
-            <button class="touch-trick" type="button" data-control="trick" aria-label="Context trick"><b>TRICK</b><span>TAP / HOLD</span></button>
+            <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" aria-label="Advanced Q Frontside Grab"><b>Q</b><span>FRONT</span></button>
+            <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" aria-label="Advanced E Stalefish Grab"><b>E</b><span>STALE</span></button>
+            <button class="touch-trick" type="button" data-control="trick" aria-label="Context trick or Advanced F Board Varial; tap on the wave to switch stance"><b>TRICK</b><span>VARIAL</span></button>
             <button class="touch-turbo" type="button" data-control="turbo" aria-label="Hold Turbo boost; successful landed tricks refill it"><b>TURBO</b><span>HOLD</span></button>
             <button class="touch-special" type="button" data-control="special" aria-label="Advanced Twist trick; Action or Trick dismounts a ridden animal" hidden><b>T</b><span>TWIST</span></button>
-            <button class="touch-action" type="button" data-control="edge" aria-label="Action: compress, pump, and pop"><b>ACTION</b><span>HOLD / RELEASE</span></button>
+            <button class="touch-action" type="button" data-control="edge" aria-label="Action: hold up to half a second to preload speed with reduced steering, then release to pop"><b>ACTION</b><span>PRELOAD / POP</span></button>
           </div>
         </div>
 

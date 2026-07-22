@@ -23,9 +23,14 @@ export const AERIAL_PANORAMA = Object.freeze({
 
 export const AIR_PROJECTION = Object.freeze({
   compressionStartY: 40,
-  supportedMinimumY: -122,
-  supportedFinalY: 16,
-  minimumY: 8,
+  // The authored full-stack launch can now reach roughly 400 physical pixels
+  // above the lip. Keep that complete range on the constant-slope branch so
+  // even the highest earned air continues to move visibly on screen.
+  highAirPivotY: -140,
+  highAirPivotFinalY: 17.5,
+  supportedMinimumY: -340,
+  supportedFinalY: 9,
+  minimumY: 6,
 });
 
 /**
@@ -41,6 +46,8 @@ export function qualifyAerialLaunch({
   turboActive = false,
   turboOverdrive = 0,
   launchScale = 1,
+  waveMomentum = 0,
+  mangoRushActive = false,
 } = {}) {
   const speed = clamp(Number(speedRatio) || 0, 0, 1);
   const climb = clamp(Number(uphillApproach) || 0, 0, 1);
@@ -83,10 +90,24 @@ export function qualifyAerialLaunch({
     + turbo * lineQuality * 0.2
     + (spaceQualified ? 0.24 : 0);
   const scale = clamp(Number(launchScale) || 1, 0.5, 2);
+  const momentum = clamp(Number(waveMomentum) || 0, 0, 1);
+  const moonPop = smoothstep(1.001, 1.18, scale);
+  const mangoRush = mangoRushActive ? 1 : 0;
+  const boostStack = clamp(turbo * 0.38 + moonPop * 0.52 + mangoRush * 0.1, 0, 1);
+  const momentumReadiness = smoothstep(0.62, 0.94, momentum)
+    * smoothstep(0.68, 0.96, speed)
+    * smoothstep(0.28, 0.72, climb)
+    * smoothstep(0.45, 0.9, compression);
+  // Extra height is earned only by carrying a strong line into stacked
+  // boosts. Ordinary jumps retain their existing impulse exactly.
+  const momentumLiftMultiplier = 1 + 0.24 * momentumReadiness * boostStack;
   const expectedHeight = clamp(
-    18 + strength * strength * 54 * scale * turboLiftMultiplier,
+    18 + strength * strength * 54
+      * scale
+      * turboLiftMultiplier
+      * momentumLiftMultiplier,
     18,
-    236,
+    420,
   );
 
   return Object.freeze({
@@ -95,9 +116,20 @@ export function qualifyAerialLaunch({
     lineQuality,
     turbo,
     turboLiftMultiplier,
+    momentumLiftMultiplier,
+    momentumReadiness,
+    boostStack,
     spaceQualified,
     expectedHeight,
   });
+}
+
+/**
+ * Opacity driver for the seam-safe cloud veil. The panorama crop never moves;
+ * only this soft overlay fades in for an earned high-air altitude.
+ */
+export function aerialCloudLayerPresence(altitude = 0) {
+  return smoothstep(0.24, 0.58, clamp(Number(altitude) || 0, 0, 1));
 }
 
 /**
@@ -113,7 +145,7 @@ export function aerialAltitudeForFlight({
   expectedHeight = 64,
 } = {}) {
   if (state !== "airborne") return 0;
-  const expected = clamp(Number(expectedHeight) || 64, 18, 236);
+  const expected = clamp(Number(expectedHeight) || 64, 18, 420);
   const rise = smoothstep(3, Math.max(18, expected * 0.74), Math.max(0, Number(flightHeight) || 0));
   let altitude = clamp(Number(ceiling) || 0, 0, 1) * rise;
   if ((Number(verticalVelocity) || 0) > 0) {
@@ -175,7 +207,9 @@ export function projectAirY(
     : AIR_PROJECTION.compressionStartY;
   if (physicalY >= start) return physicalY;
 
-  // Use a constant derivative through the complete authored flight range.
+  // Use two constant-slope spans through the complete authored flight range.
+  // The first preserves the strong visual motion of existing big airs; the
+  // second fits the newly earned full-stack range without pinning the rider.
   // The retired rational curve approached its top bound asymptotically, which
   // collapsed 7+ physical pixels into the same rendered row near the apex.
   const supportedBottom = Math.min(start - 1, AIR_PROJECTION.supportedMinimumY);
@@ -183,9 +217,21 @@ export function projectAirY(
     AIR_PROJECTION.minimumY + 0.001,
     Math.min(start - 0.001, AIR_PROJECTION.supportedFinalY),
   );
-  const compressionRatio = (start - supportedFinal) / (start - supportedBottom);
+  const pivotY = Math.max(
+    supportedBottom + 1,
+    Math.min(start - 1, AIR_PROJECTION.highAirPivotY),
+  );
+  const pivotFinalY = Math.max(
+    supportedFinal + 0.001,
+    Math.min(start - 0.001, AIR_PROJECTION.highAirPivotFinalY),
+  );
+  const upperRatio = (start - pivotFinalY) / (start - pivotY);
+  if (physicalY >= pivotY) {
+    return start + (physicalY - start) * upperRatio;
+  }
+  const extremeRatio = (pivotFinalY - supportedFinal) / (pivotY - supportedBottom);
   if (physicalY >= supportedBottom) {
-    return start + (physicalY - start) * compressionRatio;
+    return pivotFinalY + (physicalY - pivotY) * extremeRatio;
   }
 
   // Unsupported heights retain the same derivative at the join, then ease
@@ -193,7 +239,15 @@ export function projectAirY(
   const tailSpan = supportedFinal - AIR_PROJECTION.minimumY;
   const tailRise = supportedBottom - physicalY;
   return AIR_PROJECTION.minimumY
-    + tailSpan / (1 + (compressionRatio / tailSpan) * tailRise);
+    + tailSpan / (1 + (extremeRatio / tailSpan) * tailRise);
+}
+
+/** Keep the complete rider silhouette inside the canvas at earned extreme air. */
+export function riderScaleForProjectedY(projectedY, topExtent = 50) {
+  const y = Number(projectedY);
+  const extent = Math.max(1, Number(topExtent) || 50);
+  if (!Number.isFinite(y)) return 1;
+  return clamp((y - 1) / extent, 0.18, 1);
 }
 
 export function aerialBackdropCropShelves(

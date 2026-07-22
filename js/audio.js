@@ -496,6 +496,15 @@ export class SurfAudio {
       case "trafficPhase":
         this.playTrafficEvent(now, payload);
         break;
+      case "stanceSwitch":
+        this.playDirectionChange(now, {
+          ...payload,
+          direction: payload.stance === "goofy" ? -1 : 1,
+          speed: 54,
+          turnForce: 0.4,
+          switchStance: true,
+        });
+        break;
       case "carrierPhase":
         this.playCarrierPhase(now, payload.phase);
         break;

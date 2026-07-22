@@ -5,9 +5,11 @@ import test from "node:test";
 import { BOARDS, FIXED_STEP } from "../js/config.js";
 import {
   AIR_PROJECTION,
+  aerialCloudLayerPresence,
   projectAirY,
 } from "../js/aerial.js";
 import {
+  advanceAerialBackdropState,
   backgroundPanoramaCropY,
   backgroundPanoramaTravel,
   backgroundParallaxPhase,
@@ -108,12 +110,14 @@ test("real aerial events use the names consumed by renderer and audio", () => {
   simulation.update(FIXED_STEP, { trick1: true, trick1Pressed: true });
   const started = drain(simulation).find((event) => event.type === "trickStarted");
   assert.equal(started?.payload.id, "frontRailGrab");
-  for (let step = 0; step < 12; step += 1) {
+  const trickEvents = [];
+  for (let step = 0; step < 14; step += 1) {
     simulation.update(FIXED_STEP, { trick1: true });
-    drain(simulation);
+    trickEvents.push(...drain(simulation));
   }
   simulation.update(FIXED_STEP, { trick1Released: true });
-  const completed = drain(simulation).find((event) => event.type === "trickCompleted");
+  trickEvents.push(...drain(simulation));
+  const completed = trickEvents.find((event) => event.type === "trickCompleted");
   assert.equal(completed?.payload.id, "frontRailGrab");
 
   const rendererSource = readFileSync(new URL("../js/renderer.js", import.meta.url), "utf8");
@@ -149,6 +153,15 @@ test("landing and result poses resolve from state the simulation actually publis
   strongRun.finishRun("time");
   assert.equal(strongRun.player.resultWon, true);
   assert.equal(resolveKakiPose(strongRun.player), "victory");
+});
+
+test("regular and goofy riding stances resolve to visibly distinct authored poses", () => {
+  assert.equal(resolveKakiPose({ state: "riding", ridingStance: "regular" }), "regularRide");
+  assert.equal(resolveKakiPose({ state: "riding", ridingStance: "goofy" }), "goofyRide");
+  const spriteSource = readFileSync(new URL("../js/sprites.js", import.meta.url), "utf8");
+  assert.match(spriteSource, /regularRide: pose\(/);
+  assert.match(spriteSource, /goofyRide: pose\(/);
+  assert.match(spriteSource, /travelDirection \* stanceDirection/);
 });
 
 test("rapid retry clears stale particles, callouts, freeze, shake, and wave clocks", () => {
@@ -287,9 +300,10 @@ test("air projection is continuous, stateless, and never forms a fixed-Y clamp",
     assert.ok(final[index] < final[index - 1], "every meaningful physical rise remains a visible screen rise");
   }
   assert.ok(final.at(-1) > AIR_PROJECTION.minimumY);
-  assert.ok(projectAirY(-35) - projectAirY(-40) > 0.7,
+  assert.ok(projectAirY(-35) - projectAirY(-40) > 0.3,
     "real high-air motion cannot collapse into one logical row");
-  assert.ok(73 - projectAirY(-122) >= 40, "maximum supported air preserves forty logical pixels of travel");
+  assert.ok(73 - projectAirY(AIR_PROJECTION.supportedMinimumY) >= 50,
+    "maximum supported air preserves at least fifty logical pixels of travel");
 });
 
 test("Kaki, board, and rider effects share one interpolated rider-space offset", () => {
@@ -324,7 +338,8 @@ test("Kaki, board, and rider effects share one interpolated rider-space offset",
   assert.match(surferSource, /y = projection\.finalY/);
   assert.match(surferSource, /this\.ctx\.translate\(x, y\)/);
   assert.match(surferSource, /drawBoardSprite\(this\.ctx, 0, 1/);
-  assert.match(surferSource, /drawKittySprite\(this\.ctx, 0,/);
+  assert.match(surferSource, /drawKittySprite\([\s\S]*?this\.ctx,[\s\S]*?\n\s*0,/);
+  assert.match(surferSource, /this\.ctx\.scale\(riderScale, riderScale\)/);
   const renderSource = KakiRenderer.prototype.render.toString();
   assert.match(renderSource, /deferredAerialRider = player\.state === "airborne"/);
   assert.ok(renderSource.indexOf("this.drawHud(simulation)") < renderSource.lastIndexOf("this.drawSurfer(simulation, alpha)"),
@@ -367,6 +382,31 @@ test("aerial panorama remains on the stable condition shelf for every jump heigh
   assert.deepEqual([high, descending, extreme], [coast, coast, coast]);
   assert.equal(backgroundPanoramaCropY({ conditionId: "twilightGlass", player: { aerialAltitude: 1 } }), coast);
   assert.equal(backgroundPanoramaCropY({ conditionId: "stormbreak", camera: { worldY: -500 } }), coast);
+});
+
+test("the cloud veil advances smoothly while the condition crop remains fixed", () => {
+  let state = {
+    altitude: 0,
+    maximumFrameDelta: 0,
+    blend: { coastToCloud: 0, cloudToUpper: 0, upperToSpace: 0 },
+  };
+  const ascent = [];
+  for (let frame = 0; frame < 90; frame += 1) {
+    state = advanceAerialBackdropState(state, { state: "airborne", aerialAltitude: 1 }, 1 / 60);
+    ascent.push(state.altitude);
+    assert.equal(state.blend.coastToCloud, aerialCloudLayerPresence(state.altitude));
+    assert.equal(state.blend.cloudToUpper, 0);
+    assert.equal(state.blend.upperToSpace, 0);
+  }
+  for (let index = 1; index < ascent.length; index += 1) {
+    assert.ok(ascent[index] > ascent[index - 1], "cloud entry cannot flash backward");
+    assert.ok(ascent[index] - ascent[index - 1] < 0.08, "cloud entry is rate-limited per frame");
+  }
+  assert.ok(state.blend.coastToCloud > 0.99);
+  const peak = state.altitude;
+  state = advanceAerialBackdropState(state, { state: "riding", aerialAltitude: 0 }, 1 / 60);
+  assert.ok(state.altitude < peak && state.altitude > 0, "cloud exit eases instead of snapping");
+  assert.equal(backgroundPanoramaCropY({ player: { aerialAltitude: 1 } }), 424);
 });
 
 test("the full panorama is drawn once and covers both bottom corners and the final row", () => {

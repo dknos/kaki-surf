@@ -91,6 +91,19 @@ test("catalog exposes four distinct identities and legacy style normalizes to tr
   assert.equal(TRICK_CATALOG.frontRailGrab.hold, true);
   assert.equal(TRICK_CATALOG.boardVarial.discrete, true);
   assert.ok(TRICK_CATALOG.kakiTwist.minAirtime > TRICK_CATALOG.boardVarial.minAirtime);
+  assert.deepEqual(
+    Object.values(TRICK_CATALOG).map(({ action, category, displayName }) => ({
+      action,
+      category,
+      displayName,
+    })),
+    [
+      { action: "trick1", category: "grab", displayName: "FRONTSIDE GRAB" },
+      { action: "trick2", category: "grab", displayName: "STALEFISH GRAB" },
+      { action: "trick3", category: "board", displayName: "BOARD VARIAL" },
+      { action: "trick4", category: "signature", displayName: "KAKI TWIST" },
+    ],
+  );
 
   const normalized = normalizeTrickInput({
     style: true,
@@ -100,6 +113,23 @@ test("catalog exposes four distinct identities and legacy style normalizes to tr
   assert.equal(normalized.trick1, true);
   assert.equal(normalized.trick1Pressed, true);
   assert.equal(normalized.trick1Released, true);
+});
+
+test("varied completed trick landings can build the multiplier to x10", () => {
+  const score = new ScoreSystem();
+  const first = manifest([
+    completedEntry("frontRailGrab"),
+    completedEntry("boardVarial"),
+  ], Math.PI * 2);
+  const second = manifest([
+    completedEntry("tailGrab", { direction: -1 }),
+    completedEntry("kakiTwist", { direction: -1 }),
+  ], -Math.PI * 3);
+  score.registerLanding({ manifest: first, quality: "perfect" });
+  const afterFirst = score.combo;
+  score.registerLanding({ manifest: second, quality: "perfect" });
+  assert.ok(afterFirst > 1);
+  assert.equal(score.combo, 10);
 });
 
 test("one aerial sequences different tricks without repeated-key farming", () => {
@@ -116,7 +146,7 @@ test("one aerial sequences different tricks without repeated-key farming", () =>
   session.update(1 / 120, {}, context());
 
   session.update(1 / 120, { trick3: true, trick3Pressed: true }, context());
-  runFor(session, 0.5, {}, context());
+  runFor(session, 0.7, {}, context());
   assert.deepEqual(session.manifest.sequence.map((entry) => entry.id), ["tailGrab", "boardVarial"]);
   assert.ok(session.manifest.sequence.every((entry) => entry.complete));
 });
@@ -130,15 +160,15 @@ test("Kaki Twist enforces meaningful airtime/height and exposes counter-rotation
   assert.equal(rejected[0].type, "trickRejected");
   assert.match(rejected[0].hint, /AIR|POP/);
 
-  session.update(1 / 120, {}, context({ maxHeight: 24 }));
-  runFor(session, 0.3, {}, context({ maxHeight: 24 }));
-  session.update(1 / 120, { trick4: true, trick4Pressed: true }, context({ maxHeight: 24 }));
-  runFor(session, 0.3, {}, context({ maxHeight: 28 }));
+  session.update(1 / 120, {}, context({ maxHeight: 80 }));
+  runFor(session, 0.36, {}, context({ maxHeight: 80 }));
+  session.update(1 / 120, { trick4: true, trick4Pressed: true }, context({ maxHeight: 80 }));
+  runFor(session, 0.3, {}, context({ maxHeight: 84 }));
   assert.equal(session.manifest.trickPose, "kakiTwist");
   assert.notEqual(session.manifest.boardRelativeRotation, 0);
   assert.notEqual(session.manifest.bodyPose, 0);
   assert.notEqual(Math.sign(session.manifest.boardRelativeRotation), Math.sign(session.manifest.bodyPose));
-  runFor(session, 0.6, {}, context({ maxHeight: 32 }));
+  runFor(session, 0.82, {}, context({ maxHeight: 88 }));
   assert.equal(session.manifest.sequence.at(-1).complete, true);
 });
 
@@ -147,7 +177,7 @@ test("names quantize actual final rotation and preserve ordered identities", () 
     completedEntry("tailGrab"),
     completedEntry("boardVarial"),
   ], Math.PI * 2);
-  assert.equal(formatTrickName(tailVarial), "360 TAIL GRAB + VARIAL");
+  assert.equal(formatTrickName(tailVarial), "360 STALEFISH + VARIAL");
 
   const perfectVarial = manifest([completedEntry("boardVarial")], Math.PI * 3);
   assert.equal(formatTrickName(perfectVarial, { quality: "perfect" }), "PERFECT 540 VARIAL");
@@ -156,7 +186,7 @@ test("names quantize actual final rotation and preserve ordered identities", () 
   assert.equal(formatTrickName(kaki), "KAKI TWIST");
 
   const unwound = manifest([completedEntry("tailGrab")], Math.PI * 2 - Math.PI * 2);
-  assert.equal(formatTrickName(unwound), "TAIL GRAB");
+  assert.equal(formatTrickName(unwound), "STALEFISH GRAB");
 
   for (const degrees of [180, 360, 540, 720]) {
     const radians = degrees * Math.PI / 180;
@@ -255,8 +285,8 @@ test("switch takeoff and opposite-tangent landing are distinct scoreable variati
 test("varial completion and landed-orientation gates prevent partial awards", () => {
   const partial = new AerialTrickSession({ launchData: { potential: 10 } });
   runFor(partial, 0.1, {}, context({ maxHeight: 8 }));
-  partial.update(1 / 120, { trick3: true, trick3Pressed: true }, context({ maxHeight: 8 }));
-  runFor(partial, 0.14, {}, context({ maxHeight: 12 }));
+  partial.update(1 / 120, { trick3: true, trick3Pressed: true }, context({ maxHeight: 30 }));
+  runFor(partial, 0.14, {}, context({ maxHeight: 30 }));
   partial.finalizeLanding({ quality: "wobble" });
   assert.equal(partial.manifest.sequence[0].complete, false);
   assert.equal(partial.manifest.invalidBoardOrientation, true);
@@ -266,9 +296,9 @@ test("varial completion and landed-orientation gates prevent partial awards", ()
   assert.equal(result.entries.some((entry) => entry.id === "boardVarial"), false);
 
   const complete = new AerialTrickSession({ boardId: "mangoFish" });
-  runFor(complete, 0.1, {}, context({ maxHeight: 12 }));
-  complete.update(1 / 120, { trick3: true, trick3Pressed: true }, context({ maxHeight: 12 }));
-  runFor(complete, 0.5, {}, context({ maxHeight: 26 }));
+  runFor(complete, 0.1, {}, context({ maxHeight: 30 }));
+  complete.update(1 / 120, { trick3: true, trick3Pressed: true }, context({ maxHeight: 30 }));
+  runFor(complete, 0.7, {}, context({ maxHeight: 36 }));
   complete.finalizeLanding({ quality: "clean" });
   assert.equal(complete.manifest.sequence[0].complete, true);
   assert.equal(complete.manifest.invalidBoardOrientation, false);

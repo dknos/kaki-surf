@@ -9,15 +9,15 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 | Intent | Keyboard | Standard gamepad | Touch |
 | --- | --- | --- | --- |
 | Travel left/right; carve up/down; rotate/trim in air | Arrows or WASD | Left stick or D-pad | Analog surf stick |
-| Action: compress, pump, and commit a lip pop | Space or Z | A (0) or right trigger (7) | **Action** |
+| Action: 0.5 s tuck preload, pump, and commit a lip pop | Space or Z | A (0) or right trigger (7) | **Action** |
 | Turbo Boost | Hold either Shift | Left-stick press / L3 (10) | Hold **Turbo** |
 | Context trick | F or X | X (2) or B (1) | **Trick** |
 | Pause | Escape or P | Start (9) | **II** pause button; Settings also pauses |
 | Restart / retry | R; Space on results | B on results; A on results | Results button |
 
-Action is always readable: hold on the face to compress, then release while carving upward on a useful line to earn an efficiency-scaled pump; carry that uphill line through the lip to launch. Releases below the charge/line gate consume their partial charge without a burst, and a short cadence floor rejects tapping. Action is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
+Action is always readable: its first 0.5 seconds add a small tuck-preload speed impulse while reducing carve authority, then full steering returns even if the hold continues. Release while carving upward on a useful line to earn an efficiency-scaled pump; carry that uphill line through the lip to launch. Releases below the charge/line gate consume their partial charge without a burst, and a short cadence floor rejects tapping. Action is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
 
-Simple Trick is contextual and buffered. On Twilight's wave face, holding it inside the eligible critical pocket tucks Kaki into the tube; Moon Log uses its Soul Arch variant. A slightly wider hold band and 0.12-second grace keep tiny pocket jitter from cancelling the pose. Releasing Trick exits deliberately; if the barrel forces Kaki out, Trick must be released before another tube session can begin. The compact tube HUD shows live time and points, and a 0.45-second or longer ride receives a clean-exit result. Around a launch, a held request chooses Front Rail Grab, or Tail Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time.
+Simple Trick is contextual and buffered. A quick tap on the face switches regular/goofy stance; holding it past the grab threshold inside Twilight's eligible critical pocket tucks Kaki into the tube, and Moon Log uses its Soul Arch variant. A slightly wider hold band and 0.12-second grace keep tiny pocket jitter from cancelling the pose. Releasing Trick exits deliberately; if the barrel forces Kaki out, Trick must be released before another tube session can begin. The compact tube HUD shows live time and points, and a 0.45-second or longer ride receives a clean-exit result. Around a launch, a held request chooses Frontside Grab, or Stalefish Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time. Any aerial trick still held at contact causes a wipeout.
 
 In the air, left/right keeps steering the flight line and also rotates Kaki's body and board; up/down trims the board. This shared axis is available in both control modes so Simple players can spin, score rotations, and actively match a landing.
 
@@ -29,9 +29,9 @@ Turbo is the same common action in both modes: hold either Shift, L3 (10), or th
 
 | Action | Keyboard | Standard gamepad | Touch control | On the wave | In the air |
 | --- | --- | --- | --- | --- | --- |
-| Rail / `trick1` | Q; legacy X or C | X (2) or left bumper (4) | Left Spin button | Snap / slash | Front Rail Grab |
-| Tail / `trick2` | E | Y (3) or right bumper (5) | Right Spin button | Cutback / layback | Tail Grab |
-| Flip / `trick3` | F | B (1) | Trick button | Floater / re-entry | Board Varial |
+| Frontside / `trick1` | Q; legacy X or C | X (2) or left bumper (4) | Left button | Snap / slash | Frontside Grab |
+| Stalefish / `trick2` | E | Y (3) or right bumper (5) | Right button | Cutback / layback | Stalefish Grab |
+| Varial / `trick3` | F | B (1) | Trick button | Regular/goofy stance; Floater at lip | Board Varial |
 | Twist / `trick4` | T | Left trigger (6) or right-stick press (11) | T / Twist button | Tube Tuck; Moon Log Soul Arch | Kaki Twist |
 
 Advanced gamepad B is Board Varial during a run and retry only on the results screen. Advanced touch remaps the same physical five-button cluster to Q/E/F/T plus Action; the labels remain compact enough for the Simple layout.
@@ -88,7 +88,7 @@ Perfect, clean, and wobble landings preserve progressively less speed. A short c
 
 Advanced mode composes body spin, manual trim, and the Q/E/F/T manifest directly:
 
-- Front Rail and Tail Grab are held tricks. Tail pays more, changes trim, rewards an apex hold, and adds descending risk.
+- Frontside and Stalefish Grab are held tricks. Stalefish pays more, changes trim, rewards an apex hold, and adds descending risk.
 - Board Varial is a discrete board-relative turn with start, height, and airtime gates.
 - Kaki Twist is a larger signature counter-rotation with stricter gates and board-specific variants.
 
@@ -112,7 +112,7 @@ Turbo is a finite physical overdrive shared by Simple and Advanced controls. A f
 
 Only an aerial with a completed trick or at least a half-turn, followed by a clean or perfect landing, adds fuel. Completed trick entries, rotation, and a perfect grade increase the refill; exact-repeat decay also reduces fuel, closing the easiest farming loop. Empty pops, wobble recoveries, and failed landings add none. Wipeout keeps the mechanic legible by removing 25% of the remaining tank rather than silently resetting it.
 
-Flow is a separate 0–100 style/combo state. Valid full arcs, committed direction changes, timed pumps, varied landed tricks, landing quality, wildlife rides, near misses, and set-piece bonuses add Flow. A strong line can briefly sustain Flow that an action already earned, but ordinary riding never creates it; passive play, stalling, repetition, wobble, and wipeouts reduce it. Flow drives the live score multiplier but never replaces physical speed.
+Flow is a separate 0–100 style/combo state. Valid full arcs, committed direction changes, timed pumps, varied landed tricks, landing quality, wildlife rides, near misses, and set-piece bonuses add Flow. A strong line can briefly sustain Flow that an action already earned, but ordinary riding never creates it; passive play, stalling, repetition, wobble, and wipeouts reduce it. Flow drives the live x1–x10 score multiplier but never replaces physical speed.
 
 ## Wave Read Assist and teaching
 

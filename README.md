@@ -23,12 +23,12 @@ Simple Controls are the default:
 | Intent | Keyboard | Standard gamepad | Touch |
 | --- | --- | --- | --- |
 | Travel and carve; rotate and trim in air | Arrows or WASD | Left stick or D-pad | Analog surf stick |
-| Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
+| Action: 0.5 s tuck preload, pump, and pop | Space or Z | A or right trigger | **Action** |
 | Turbo Boost | Hold either Shift | Left-stick press / L3 | Hold **Turbo** |
 | Context trick / tube hold | F or X | X or B | **Trick** |
 | Pause | Escape or P | Start | **II** pause button; Settings also pauses |
 
-Advanced Controls preserve the original Q/E/F/T trick map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
+Advanced Controls can be selected in Settings: Q is Frontside Grab, E is Stalefish Grab, F is Board Varial, and T is Kaki Twist. On the face, F switches regular/goofy stance; in the air it remains the board-trick key. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
 
 The standard gamepad now owns the whole arcade loop: stick/D-pad navigation, A to activate, B to close dialogs or instantly retry results, and Start to pause/resume. Directional focus repeats deliberately, while sliders and selects adjust in place. Touch play uses a continuous radial analog stick plus independent Action, Trick, and Turbo pointers. Starting a mobile run requests fullscreen and a native landscape lock; unsupported browsers gate play behind a rotate-phone prompt instead of squeezing controls into portrait.
 
@@ -42,11 +42,11 @@ Speed, Turbo, and Flow have separate jobs:
 
 - **Speed** is canonical path motion and is communicated primarily by the trajectory wake, tail spray, parallax, pose, and audio.
 - **Turbo** is a common short overdrive in both control modes. Hold Shift, L3, or the touch Turbo button on the face to spend it; landed tricks refill it.
-- **Flow** is the run's combo/style state. Valid full carves, timed pumps, direction changes, varied tricks, clean landings, and wildlife moments build it. A strong line can briefly sustain earned Flow, but passive riding, repetition, stalling, wobble, and wipeouts reduce it.
+- **Flow** is the run's x1–x10 combo/style state. Valid full carves, timed pumps, direction changes, varied tricks, clean landings, and wildlife moments build it. A strong line can briefly sustain earned Flow, but passive riding, repetition, stalling, wobble, and wipeouts reduce it.
 
 The persistent play HUD is limited to score, time or paws, Turbo, and a compact combo only while it is active. Speed, Flow, Set, powerup, and pump meters no longer compete with the wave read.
 
-Simple Controls make Trick contextual: hold it inside Twilight's critical pocket to tuck into the tube, or use it around a launch to buffer an eligible aerial move. A large move that no longer fits falls back to a readable grab, and late descent begins helping the board toward the nearest valid landing tangent. Advanced Controls retain direct on-wave maneuvers, a dedicated held Tube Tuck/Soul Arch, and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
+Simple Controls make Trick contextual: a quick tap on the face switches regular/goofy stance; a deliberate hold inside Twilight's critical pocket tucks into the tube; and an aerial press buffers an eligible move. Holding any aerial trick through contact now wipes out, so every trick must be completed and released before landing. A large move that no longer fits falls back to a readable grab, and late descent begins helping the board toward the nearest valid landing tangent. Advanced Controls retain direct on-wave maneuvers, a dedicated held Tube Tuck/Soul Arch, and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing, and successful trick landings refill Turbo.
 
 Fresh profiles open on **Twilight Glass** and receive six small contextual **Surf School** prompts: drop for speed, climb with carried speed, cut back, hit the lip, trick, and match the landing. Each lesson advances only after the physical action succeeds and can be armed again from Settings.
 

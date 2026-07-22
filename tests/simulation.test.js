@@ -523,7 +523,7 @@ test("only successfully banked tricks refill Turbo, with quality and repetition 
   const landedTrick = prepareLaunch(BOARDS.foamPuff);
   landedTrick.controlMode = "advanced";
   landedTrick.player.turbo = 0.08;
-  for (let step = 0; step < 12; step += 1) {
+  for (let step = 0; step < 14; step += 1) {
     landedTrick.update(FIXED_STEP, {
       trick1: true,
       trick1Pressed: step === 0,
@@ -537,6 +537,69 @@ test("only successfully banked tricks refill Turbo, with quality and repetition 
   const landingEvents = collectEvents(landedTrick);
   assert.ok(landedTrick.player.turbo > 0.08);
   assert.ok(landingEvents.some((event) => event.type === "turboRefill"));
+});
+
+test("holding a trick through contact crashes while a released trick can land", () => {
+  for (const [controlMode, heldInput] of [
+    ["simple", { trick: true }],
+    ["advanced", { trick1: true }],
+  ]) {
+    const held = prepareLaunch(BOARDS.foamPuff);
+    held.controlMode = controlMode;
+    forceContact(held, 0);
+    held.update(FIXED_STEP, heldInput);
+    assert.equal(held.player.state, "wipeout", controlMode);
+    assert.equal(held.player.wipeoutCause, "heldTrickLanding", controlMode);
+    assert.ok(collectEvents(held).some((event) => event.type === "wipeout"), controlMode);
+
+    const released = prepareLaunch(BOARDS.foamPuff);
+    released.controlMode = controlMode;
+    forceContact(released, 0);
+    released.update(FIXED_STEP, controlMode === "simple"
+      ? { trickReleased: true }
+      : { trick1Released: true });
+    assert.notEqual(released.player.state, "wipeout", controlMode);
+  }
+});
+
+test("a half-second Action tuck adds a bounded speed preload and trades away steering", () => {
+  const tucked = beginRiding(BOARDS.mangoFish);
+  const free = beginRiding(BOARDS.mangoFish);
+  tucked.wave.curlX = -1_000;
+  free.wave.curlX = -1_000;
+  tucked.player.speed = 70;
+  free.player.speed = 70;
+  for (let step = 0; step < Math.ceil(TUNING.tuckPreloadDuration / FIXED_STEP); step += 1) {
+    tucked.update(FIXED_STEP, { edge: true, edgePressed: step === 0, y: 0.7 });
+    free.update(FIXED_STEP, { y: 0.7 });
+  }
+  assert.ok(tucked.player.speed > free.player.speed + 1.5);
+  assert.ok(tucked.player.speed < free.player.speed + TUNING.tuckPreloadSpeedBoost + 1);
+  assert.ok(Math.abs(tucked.player.faceVelocity) < Math.abs(free.player.faceVelocity) * 0.9);
+  assert.equal(tucked.player.tuckPreloadTime, TUNING.tuckPreloadDuration);
+
+  for (let step = 0; step < 30; step += 1) tucked.update(FIXED_STEP, { edge: true });
+  assert.equal(tucked.player.tuckPreloadTime, TUNING.tuckPreloadDuration,
+    "holding past the preload window cannot farm repeated speed kicks");
+});
+
+test("grounded Trick switches regular and goofy stance without scoring an aerial trick", () => {
+  const simple = beginRiding(BOARDS.foamPuff, { controlMode: "simple" });
+  assert.equal(simple.player.ridingStance, "regular");
+  simple.update(FIXED_STEP, { trick: true, trickPressed: true });
+  simple.update(FIXED_STEP, { trickReleased: true });
+  assert.equal(simple.player.ridingStance, "goofy");
+  assert.equal(simple.player.stanceSwitches, 1);
+  assert.ok(collectEvents(simple).some((event) => event.type === "stanceSwitch"));
+  simple.update(FIXED_STEP, { trick: true, trickPressed: true });
+  simple.update(FIXED_STEP, { trickReleased: true });
+  assert.equal(simple.player.ridingStance, "regular");
+
+  const advanced = beginRiding(BOARDS.foamPuff, { controlMode: "advanced" });
+  advanced.update(FIXED_STEP, { trick3: true, trick3Pressed: true });
+  assert.equal(advanced.player.ridingStance, "goofy");
+  assert.equal(advanced.player.maneuver.id, "");
+  assert.equal(advanced.score.breakdown.maneuvers, 0);
 });
 
 test("launch energy is led by approach speed and uphill slope while Pump remains an enhancer", () => {
@@ -666,7 +729,12 @@ test("Simple TRICK holds a scored tube tuck inside Twilight's rideable pocket", 
   player.speed = 116;
   const styleBefore = simulation.score.breakdown.style;
 
-  simulation.update(FIXED_STEP, { trick: true, trickPressed: true });
+  for (let step = 0; step < Math.ceil(TUNING.simpleGrabHold / FIXED_STEP) + 1; step += 1) {
+    simulation.update(FIXED_STEP, {
+      trick: true,
+      trickPressed: step === 0,
+    });
+  }
 
   assert.equal(player.state, "riding");
   assert.equal(player.maneuver.id, "tubeTuck");
@@ -689,7 +757,12 @@ test("Simple TRICK holds a scored tube tuck inside Twilight's rideable pocket", 
   simulation.update(FIXED_STEP, { trick: true });
   assert.equal(player.maneuver.id, "", "a held input cannot silently create a second tube session");
   simulation.update(FIXED_STEP, { trickReleased: true });
-  simulation.update(FIXED_STEP, { trick: true, trickPressed: true });
+  for (let step = 0; step < Math.ceil(TUNING.simpleGrabHold / FIXED_STEP) + 1; step += 1) {
+    simulation.update(FIXED_STEP, {
+      trick: true,
+      trickPressed: step === 0,
+    });
+  }
   assert.equal(player.maneuver.id, "tubeTuck", "release and press explicitly re-arm Tube Tuck");
   simulation.update(FIXED_STEP, { trickReleased: true });
   assert.equal(player.maneuver.id, "");
@@ -931,7 +1004,7 @@ test("Flow owns style/combo truth independently from physical speed tiers", () =
   const stalledFlow = score.flow;
   score.registerDirectionChange({ speed: 110, turnForce: 0.8, switchStance: true });
   assert.ok(score.flow > stalledFlow, "a committed switch reversal builds Flow");
-  assert.equal(score.combo, 1 + score.flow * 3.2);
+  assert.equal(score.combo, 1 + score.flow * 9);
 
   const first = score.registerLanding({ turns: 1, maxHeight: 24, quality: "clean" });
   const afterVariety = score.flow;
@@ -1285,7 +1358,7 @@ test("Endless Surf replaces the clock with deterministic escalating sets and cap
   simulation.activeTime = TUNING.endlessSetDuration * 100;
   simulation.update(FIXED_STEP, {});
   assert.equal(simulation.endlessSet, TUNING.endlessMaxSet);
-  assert.ok(simulation.currentMultiplier() <= 7.5);
+  assert.ok(simulation.currentMultiplier() <= 10);
 });
 
 test("Score Attack preserves the 78-second finish while Endless ends on the third wipeout", () => {

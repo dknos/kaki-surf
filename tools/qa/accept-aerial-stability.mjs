@@ -7,6 +7,7 @@ const baseUrl = process.env.KAKI_SURF_QA_URL
 const outputDir = process.env.KAKI_SURF_AERIAL_QA_DIR
   ?? path.resolve("docs/images/qa-aerial-stability");
 const conditionId = process.env.KAKI_SURF_QA_CONDITION ?? "twilightGlass";
+const advancedTricks = process.env.KAKI_SURF_QA_TRICKS === "1";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pages = await fetch(`${cdpHost}/json/list`).then((response) => response.json());
@@ -67,6 +68,10 @@ const keyMap = {
   ArrowDown: ["ArrowDown", 40],
   Space: [" ", 32],
   ShiftLeft: ["Shift", 16],
+  KeyQ: ["q", 81],
+  KeyE: ["e", 69],
+  KeyF: ["f", 70],
+  KeyT: ["t", 84],
 };
 
 async function key(code, down) {
@@ -98,6 +103,7 @@ function aerialFrame(sample, elapsedMs) {
     state: sample.state,
     naturalY: sample.naturalPlayerY,
     finalY: sample.finalPlayerScreenY,
+    riderScale: Number(sample.riderScale) || 1,
     rotation: sample.rotation,
     activeTime: sample.activeTime,
     airVY: sample.airVY,
@@ -105,6 +111,13 @@ function aerialFrame(sample, elapsedMs) {
     backdropAltitude: sample.backdropAltitude,
     backdropSourceX: sample.backdropSourceX,
     backdropSourceY: sample.backdropSourceY,
+    cloudBlend: Number(sample.backdropBlendState?.coastToCloud) || 0,
+    maxAirHeight: Number(sample.maxAirHeight) || 0,
+    waveMomentum: Number(sample.waveMomentum) || 0,
+    momentumLiftMultiplier: Number(sample.momentumLiftMultiplier) || 1,
+    aerialBoostStack: Number(sample.aerialBoostStack) || 0,
+    trickSequence: sample.trickSequence ?? [],
+    multiplier: Number(sample.multiplier) || 1,
     elapsedMs,
   };
 }
@@ -212,6 +225,10 @@ function summarizeJump(name, frames, landing, coverage) {
     apexNaturalY: apex.naturalY,
     apexFinalY: apex.finalY,
     visibleTravel: frames[0].finalY - apex.finalY,
+    riderScaleRange: [
+      Math.min(...frames.map((frame) => frame.riderScale)),
+      Math.max(...frames.map((frame) => frame.riderScale)),
+    ],
     longestNonApexPlateau,
     longestRenderedNonApexPlateau,
     minimumQuarterSecondTravel,
@@ -225,6 +242,11 @@ function summarizeJump(name, frames, landing, coverage) {
       - Math.min(...frames.map((frame) => frame.rotation)),
     stageOffsetRange: [Math.min(...stageOffsets), Math.max(...stageOffsets)],
     backdropAltitudes: [Math.min(...frames.map((frame) => frame.backdropAltitude)), Math.max(...frames.map((frame) => frame.backdropAltitude))],
+    cloudBlendRange: [Math.min(...frames.map((frame) => frame.cloudBlend)), Math.max(...frames.map((frame) => frame.cloudBlend))],
+    physicalHeight: Math.max(...frames.map((frame) => frame.maxAirHeight)),
+    launchMomentum: frames[0].waveMomentum,
+    momentumLiftMultiplier: frames[0].momentumLiftMultiplier,
+    aerialBoostStack: frames[0].aerialBoostStack,
     backdropSources: [...backdropSources],
     backdropSourceXRange: [Math.min(...backdropSourceXs), Math.max(...backdropSourceXs)],
     maximumBackdropSourceXDelta,
@@ -241,14 +263,18 @@ async function performJump({
   name,
   prep = [],
   prepMs = 0,
+  leadMs = 0,
   approachMs = 0,
   turbo = false,
   releaseAfterMs = 50,
   spin = false,
   chargeMs = 0,
+  trickSchedule = [],
 }) {
-  await waitForPlayable();
+  const playable = await waitForPlayable();
+  const wipeoutsBefore = Number(playable.wipeouts) || 0;
   if (prepMs > 0) await hold(prep, prepMs);
+  if (leadMs > 0) await hold(["ArrowRight"], leadMs);
   if (approachMs > 0) await hold(["ArrowUp", "ArrowRight"], approachMs);
 
   await key("Space", true);
@@ -267,6 +293,9 @@ async function performJump({
   }
   await key("Space", false);
   if (!first) throw new Error(`${name}: real input did not launch Kaki`);
+  if ((Number(first.wipeouts) || 0) !== wipeoutsBefore) {
+    throw new Error(`${name}: approach wiped out before takeoff`);
+  }
 
   const launchAt = Date.now();
   const frames = [aerialFrame(first, 0)];
@@ -275,10 +304,21 @@ async function performJump({
   let nextCaptureAt = 250;
   let lineReleased = false;
   let spinPhase = spin ? "right" : "done";
+  const scheduledTricks = trickSchedule.map((trick) => ({ ...trick, started: false, released: false }));
   let landing = null;
-  while (Date.now() - launchAt < 5000) {
+  while (Date.now() - launchAt < 7000) {
     await sleep(16);
     const elapsedMs = Date.now() - launchAt;
+    for (const trick of scheduledTricks) {
+      if (!trick.started && elapsedMs >= trick.at) {
+        await key(trick.code, true);
+        trick.started = true;
+      }
+      if (trick.started && !trick.released && elapsedMs >= trick.at + trick.duration) {
+        await key(trick.code, false);
+        trick.released = true;
+      }
+    }
     if (!lineReleased && elapsedMs >= releaseAfterMs) {
       await key("ArrowUp", false);
       if (turbo) await key("ShiftLeft", false);
@@ -305,8 +345,10 @@ async function performJump({
     }
   }
   await releaseAll();
-  if (!landing) throw new Error(`${name}: flight did not finish within five seconds`);
-  if (landing.state === "wipeout") throw new Error(`${name}: jump ended in a wipeout`);
+  if (!landing) throw new Error(`${name}: flight did not finish within seven seconds`);
+  if (landing.state === "wipeout") {
+    throw new Error(`${name}: jump ended in a wipeout (${landing.wipeoutCause || "unknown"}; ${landing.elapsedMs}ms; gap ${Number(landing.barrelGap).toFixed(2)})`);
+  }
   await waitForPlayable();
   coverage.push(await captureCanvas(`${name}-ready`));
   return { name, frames, summary: summarizeJump(name, frames, landing, coverage) };
@@ -338,6 +380,7 @@ for (let attempt = 0; attempt < 200; attempt += 1) {
 browserFailures.length = 0;
 await evaluate(`(() => {
   document.querySelector(${JSON.stringify(`[data-condition="${conditionId}"]`)})?.click();
+  document.querySelector('[data-board="foamPuff"]')?.click();
   const select = document.querySelector('[data-setting="controlMode"]');
   select.value = 'simple';
   select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -352,18 +395,33 @@ const jumps = [];
 jumps.push(await performJump({
   name: "01-small",
   prep: ["ArrowLeft"],
-  prepMs: 1800,
+  prepMs: 700,
 }));
 jumps.push(await performJump({
   name: "02-medium",
+  leadMs: 350,
   turbo: true,
 }));
+if (advancedTricks) {
+  await evaluate(`(() => {
+    const select = document.querySelector('[data-setting="controlMode"]');
+    select.value = 'advanced';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+}
 jumps.push(await performJump({
   name: "03-huge",
-  prep: ["ArrowDown", "ArrowRight"],
-  prepMs: 2000,
+  prep: ["ArrowRight", "ShiftLeft"],
+  prepMs: 800,
   turbo: true,
   spin: true,
+  chargeMs: 500,
+  trickSchedule: advancedTricks ? [
+    { code: "KeyQ", at: 100, duration: 260 },
+    { code: "KeyE", at: 420, duration: 300 },
+    { code: "KeyF", at: 760, duration: 60 },
+    { code: "KeyT", at: 1160, duration: 60 },
+  ] : [],
 }));
 
 const report = {
@@ -386,18 +444,30 @@ if (jumps[2].summary.visibleTravel < 40) {
 if (jumps.some((jump) => jump.summary.longestNonApexPlateau > 0)) {
   throw new Error("A non-apex rider screen-position plateau was detected");
 }
-if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.8)) {
+if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.5)) {
   throw new Error(`Huge air moved only ${jumps[2].summary.minimumQuarterSecondTravel.toFixed(2)}px in a non-apex quarter second`);
 }
-if (jumps.some((jump) => jump.summary.backdropAltitudes.some((value) => value !== 0)
-  || jump.summary.backdropSources.some((value) => value !== 424))) {
-  throw new Error("A jump changed the stable condition backdrop");
+if (jumps.some((jump) => jump.summary.backdropSources.some((value) => value !== 424))) {
+  throw new Error("A jump changed the stable condition panorama crop");
+}
+if (jumps[2].summary.cloudBlendRange[1] < 0.85) {
+  throw new Error("The maximum earned air never entered the cloud veil");
 }
 if (jumps.some((jump) => jump.summary.maximumBackdropSourceXDelta > 1)) {
   throw new Error("Panorama source travel jumped to an unrelated part of the artwork");
 }
 if (jumps.some((jump) => !jump.summary.fullCanvasCoverage)) {
   throw new Error("A captured frame failed full-canvas coverage");
+}
+if (advancedTricks) {
+  const entries = jumps[2].frames.flatMap((frame) => frame.trickSequence);
+  const ids = new Set(entries.map((entry) => entry.id));
+  for (const id of ["frontRailGrab", "tailGrab", "boardVarial", "kakiTwist"]) {
+    if (!ids.has(id)) throw new Error(`Advanced real-input sequence never started ${id}`);
+    if (!entries.some((entry) => entry.id === id && entry.complete)) {
+      throw new Error(`Advanced real-input sequence never completed ${id}`);
+    }
+  }
 }
 if (browserFailures.length) {
   throw new Error(`Browser QA reported ${browserFailures.length} error(s):\n${browserFailures.join("\n")}`);

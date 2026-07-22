@@ -9,6 +9,11 @@ const BOARD_PROFILES = Object.freeze({
 
 const POSES = Object.freeze({
   neutralRide: pose(),
+  regularRide: pose({ lean: -1, headX: 1, leftPaw: [-12, -13], rightPaw: [7, -10], legSpread: 6 }),
+  // The full rider is mirrored for goofy stance below, so keep this authored
+  // in rider-local space. Mirroring already swaps the lead foot; pre-mirroring
+  // these values as well made the two stances cancel out visually.
+  goofyRide: pose({ crouch: 1, lean: -1, headX: 2, leftPaw: [-13, -12], rightPaw: [8, -11], legSpread: 7 }),
   highLineCarve: pose({ crouch: 1, lean: -2, headX: 2, leftPaw: [-12, -12], rightPaw: [7, -10], legSpread: 6 }),
   downFaceCarve: pose({ crouch: 2, lean: 3, headX: 3, leftPaw: [-8, -14], rightPaw: [10, -9], legSpread: 6 }),
   snap: pose({ crouch: 2, lean: -4, headX: 4, leftPaw: [-13, -15], rightPaw: [8, -7], legSpread: 7, expression: "focus" }),
@@ -41,6 +46,11 @@ const POSE_ALIASES = Object.freeze({
   neutral: "neutralRide",
   ride: "neutralRide",
   neutralride: "neutralRide",
+  regular: "regularRide",
+  regularride: "regularRide",
+  straight: "regularRide",
+  goofy: "goofyRide",
+  goofyride: "goofyRide",
   high: "highLineCarve",
   highcarve: "highLineCarve",
   highlinecarve: "highLineCarve",
@@ -128,7 +138,7 @@ export function resolveKakiPose(player = {}) {
       if ((player.compression ?? 0) > 0.58 || (player.charge ?? 0) > 0.55) return "compression";
       if ((player.faceVelocity ?? 0) < -0.22) return "highLineCarve";
       if ((player.faceVelocity ?? 0) > 0.22) return "downFaceCarve";
-      return "neutralRide";
+      return player.ridingStance === "goofy" ? "goofyRide" : "regularRide";
   }
 }
 
@@ -238,7 +248,11 @@ export function drawKittySprite(ctx, x, y, angle, player, palette, options = {})
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   ctx.rotate(snapAngle(angle + poseData.lean * 0.035 + (poseData.loose ? Math.sin((player.stateTime ?? 0) * 17) * 0.16 : 0)));
-  ctx.scale(Math.sign(options.direction ?? player?.travelDirection ?? 1) || 1, 1);
+  const travelDirection = Math.sign(options.direction ?? player?.travelDirection ?? 1) || 1;
+  const stanceDirection = Math.sign(
+    options.stanceDirection ?? (player?.ridingStance === "goofy" ? -1 : 1),
+  ) || 1;
+  ctx.scale(travelDirection * stanceDirection, 1);
   ctx.translate(0, -poseData.float);
 
   // Tail and independent legs keep the plush silhouette readable at speed.

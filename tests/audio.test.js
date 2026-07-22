@@ -43,6 +43,11 @@ test("direction and downhill events have physical, direction-aware pitch sweeps"
   assert.equal(firstTone(calls).start, 294, "string-form semantic events remain supported");
 
   calls.length = 0;
+  audio.onEvent({ type: "stanceSwitch", payload: { stance: "goofy" } });
+  assert.equal(firstTone(calls).start, 392, "goofy stance has the mirrored confirmation sweep");
+  assert.equal(calls.filter((call) => call.method === "tone").length, 3);
+
+  calls.length = 0;
   audio.onEvent({ type: "downhillDrive", payload: { drive: 1, tier: 4 } });
   const downhill = firstTone(calls);
   assert.ok(downhill.end > downhill.start * 4, "downhill drive rises sharply with speed");

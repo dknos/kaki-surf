@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.1.2";
+export const GAME_VERSION = "2.2.0";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -326,6 +326,11 @@ export const TUNING = {
   simpleAutoLevelStart: 18,
   simpleTrickBuffer: 0.34,
   simpleGrabHold: 0.115,
+  // Action is a half-second lip preload: a small carried-speed reward in
+  // exchange for deliberately reduced steering while Kaki is tucked.
+  tuckPreloadDuration: 0.5,
+  tuckPreloadSpeedBoost: 6,
+  tuckPreloadSteeringScale: 0.82,
   perfectLandingCarry: 0.58,
   cleanLandingCarry: 0.4,
   wobbleLandingCarry: 0.18,
@@ -466,7 +471,7 @@ export const SCORE = {
   wobbleSave: 55,
   repeatDecay: 0.58,
   comboStep: 0.18,
-  comboMax: 4.2,
+  comboMax: 10,
   switchTakeoff: 80,
   switchLanding: 135,
   tubeStylePerSecond: 58,

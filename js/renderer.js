@@ -2,7 +2,9 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import {
   AERIAL_PANORAMA,
   aerialBackdropCropShelves,
+  aerialCloudLayerPresence,
   projectAirY,
+  riderScaleForProjectedY,
 } from "./aerial.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { cameraLayerOffset } from "./camera.js";
@@ -62,6 +64,35 @@ export function backgroundPanoramaCropY(source) {
   return aerialBackdropCropShelves().coast;
 }
 
+/** Advance only the cloud-overlay presentation; the panorama source is fixed. */
+export function advanceAerialBackdropState(previousState, player, dt) {
+  const previousAltitude = Number(previousState?.altitude) || 0;
+  const targetAltitude = player?.state === "airborne"
+    ? clamp(Number(player?.aerialAltitude) || 0, 0, 1)
+    : 0;
+  const altitude = damp(
+    previousAltitude,
+    targetAltitude,
+    targetAltitude > previousAltitude ? 4.8 : 6.4,
+    Math.max(0, Number(dt) || 0),
+  );
+  const frameDelta = Math.abs(altitude - previousAltitude);
+  return {
+    altitude,
+    previousAltitude,
+    frameDelta,
+    maximumFrameDelta: Math.max(
+      Number(previousState?.maximumFrameDelta) || 0,
+      frameDelta,
+    ),
+    blend: {
+      coastToCloud: aerialCloudLayerPresence(altitude),
+      cloudToUpper: 0,
+      upperToSpace: 0,
+    },
+  };
+}
+
 /** One interpolation/projection is shared by Kaki, board, and rider effects. */
 export function riderScreenProjection(simulation, alpha = 1) {
   const player = simulation?.player;
@@ -80,11 +111,13 @@ export function riderScreenProjection(simulation, alpha = 1) {
     : Number.NaN;
   const finalY = player?.state === "airborne" ? projectAirY(naturalY) : naturalY;
   const frameOffsetY = player?.state === "airborne" ? finalY - naturalY : 0;
+  const riderScale = player?.state === "airborne" ? riderScaleForProjectedY(finalY) : 1;
   return Object.freeze({
     worldX,
     naturalY,
     frameOffsetY,
     finalY,
+    riderScale,
   });
 }
 
@@ -357,6 +390,7 @@ export class KakiRenderer {
 
     const player = simulation.player;
     this.currentPlayer = player;
+    this.aerialBackdrop = advanceAerialBackdropState(this.aerialBackdrop, player, dt);
     advanceWavePresentationClocks(
       this.wavePresentationClocks,
       simulation.wave,
@@ -572,11 +606,9 @@ export class KakiRenderer {
 
   drawAerialDepthLayer(simulation, foreground = false) {
     const player = simulation?.player;
-    const altitude = 0;
-    const cloudPresence = smoothstep(0.13, 0.3, altitude)
-      * (1 - smoothstep(0.58, 0.8, altitude));
+    const altitude = clamp(Number(this.aerialBackdrop?.altitude) || 0, 0, 1);
+    const cloudPresence = aerialCloudLayerPresence(altitude);
     if (cloudPresence <= 0.015) {
-      if (!foreground) this.drawConditionSpaceDetails(simulation, altitude);
       return;
     }
     const ctx = this.ctx;
@@ -588,14 +620,25 @@ export class KakiRenderer {
 
     if (!foreground) {
       ctx.save();
-      ctx.globalAlpha = (0.12 + cloudPresence * 0.26) * (this.settings.highContrast ? 1.25 : 1);
+      // The coast panorama remains a single fixed crop. This irregular,
+      // full-width cloud bank is composited over it and therefore has no image
+      // edge, crop seam, or uncovered row to reveal during a high jump.
+      ctx.globalAlpha = cloudPresence * (this.settings.highContrast ? 0.86 : 0.76);
+      ctx.fillStyle = p.haze;
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, 112);
+      ctx.globalAlpha = (0.12 + cloudPresence * 0.58)
+        * (this.settings.highContrast ? 1.15 : 1);
       const slow = wrapVisual(38 - signedTravel * 0.08 - drift * 0.2, 492) - 54;
       const middle = wrapVisual(256 - signedTravel * 0.2 - drift * 0.55, 536) - 70;
-      drawCloud(ctx, slow, 34 + Math.round(altitude * 28), cloudLight, cloudShade);
-      drawCloud(ctx, middle, 102 - Math.round(altitude * 36), cloudLight, cloudShade);
-      drawCloud(ctx, middle + 198, 66, cloudLight, cloudShade);
+      drawCloudCluster(ctx, slow, 20 + Math.round(altitude * 10), cloudLight, cloudShade);
+      drawCloudCluster(ctx, middle, 58 - Math.round(altitude * 12), cloudLight, cloudShade);
+      drawCloudCluster(ctx, middle + 198, 30, cloudLight, cloudShade);
+      for (let index = -1; index < 7; index += 1) {
+        const bankX = index * 68 - ((signedTravel * 0.035 + drift * 0.12) % 68);
+        const bankY = 70 + ((index * 13) % 23) - Math.round(altitude * 9);
+        drawCloudCluster(ctx, bankX, bankY, cloudLight, cloudShade);
+      }
       ctx.restore();
-      this.drawConditionSpaceDetails(simulation, altitude);
       return;
     }
 
@@ -610,12 +653,8 @@ export class KakiRenderer {
     const frontX = riderX - 44 + (pass - 0.6) * 42;
     const frontY = clamp(riderY + 8, 22, 174);
     ctx.save();
-    ctx.globalAlpha = cloudPresence * 0.32;
+    ctx.globalAlpha = cloudPresence * 0.28;
     drawCloud(ctx, frontX, frontY, cloudLight, cloudShade);
-    ctx.globalAlpha = cloudPresence * 0.62;
-    ctx.strokeStyle = p.white;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(Math.round(riderX - 7), Math.round(riderY - 9), 14, 16);
     ctx.restore();
   }
 
@@ -931,12 +970,15 @@ export class KakiRenderer {
   drawSurfer(simulation, alpha) {
     const player = simulation.player;
     const wave = simulation.wave;
+    const stanceDirection = player.ridingStance === "goofy" ? -1 : 1;
+    let riderScale = 1;
     let x;
     let y;
     if (player.state === "airborne" || player.state === "wipeout") {
       const projection = riderScreenProjection(simulation, alpha);
       x = projection.worldX;
       y = projection.finalY;
+      riderScale = projection.riderScale;
     } else {
       x = lerp(player.previousWorldX, player.worldX, alpha);
       const face = lerp(player.previousFace, player.face, alpha);
@@ -958,7 +1000,10 @@ export class KakiRenderer {
         assets: this.visualAssets,
         airborne: true,
       });
-      drawKittySprite(this.ctx, x - direction * 4, y - 1, player.bodyAngle, this.presentationPlayer(player), this.palette, { direction });
+      drawKittySprite(this.ctx, x - direction * 4, y - 1, player.bodyAngle, this.presentationPlayer(player), this.palette, {
+        direction,
+        stanceDirection,
+      });
       if (player.stateTime > 0.62) drawEmbarrassedPaw(this.ctx, x - 2, Math.min(188, y + 13), this.palette);
       return;
     }
@@ -966,9 +1011,13 @@ export class KakiRenderer {
     const boardAngle = resolvedBoardAngle(player);
     const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? player.takeoffDirection ?? 1) || 1;
     const mounted = Boolean(player.animalMount || player.mountKind || player.mountType);
+    const trickBodyPose = player.state === "airborne"
+      ? Number(player.trickManifest?.bodyPose) || 0
+      : 0;
     if (player.state === "airborne") {
       this.ctx.save();
       this.ctx.translate(x, y);
+      this.ctx.scale(riderScale, riderScale);
       if (!mounted) {
         drawBoardSprite(this.ctx, 0, 1, boardAngle, simulation.board, this.palette, {
           compression: player.compression,
@@ -977,7 +1026,15 @@ export class KakiRenderer {
           airborne: true,
         });
       }
-      drawKittySprite(this.ctx, 0, mounted ? -5 : 0, player.bodyAngle, this.presentationPlayer(player), this.palette, { direction });
+      drawKittySprite(
+        this.ctx,
+        0,
+        mounted ? -5 : 0,
+        player.bodyAngle + trickBodyPose,
+        this.presentationPlayer(player),
+        this.palette,
+        { direction, stanceDirection },
+      );
       this.ctx.restore();
       return;
     }
@@ -989,11 +1046,18 @@ export class KakiRenderer {
         airborne: player.state === "airborne",
       });
     }
-    drawKittySprite(this.ctx, x, y - (mounted ? 5 : 0), player.bodyAngle, this.presentationPlayer(player), this.palette, { direction });
+    drawKittySprite(this.ctx, x, y - (mounted ? 5 : 0), player.bodyAngle, this.presentationPlayer(player), this.palette, {
+      direction,
+      stanceDirection,
+    });
   }
 
   riderFrameOffsetY(simulation, alpha = 1) {
     return riderScreenProjection(simulation, alpha).frameOffsetY;
+  }
+
+  riderProjection(simulation, alpha = 1) {
+    return riderScreenProjection(simulation, alpha);
   }
 
   backgroundSourceY() {
@@ -1705,6 +1769,12 @@ function drawCloud(ctx, x, y, color, shade) {
   ctx.fillRect(px + 2, y + 3, 27, 6);
   ctx.fillRect(px + 8, y, 9, 5);
   ctx.fillRect(px + 19, y + 1, 6, 4);
+}
+
+function drawCloudCluster(ctx, x, y, color, shade) {
+  drawCloud(ctx, x, y, color, shade);
+  drawCloud(ctx, x + 20, y + 5, color, shade);
+  drawCloud(ctx, x + 9, y - 7, color, shade);
 }
 
 function drawPixelLightning(ctx, x, y, color) {
