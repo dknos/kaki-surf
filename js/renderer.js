@@ -809,13 +809,17 @@ export class KakiRenderer {
   drawPassedSkyBackdrop(simulation, window) {
     const ctx = this.ctx;
     const bottom = Math.round(window?.bottom ?? 104);
-    // The sky painter owns only the authored strip above the horizon. Below it
-    // the already-rendered backwater remains visible through the passed wave,
-    // so the opening can never turn into the old white/haze shelf.
+    // Rebuild the same backdrop stack that was behind the break before the
+    // wave was drawn. The panorama is screen-locked, while the authored coast
+    // shares the vertical world camera. Repainting only the panorama punched
+    // a pale wedge through the coast during high aerials.
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawSky(simulation);
     ctx.restore();
+    this.drawCoastline(simulation);
+    // Below the authored horizon the already-rendered backwater remains
+    // visible, so the opening cannot turn into a white/haze shelf.
     if (bottom <= 80) return;
     ctx.fillStyle = this.palette.water;
     ctx.globalAlpha = this.settings.highContrast ? 0.32 : 0.1;

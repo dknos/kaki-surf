@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **229/229 tests pass** and **35 JavaScript modules pass syntax checking**.
+Current result: **230/230 tests pass** and **35 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
@@ -22,7 +22,7 @@ Current result: **229/229 tests pass** and **35 JavaScript modules pass syntax c
 | --- | --- | --- | --- |
 | Entry/UI | Endless/Score Attack selector, menu, settings Simple, settings Advanced, six-step Surf School, results | Immediate start action before customization on portrait; mode-specific labels and records; Twilight travelling break and Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or overlapping long result rows | Pass |
 | Core ride | Core Surf Lab, right/left travel, downhill-right/downhill-left, uphill, reversal, launch, landing | One canonical path vector owns board, rider, wake, spray, camera, and audio; every condition scrolls at the forward dead zone; trajectory foam always trails; the drop/climb/cutback line reads without rewards or wildlife | Pass |
-| Air/landing | Small/medium/huge air, Coastal Sky/Cloud Layer/Upper Atmosphere/Kaki Space in all conditions, re-entry, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Canonical nonlinear altitude samples a seamless tall panorama behind a vertically fixed wave; only a qualified Turbo lip launch reaches space; Simple and Advanced steering both rotate the board; rider-only framing, signed horizontal travel, cloud depth, altitude audio, landing guide, and landing tangent remain legible | Pass |
+| Air/landing | Small/medium/huge air, Coastal Sky/Cloud Layer/Upper Atmosphere/Kaki Space in all conditions, re-entry, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Canonical nonlinear altitude samples a seamless tall panorama; an advanced trailing-break cutout restores the matching panorama and coast without a wedge; only a qualified Turbo lip launch reaches space; Simple and Advanced steering both rotate the board; physical framing, signed horizontal travel, cloud depth, altitude audio, landing guide, and landing tangent remain legible | Pass |
 | Wildlife | Dolphin and shark phases; whale distant, breach start/apex/return, ramp, rides, and splash | Whale art, collision, foam, and foreground mask share one water anchor; production whale weights remain zero | Pass |
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, expiration, consumption, protected event, plane drop | Unique silhouettes and temporary callouts; no persistent powerup meter; consumption and harmless misses remain visible | Pass |
 | Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation without traffic ping-pong, stable facing, breaker-aware occlusion, readable reactive text, and watercraft grounded in waterline bands | Pass |

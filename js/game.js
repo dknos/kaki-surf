@@ -1128,6 +1128,12 @@ export class KakiSurfGame {
       this.simulation.camera.verticalAnchorY = this.simulation.camera.worldY;
       this.simulation.camera.verticalTracking = true;
       this.renderer.cameraY = this.simulation.camera.worldY;
+      // Keep the orbital fixture honest: a real late-run launch often happens
+      // after the break has advanced far enough to open its trailing cutout.
+      // That overlap caught the aerial panorama/coast compositing regression.
+      if (stage.tier === 4) {
+        this.simulation.wave.curlWorldX = this.simulation.camera.worldX + 92;
+      }
       if (stage.label) {
         this.renderer.onEvent({
           type: "aerialMilestone",

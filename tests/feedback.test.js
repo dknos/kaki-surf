@@ -291,3 +291,37 @@ test("aerial panorama parallax preserves signed travel and freezes to the center
   assert.ok(reverse < center);
   assert.equal(backgroundParallaxPhase({ cameraWorldX: 900 }, true), center);
 });
+
+test("passed-break cutouts restore the camera-matched coast over aerial panoramas", () => {
+  const calls = [];
+  const transforms = ["world"];
+  const ctx = {
+    save() {
+      transforms.push(transforms.at(-1));
+    },
+    restore() {
+      transforms.pop();
+    },
+    setTransform() {
+      transforms[transforms.length - 1] = "screen";
+    },
+  };
+  const renderer = {
+    ctx,
+    drawSky() {
+      calls.push(["sky", transforms.at(-1)]);
+    },
+    drawCoastline() {
+      calls.push(["coastline", transforms.at(-1)]);
+    },
+  };
+
+  KakiRenderer.prototype.drawPassedSkyBackdrop.call(renderer, {
+    camera: { worldY: -118 },
+  }, { bottom: 80 });
+
+  assert.deepEqual(calls, [
+    ["sky", "screen"],
+    ["coastline", "world"],
+  ]);
+});
