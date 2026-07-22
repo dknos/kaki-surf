@@ -5,7 +5,6 @@ import test from "node:test";
 import { BOARDS, FIXED_STEP } from "../js/config.js";
 import {
   AIR_PROJECTION,
-  aerialCloudLayerPresence,
   projectAirY,
 } from "../js/aerial.js";
 import {
@@ -322,6 +321,7 @@ test("Kaki, board, and rider effects share one interpolated rider-space offset",
   assert.equal(projection.naturalY, -80);
   assert.equal(projection.finalY, projectAirY(-80));
   assert.equal(projection.finalY - projection.naturalY, projection.frameOffsetY);
+  assert.equal(projection.riderScale, 1, "air height must never resize Kaki or the board");
 
   for (const worldY of [0, -42, -96, -132]) {
     const samePhysicalPose = riderScreenProjection({
@@ -339,8 +339,11 @@ test("Kaki, board, and rider effects share one interpolated rider-space offset",
   assert.match(surferSource, /this\.ctx\.translate\(x, y\)/);
   assert.match(surferSource, /drawBoardSprite\(this\.ctx, 0, 1/);
   assert.match(surferSource, /drawKittySprite\([\s\S]*?this\.ctx,[\s\S]*?\n\s*0,/);
-  assert.match(surferSource, /this\.ctx\.scale\(riderScale, riderScale\)/);
+  assert.doesNotMatch(surferSource, /riderScale|\.scale\(/,
+    "the shared rider group must stay at its authored size throughout the jump");
   const renderSource = KakiRenderer.prototype.render.toString();
+  assert.doesNotMatch(renderSource, /drawAerialDepthLayer/,
+    "jump height must not introduce a cloud presentation layer");
   assert.match(renderSource, /deferredAerialRider = player\.state === "airborne"/);
   assert.ok(renderSource.indexOf("this.drawHud(simulation)") < renderSource.lastIndexOf("this.drawSurfer(simulation, alpha)"),
     "airborne Kaki is composited after the fixed HUD instead of disappearing behind it");
@@ -384,28 +387,25 @@ test("aerial panorama remains on the stable condition shelf for every jump heigh
   assert.equal(backgroundPanoramaCropY({ conditionId: "stormbreak", camera: { worldY: -500 } }), coast);
 });
 
-test("the cloud veil advances smoothly while the condition crop remains fixed", () => {
+test("aerial presentation stays on the coast with no cloud blend", () => {
   let state = {
     altitude: 0,
     maximumFrameDelta: 0,
     blend: { coastToCloud: 0, cloudToUpper: 0, upperToSpace: 0 },
   };
-  const ascent = [];
   for (let frame = 0; frame < 90; frame += 1) {
     state = advanceAerialBackdropState(state, { state: "airborne", aerialAltitude: 1 }, 1 / 60);
-    ascent.push(state.altitude);
-    assert.equal(state.blend.coastToCloud, aerialCloudLayerPresence(state.altitude));
+    assert.equal(state.altitude, 0);
+    assert.equal(state.previousAltitude, 0);
+    assert.equal(state.frameDelta, 0);
+    assert.equal(state.maximumFrameDelta, 0);
+    assert.equal(state.blend.coastToCloud, 0);
     assert.equal(state.blend.cloudToUpper, 0);
     assert.equal(state.blend.upperToSpace, 0);
   }
-  for (let index = 1; index < ascent.length; index += 1) {
-    assert.ok(ascent[index] > ascent[index - 1], "cloud entry cannot flash backward");
-    assert.ok(ascent[index] - ascent[index - 1] < 0.08, "cloud entry is rate-limited per frame");
-  }
-  assert.ok(state.blend.coastToCloud > 0.99);
-  const peak = state.altitude;
   state = advanceAerialBackdropState(state, { state: "riding", aerialAltitude: 0 }, 1 / 60);
-  assert.ok(state.altitude < peak && state.altitude > 0, "cloud exit eases instead of snapping");
+  assert.equal(state.altitude, 0);
+  assert.equal(state.blend.coastToCloud, 0);
   assert.equal(backgroundPanoramaCropY({ player: { aerialAltitude: 1 } }), 424);
 });
 

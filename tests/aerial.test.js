@@ -7,13 +7,11 @@ import {
   AERIAL_PANORAMA,
   aerialAltitudeForFlight,
   aerialCameraTarget,
-  aerialCloudLayerPresence,
   aerialPanoramaCropX,
   aerialPanoramaCropY,
   aerialZoneForAltitude,
   projectAirY,
   qualifyAerialLaunch,
-  riderScaleForProjectedY,
 } from "../js/aerial.js";
 import { BOARDS, FIXED_STEP } from "../js/config.js";
 import { SurfSimulation } from "../js/simulation.js";
@@ -78,15 +76,6 @@ test("carried momentum unlocks extra height only when real boosts are stacked", 
   assert.ok(turboMomentum.momentumLiftMultiplier > 1.08, "Turbo converts full momentum into extra lift");
   assert.ok(fullStack.momentumLiftMultiplier > 1.23, "Moon Pop, Mango Rush, Turbo, and momentum earn maximum lift");
   assert.ok(fullStack.expectedHeight > turboMomentum.expectedHeight);
-});
-
-test("cloud layer fades in smoothly without changing panorama shelves", () => {
-  assert.equal(aerialCloudLayerPresence(0.2), 0);
-  assert.equal(aerialCloudLayerPresence(0.58), 1);
-  const samples = [0.24, 0.3, 0.4, 0.5, 0.58].map(aerialCloudLayerPresence);
-  for (let index = 1; index < samples.length; index += 1) {
-    assert.ok(samples[index] >= samples[index - 1]);
-  }
 });
 
 test("canonical altitude rises nonlinearly and anticipates the wave on descent", () => {
@@ -176,11 +165,6 @@ test("high-air projection is natural below the threshold and monotonic above it"
     "five physical pixels near a real apex must remain visibly separated");
   assert.ok(71 - projectAirY(AIR_PROJECTION.supportedMinimumY) >= 50,
     "the supported maximum air retains a large visible rise");
-  const maximumScale = riderScaleForProjectedY(
-    projectAirY(AIR_PROJECTION.supportedMinimumY),
-  );
-  assert.ok(maximumScale * 44 <= projectAirY(AIR_PROJECTION.supportedMinimumY),
-    "the complete rider silhouette remains inside the canvas at maximum authored air");
 });
 
 test("a full momentum and powerup stack materially raises the physical apex", () => {

@@ -2,11 +2,9 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import {
   AERIAL_PANORAMA,
   aerialBackdropCropShelves,
-  aerialCloudLayerPresence,
   projectAirY,
-  riderScaleForProjectedY,
 } from "./aerial.js";
-import { clamp, damp, lerp, smoothstep } from "./math.js";
+import { clamp, lerp, smoothstep } from "./math.js";
 import { cameraLayerOffset } from "./camera.js";
 import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
 import { persistentHudContract } from "./hud-contract.js";
@@ -64,33 +62,12 @@ export function backgroundPanoramaCropY(source) {
   return aerialBackdropCropShelves().coast;
 }
 
-/** Advance only the cloud-overlay presentation; the panorama source is fixed. */
+/** Keep aerial presentation on the selected condition's fixed coastal shelf. */
 export function advanceAerialBackdropState(previousState, player, dt) {
-  const previousAltitude = Number(previousState?.altitude) || 0;
-  const targetAltitude = player?.state === "airborne"
-    ? clamp(Number(player?.aerialAltitude) || 0, 0, 1)
-    : 0;
-  const altitude = damp(
-    previousAltitude,
-    targetAltitude,
-    targetAltitude > previousAltitude ? 4.8 : 6.4,
-    Math.max(0, Number(dt) || 0),
-  );
-  const frameDelta = Math.abs(altitude - previousAltitude);
-  return {
-    altitude,
-    previousAltitude,
-    frameDelta,
-    maximumFrameDelta: Math.max(
-      Number(previousState?.maximumFrameDelta) || 0,
-      frameDelta,
-    ),
-    blend: {
-      coastToCloud: aerialCloudLayerPresence(altitude),
-      cloudToUpper: 0,
-      upperToSpace: 0,
-    },
-  };
+  void previousState;
+  void player;
+  void dt;
+  return stableBackdropState();
 }
 
 /** One interpolation/projection is shared by Kaki, board, and rider effects. */
@@ -111,13 +88,12 @@ export function riderScreenProjection(simulation, alpha = 1) {
     : Number.NaN;
   const finalY = player?.state === "airborne" ? projectAirY(naturalY) : naturalY;
   const frameOffsetY = player?.state === "airborne" ? finalY - naturalY : 0;
-  const riderScale = player?.state === "airborne" ? riderScaleForProjectedY(finalY) : 1;
   return Object.freeze({
     worldX,
     naturalY,
     frameOffsetY,
     finalY,
-    riderScale,
+    riderScale: 1,
   });
 }
 
@@ -456,7 +432,6 @@ export class KakiRenderer {
     ctx.fillStyle = palette.skyTop;
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
     this.drawSky(simulation);
-    this.drawAerialDepthLayer(simulation, false);
 
     // Screen/aerial backdrop space is locked. The fixed surf stage receives
     // only bounded impact shake, never the rider's vertical framing signal.
@@ -502,7 +477,6 @@ export class KakiRenderer {
     drawWorldWildlifeContact(ctx, simulation, palette, alpha, this.settings);
     this.drawParticles(true);
     ctx.restore();
-    this.drawAerialDepthLayer(simulation, true);
     this.drawLandingIndicator(simulation);
     this.drawHud(simulation);
     if (deferredAerialRider) {
@@ -601,60 +575,6 @@ export class KakiRenderer {
       drawSteppedHill(ctx, x + 132, 74, 190, 10);
     }
     if (this.conditionId === "goldenCoast") drawPalm(ctx, 42 - ((shift * 0.4) % 460), 61, p.deepInk, p.distant);
-    ctx.restore();
-  }
-
-  drawAerialDepthLayer(simulation, foreground = false) {
-    const player = simulation?.player;
-    const altitude = clamp(Number(this.aerialBackdrop?.altitude) || 0, 0, 1);
-    const cloudPresence = aerialCloudLayerPresence(altitude);
-    if (cloudPresence <= 0.015) {
-      return;
-    }
-    const ctx = this.ctx;
-    const p = this.palette;
-    const signedTravel = this.settings.reducedMotion ? 0 : Number(simulation.cameraWorldX) || 0;
-    const drift = this.settings.reducedMotion ? 0 : this.time * 2.4;
-    const cloudLight = this.conditionId === "stormbreak" ? p.foamShade : p.foam;
-    const cloudShade = this.conditionId === "twilightGlass" ? p.violet : p.haze;
-
-    if (!foreground) {
-      ctx.save();
-      // The coast panorama remains a single fixed crop. This irregular,
-      // full-width cloud bank is composited over it and therefore has no image
-      // edge, crop seam, or uncovered row to reveal during a high jump.
-      ctx.globalAlpha = cloudPresence * (this.settings.highContrast ? 0.86 : 0.76);
-      ctx.fillStyle = p.haze;
-      ctx.fillRect(0, 0, LOGICAL_WIDTH, 112);
-      ctx.globalAlpha = (0.12 + cloudPresence * 0.58)
-        * (this.settings.highContrast ? 1.15 : 1);
-      const slow = wrapVisual(38 - signedTravel * 0.08 - drift * 0.2, 492) - 54;
-      const middle = wrapVisual(256 - signedTravel * 0.2 - drift * 0.55, 536) - 70;
-      drawCloudCluster(ctx, slow, 20 + Math.round(altitude * 10), cloudLight, cloudShade);
-      drawCloudCluster(ctx, middle, 58 - Math.round(altitude * 12), cloudLight, cloudShade);
-      drawCloudCluster(ctx, middle + 198, 30, cloudLight, cloudShade);
-      for (let index = -1; index < 7; index += 1) {
-        const bankX = index * 68 - ((signedTravel * 0.035 + drift * 0.12) % 68);
-        const bankY = 70 + ((index * 13) % 23) - Math.round(altitude * 9);
-        drawCloudCluster(ctx, bankX, bankY, cloudLight, cloudShade);
-      }
-      ctx.restore();
-      return;
-    }
-
-    const importantTrick = Boolean(player?.provisionalTrickName)
-      || Boolean(player?.grabbed)
-      || (Number(player?.airVY) || 0) > 13;
-    if (importantTrick || this.settings.reducedMotion || player?.state !== "airborne") return;
-    const pass = 0.5 + Math.sin(this.time * 0.72 + signedTravel * 0.014 + altitude * 7) * 0.5;
-    if (pass < 0.6) return;
-    const riderX = (Number(player.worldX) || 192) - (Number(simulation.camera?.worldX) || 0);
-    const riderY = (Number(player.airY) || 60) + this.riderFrameOffsetY(simulation, 1);
-    const frontX = riderX - 44 + (pass - 0.6) * 42;
-    const frontY = clamp(riderY + 8, 22, 174);
-    ctx.save();
-    ctx.globalAlpha = cloudPresence * 0.28;
-    drawCloud(ctx, frontX, frontY, cloudLight, cloudShade);
     ctx.restore();
   }
 
@@ -971,14 +891,12 @@ export class KakiRenderer {
     const player = simulation.player;
     const wave = simulation.wave;
     const stanceDirection = player.ridingStance === "goofy" ? -1 : 1;
-    let riderScale = 1;
     let x;
     let y;
     if (player.state === "airborne" || player.state === "wipeout") {
       const projection = riderScreenProjection(simulation, alpha);
       x = projection.worldX;
       y = projection.finalY;
-      riderScale = projection.riderScale;
     } else {
       x = lerp(player.previousWorldX, player.worldX, alpha);
       const face = lerp(player.previousFace, player.face, alpha);
@@ -1017,7 +935,6 @@ export class KakiRenderer {
     if (player.state === "airborne") {
       this.ctx.save();
       this.ctx.translate(x, y);
-      this.ctx.scale(riderScale, riderScale);
       if (!mounted) {
         drawBoardSprite(this.ctx, 0, 1, boardAngle, simulation.board, this.palette, {
           compression: player.compression,
@@ -1769,12 +1686,6 @@ function drawCloud(ctx, x, y, color, shade) {
   ctx.fillRect(px + 2, y + 3, 27, 6);
   ctx.fillRect(px + 8, y, 9, 5);
   ctx.fillRect(px + 19, y + 1, 6, 4);
-}
-
-function drawCloudCluster(ctx, x, y, color, shade) {
-  drawCloud(ctx, x, y, color, shade);
-  drawCloud(ctx, x + 20, y + 5, color, shade);
-  drawCloud(ctx, x + 9, y - 7, color, shade);
 }
 
 function drawPixelLightning(ctx, x, y, color) {

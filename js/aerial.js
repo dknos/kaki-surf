@@ -125,14 +125,6 @@ export function qualifyAerialLaunch({
 }
 
 /**
- * Opacity driver for the seam-safe cloud veil. The panorama crop never moves;
- * only this soft overlay fades in for an earned high-air altitude.
- */
-export function aerialCloudLayerPresence(altitude = 0) {
-  return smoothstep(0.24, 0.58, clamp(Number(altitude) || 0, 0, 1));
-}
-
-/**
  * Canonical normalized altitude. It is derived from the authored launch
  * envelope and clearance, never from screen-space camera translation.
  */
@@ -240,14 +232,6 @@ export function projectAirY(
   const tailRise = supportedBottom - physicalY;
   return AIR_PROJECTION.minimumY
     + tailSpan / (1 + (extremeRatio / tailSpan) * tailRise);
-}
-
-/** Keep the complete rider silhouette inside the canvas at earned extreme air. */
-export function riderScaleForProjectedY(projectedY, topExtent = 50) {
-  const y = Number(projectedY);
-  const extent = Math.max(1, Number(topExtent) || 50);
-  if (!Number.isFinite(y)) return 1;
-  return clamp((y - 1) / extent, 0.18, 1);
 }
 
 export function aerialBackdropCropShelves(

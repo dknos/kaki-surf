@@ -450,8 +450,11 @@ if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.5)) {
 if (jumps.some((jump) => jump.summary.backdropSources.some((value) => value !== 424))) {
   throw new Error("A jump changed the stable condition panorama crop");
 }
-if (jumps[2].summary.cloudBlendRange[1] < 0.85) {
-  throw new Error("The maximum earned air never entered the cloud veil");
+if (jumps.some((jump) => jump.summary.riderScaleRange.some((value) => value !== 1))) {
+  throw new Error("A jump resized the rider or board");
+}
+if (jumps.some((jump) => jump.summary.cloudBlendRange.some((value) => value !== 0))) {
+  throw new Error("A jump introduced an aerial cloud blend");
 }
 if (jumps.some((jump) => jump.summary.maximumBackdropSourceXDelta > 1)) {
   throw new Error("Panorama source travel jumped to an unrelated part of the artwork");
