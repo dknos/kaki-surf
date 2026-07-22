@@ -93,6 +93,35 @@ export function resolveViewportTransition(previousOrientation, width, height) {
   };
 }
 
+export async function lockMobileLandscape({
+  enabled = true,
+  host = null,
+  documentRef = globalThis.document,
+  screenRef = globalThis.screen,
+} = {}) {
+  if (!enabled) return { fullscreen: false, locked: false };
+  let fullscreen = Boolean(documentRef?.fullscreenElement);
+  let locked = false;
+  if (!fullscreen && typeof host?.requestFullscreen === "function") {
+    try {
+      await host.requestFullscreen({ navigationUI: "hide" });
+      fullscreen = true;
+    } catch {
+      // iOS Safari and embedded browsers may deny fullscreen; the rotate gate
+      // remains available without breaking the run.
+    }
+  }
+  if (typeof screenRef?.orientation?.lock === "function") {
+    try {
+      await screenRef.orientation.lock("landscape");
+      locked = true;
+    } catch {
+      // Orientation lock generally requires fullscreen and is not universal.
+    }
+  }
+  return { fullscreen, locked };
+}
+
 export class KakiSurfGame {
   constructor({
     host,
@@ -186,6 +215,10 @@ export class KakiSurfGame {
 
   async startRun() {
     if (this.destroyed) return;
+    const landscapeLock = lockMobileLandscape({
+      enabled: this.isTouchControlEnvironment(),
+      host: this.host,
+    });
     const runSequence = ++this.runSequence;
     this.announcer.clear();
     this.save.selectedBoard = this.selectedBoard;
@@ -220,6 +253,13 @@ export class KakiSurfGame {
     } catch (error) {
       console.warn("Kaki Surf audio could not be unlocked; play continues silently.", error);
     }
+    await landscapeLock;
+    this.refreshViewportOrientation();
+    if (this.state === "running" && this.isPortraitTouchLayout()) {
+      this.pause("orientation");
+      this.announce("Turn your phone sideways to surf.", { urgent: true });
+      return;
+    }
     this.announce(`${RUN_MODES[this.selectedMode].name} started on ${BOARDS[this.selectedBoard].name} at ${CONDITIONS[this.selectedCondition].name}.`);
   }
 
@@ -238,6 +278,10 @@ export class KakiSurfGame {
 
   resume() {
     if (this.state !== "paused") return;
+    void lockMobileLandscape({
+      enabled: this.isTouchControlEnvironment?.() ?? false,
+      host: this.host,
+    });
     this.announcer.clear();
     // A/B can both activate pause UI and map to gameplay actions. Neutralize
     // them before the same frame returns to the fixed-step simulation.
@@ -829,6 +873,7 @@ export class KakiSurfGame {
     this.elements.topControls.hidden = name === "menu";
     this.elements.pauseButton.hidden = this.state !== "running";
     this.syncTouchControlsVisibility();
+    this.syncOrientationGate();
   }
 
   handleViewportChange(forceOrientationChange = false) {
@@ -839,10 +884,22 @@ export class KakiSurfGame {
     );
     this.viewportOrientation = transition.orientation;
     if (forceOrientationChange || transition.changed) {
-      if (this.state === "running") this.pause("orientation");
-      else this.input.clear?.();
+      if (transition.orientation === "portrait" && this.state === "running") {
+        this.pause("orientation");
+      } else if (transition.orientation === "landscape"
+        && this.state === "paused" && this.pausedFrom === "orientation") {
+        this.resume();
+      } else this.input.clear?.();
     }
     this.syncTouchControlsVisibility();
+    this.syncOrientationGate?.();
+  }
+
+  refreshViewportOrientation() {
+    this.viewportOrientation = stableViewportOrientation(
+      globalThis.window?.innerWidth,
+      globalThis.window?.innerHeight,
+    ) ?? this.viewportOrientation;
   }
 
   isTouchControlEnvironment() {
@@ -855,17 +912,32 @@ export class KakiSurfGame {
 
   syncTouchControlsVisibility() {
     const controls = this.elements.touchControls;
+    const touchEnvironment = this.isTouchControlEnvironment();
     const visible = shouldShowTouchControls(
       this.state,
       this.settings.touchControls,
       this.elements.settingsDialog.open,
-      this.isTouchControlEnvironment(),
+      touchEnvironment && this.viewportOrientation !== "portrait",
       controls.classList.contains("qa-visible"),
     );
     if (!visible && !controls.hidden) this.input.clear?.();
     controls.hidden = !visible;
     controls.inert = !visible;
     controls.setAttribute("aria-hidden", String(!visible));
+  }
+
+  isPortraitTouchLayout() {
+    return this.viewportOrientation === "portrait" && this.isTouchControlEnvironment();
+  }
+
+  syncOrientationGate() {
+    const gate = this.elements.orientationGate;
+    const visible = this.isPortraitTouchLayout()
+      && (this.state === "running" || (this.state === "paused" && this.pausedFrom === "orientation"));
+    this.host.dataset.touchUi = this.isTouchControlEnvironment() ? "true" : "false";
+    gate.hidden = !visible;
+    gate.inert = !visible;
+    gate.setAttribute("aria-hidden", String(!visible));
   }
 
   announce(message, options = {}) {
@@ -875,7 +947,9 @@ export class KakiSurfGame {
   async toggleFullscreen() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
-      else await this.host.requestFullscreen();
+      else if (this.isTouchControlEnvironment()) {
+        await lockMobileLandscape({ host: this.host });
+      } else await this.host.requestFullscreen();
     } catch (error) {
       console.warn("Fullscreen is unavailable.", error);
     }
@@ -1286,8 +1360,15 @@ export class KakiSurfGame {
         this.showLayer("pause");
         break;
       case "touch":
-        this.elements.touchControls.hidden = false;
-        this.elements.touchControls.classList.add("qa-visible");
+        if (this.isPortraitTouchLayout()) {
+          this.state = "paused";
+          this.pausedFrom = "orientation";
+          this.elements.touchControls.hidden = true;
+          this.syncOrientationGate();
+        } else {
+          this.elements.touchControls.hidden = false;
+          this.elements.touchControls.classList.add("qa-visible");
+        }
         break;
       case "touchAdvanced":
         this.settings.controlMode = "advanced";
@@ -1629,6 +1710,7 @@ function collectElements(host) {
     replayTutorial: host.querySelector("[data-action=replay-tutorial]"),
     settingsInputs: host.querySelectorAll("[data-setting]"),
     touchControls: host.querySelector(".touch-controls"),
+    orientationGate: host.querySelector(".orientation-gate"),
     touchSpecial: host.querySelector('[data-control="special"]'),
     debugPanel: host.querySelector(".debug-panel"),
     debugFields: host.querySelector(".debug-fields"),
@@ -1705,11 +1787,12 @@ function gameMarkup() {
         </div>
 
         <div class="touch-controls" aria-label="Touch controls" hidden>
-          <div class="touch-dpad">
-            <button type="button" data-control="up" aria-label="Carve toward the lip">▲</button>
-            <button type="button" data-control="left" aria-label="Steer left">◀</button>
-            <button type="button" data-control="down" aria-label="Carve toward the trough">▼</button>
-            <button type="button" data-control="right" aria-label="Steer right">▶</button>
+          <div class="touch-stick" data-touch-stick data-stick-radius="42" role="group" aria-label="Analog surf stick. Drag in any direction to carve and rotate.">
+            <span class="touch-stick__gate" data-stick-gate aria-hidden="true">
+              <span class="touch-stick__ticks"></span>
+              <span class="touch-stick__knob"></span>
+            </span>
+            <span class="touch-stick__label" aria-hidden="true">CARVE · SPIN</span>
           </div>
           <div class="touch-actions">
             <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" aria-label="Optional counterclockwise spin or advanced trick one"><b>Q</b><span>SPIN</span></button>
@@ -1719,6 +1802,11 @@ function gameMarkup() {
             <button class="touch-special" type="button" data-control="special" aria-label="Advanced Twist trick; Action or Trick dismounts a ridden animal" hidden><b>T</b><span>TWIST</span></button>
             <button class="touch-action" type="button" data-control="edge" aria-label="Action: compress, pump, and pop"><b>ACTION</b><span>HOLD / RELEASE</span></button>
           </div>
+        </div>
+
+        <div class="game-layer orientation-gate" hidden inert aria-hidden="true">
+          <div class="orientation-gate__phone" aria-hidden="true"><span></span></div>
+          <p><b>TURN PHONE</b><span>SURF HORIZONTAL</span></p>
         </div>
 
         <aside class="debug-panel" hidden>

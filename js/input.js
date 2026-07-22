@@ -5,6 +5,8 @@ export const BUFFER_WINDOW = 0.12;
 export const UI_REPEAT_DELAY = 0.34;
 export const UI_REPEAT_INTERVAL = 0.11;
 export const UI_DIRECTION_THRESHOLD = 0.5;
+export const TOUCH_STICK_RADIUS = 42;
+export const TOUCH_STICK_DEAD_ZONE = 0.12;
 
 export const CONTROL_MODES = Object.freeze({
   SIMPLE: "simple",
@@ -113,6 +115,8 @@ export class InputManager {
     this.touch = createTouchState();
     this.touchPointers = new Map();
     this.touchButtons = new Set();
+    this.touchStick = createTouchStickState();
+    this.touchStickElement = null;
     this.gamepad = DISCONNECTED_GAMEPAD;
     this.gamepadNeedsNeutral = false;
     this.previousActions = createBooleanRecord(STEP_ACTIONS);
@@ -193,6 +197,71 @@ export class InputManager {
         }, options);
       }
     });
+    this.bindTouchStick(root, options);
+  }
+
+  bindTouchStick(root, options) {
+    const stick = root.querySelector?.("[data-touch-stick]");
+    if (!stick?.addEventListener) return;
+    this.touchStickElement = stick;
+
+    stick.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      if (!this.enabled || this.touchStick.pointerId !== null) return;
+      this.touchStick.pointerId = event.pointerId;
+      this.updateTouchStick(event);
+      stick.classList?.toggle("is-active", true);
+      try {
+        stick.setPointerCapture?.(event.pointerId);
+      } catch {
+        // Lost/cancelled pointers are neutralized by the matching release event.
+      }
+      this.lastDevice = "touch";
+    }, options);
+
+    stick.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== this.touchStick.pointerId) return;
+      event.preventDefault();
+      this.updateTouchStick(event);
+    }, options);
+
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      stick.addEventListener(type, (event) => {
+        if (event.pointerId !== this.touchStick.pointerId) return;
+        event.preventDefault?.();
+        this.resetTouchStick();
+      }, options);
+    }
+  }
+
+  updateTouchStick(event) {
+    const stick = this.touchStickElement;
+    const gate = stick?.querySelector?.("[data-stick-gate]") ?? stick;
+    const rect = gate?.getBoundingClientRect?.();
+    if (!rect) return;
+    const radius = positiveNumber(stick.dataset?.stickRadius, TOUCH_STICK_RADIUS);
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const vector = touchStickVector(
+      Number(event.clientX) - centerX,
+      Number(event.clientY) - centerY,
+      radius,
+    );
+    this.touchStick.x = vector.x;
+    this.touchStick.y = vector.y;
+    stick.style?.setProperty?.("--stick-x", `${(vector.x * radius).toFixed(2)}px`);
+    stick.style?.setProperty?.("--stick-y", `${(vector.y * radius).toFixed(2)}px`);
+    this.syncTouchState();
+  }
+
+  resetTouchStick() {
+    this.touchStick.pointerId = null;
+    this.touchStick.x = 0;
+    this.touchStick.y = 0;
+    this.touchStickElement?.classList?.toggle("is-active", false);
+    this.touchStickElement?.style?.setProperty?.("--stick-x", "0px");
+    this.touchStickElement?.style?.setProperty?.("--stick-y", "0px");
+    this.syncTouchState();
   }
 
   activateTouchPointer(pointerId, button, control) {
@@ -226,6 +295,8 @@ export class InputManager {
     }
     this.touch.x = clamp(this.touch.x, -1, 1);
     this.touch.y = clamp(this.touch.y, -1, 1);
+    this.touch.x = clamp(this.touch.x + this.touchStick.x, -1, 1);
+    this.touch.y = clamp(this.touch.y + this.touchStick.y, -1, 1);
     this.touch.style = this.touch.trick1;
 
     for (const button of this.touchButtons) {
@@ -403,6 +474,12 @@ export class InputManager {
     this.touchPointers.clear();
     Object.assign(this.touch, createTouchState());
     for (const button of this.touchButtons) button.classList?.toggle("is-active", false);
+    this.touchStick.pointerId = null;
+    this.touchStick.x = 0;
+    this.touchStick.y = 0;
+    this.touchStickElement?.classList?.toggle("is-active", false);
+    this.touchStickElement?.style?.setProperty?.("--stick-x", "0px");
+    this.touchStickElement?.style?.setProperty?.("--stick-y", "0px");
     this.gamepad = DISCONNECTED_GAMEPAD;
     this.gamepadNeedsNeutral = true;
     for (const action of STEP_ACTIONS) {
@@ -454,6 +531,28 @@ export function applyDeadZone(value) {
   const magnitude = Math.abs(value);
   if (magnitude <= DEAD_ZONE) return 0;
   return Math.sign(value) * ((magnitude - DEAD_ZONE) / (1 - DEAD_ZONE));
+}
+
+export function touchStickVector(
+  deltaX,
+  deltaY,
+  radius = TOUCH_STICK_RADIUS,
+  deadZone = TOUCH_STICK_DEAD_ZONE,
+) {
+  const x = Number(deltaX);
+  const y = Number(deltaY);
+  const travel = Number(radius);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !(travel > 0)) return { x: 0, y: 0 };
+  const distance = Math.hypot(x, y);
+  if (!distance) return { x: 0, y: 0 };
+  const rawMagnitude = Math.min(distance / travel, 1);
+  const threshold = clamp(Number(deadZone) || 0, 0, 0.95);
+  if (rawMagnitude <= threshold) return { x: 0, y: 0 };
+  const magnitude = (rawMagnitude - threshold) / (1 - threshold);
+  return {
+    x: (x / distance) * magnitude,
+    y: (y / distance) * magnitude,
+  };
 }
 
 export function pollGamepad(getGamepads = defaultGetGamepads) {
@@ -547,6 +646,15 @@ function createTouchState() {
     trick4: false,
     style: false,
   };
+}
+
+function createTouchStickState() {
+  return { pointerId: null, x: 0, y: 0 };
+}
+
+function positiveNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function createBooleanRecord(actions) {

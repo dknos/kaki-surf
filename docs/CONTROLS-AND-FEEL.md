@@ -8,7 +8,7 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 
 | Intent | Keyboard | Standard gamepad | Touch |
 | --- | --- | --- | --- |
-| Travel left/right; carve up/down; rotate/trim in air | Arrows or WASD | Left stick or D-pad | Direction pad |
+| Travel left/right; carve up/down; rotate/trim in air | Arrows or WASD | Left stick or D-pad | Analog surf stick |
 | Action: compress, pump, and commit a lip pop | Space or Z | A (0) or right trigger (7) | **Action** |
 | Turbo Boost | Hold either Shift | Left-stick press / L3 (10) | Hold **Turbo** |
 | Context trick | F or X | X (2) or B (1) | **Trick** |
@@ -46,13 +46,13 @@ Advanced gamepad B is Board Varial during a run and retry only on the results sc
 
 Keyboard repeat cannot create duplicate edges. In Advanced mode Q/X/C are aliases for one action, so releasing one alias while another remains held does not generate a release. The legacy `style`, `stylePressed`, and `styleReleased` fields mirror `trick1` for old host adapters.
 
-Simple mode exposes `edge`, `turbo`, and contextual `trick`; `special`, spin impulses, and direct trick slots remain false. Advanced mode exposes `edge`, `turbo`, and `trick1` through `trick4`. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers.
+Simple mode exposes `edge`, `turbo`, and contextual `trick`; `special`, spin impulses, and direct trick slots remain false. Advanced mode exposes `edge`, `turbo`, and `trick1` through `trick4`. Gamepad axes use an 18% dead zone; the touch stick uses a 12% radial dead zone over 42 px of travel. Both preserve continuous magnitude outside the dead zone. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, stick position, gamepad state, and buffers.
 
-Touch pointers are independent, allowing direction plus Action or a held Trick at the same time. Releasing one pointer does not cancel another.
+The analog stick owns one pointer independently from Action, Trick, and Turbo, so steering and multiple held actions remain simultaneous. Releasing the stick returns only X/Y to neutral and does not cancel another pointer.
 
 Outside active play, a standard gamepad navigates visible controls spatially with the stick or D-pad. A activates the focused control, B closes Settings or resumes from Pause, and Start remains the direct pause/resume control. Direction repeats after a 340 ms hold and then every 110 ms; A/B remain discrete. Left/right adjusts focused ranges and selects without ejecting focus. The same neutral-after-clear rule prevents a gameplay hold from activating a pause, menu, or results control.
 
-Touch presentation is capability-aware. The persistent setting allows the controls, while the runtime shows them only for a coarse primary pointer or a compact device that reports touch points. Fine-pointer desktops remain unobscured. A stable portrait/landscape transition pauses play and clears every held pointer before moving the controls.
+Touch presentation is capability-aware and landscape-only. Mobile run start/resume requests fullscreen followed by the native `screen.orientation.lock("landscape")`; the install manifest also declares fullscreen landscape. If the browser denies locking, portrait play pauses behind a rotate-phone gate and automatically resumes once the viewport becomes landscape. Fine-pointer desktops remain unobscured.
 
 ## Bidirectional travel and switch stance
 

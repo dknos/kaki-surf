@@ -22,7 +22,7 @@ Simple Controls are the default:
 
 | Intent | Keyboard | Standard gamepad | Touch |
 | --- | --- | --- | --- |
-| Travel and carve; rotate and trim in air | Arrows or WASD | Left stick or D-pad | Direction pad |
+| Travel and carve; rotate and trim in air | Arrows or WASD | Left stick or D-pad | Analog surf stick |
 | Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
 | Turbo Boost | Hold either Shift | Left-stick press / L3 | Hold **Turbo** |
 | Context trick / tube hold | F or X | X or B | **Trick** |
@@ -30,7 +30,7 @@ Simple Controls are the default:
 
 Advanced Controls preserve the original Q/E/F/T trick map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
 
-The standard gamepad now owns the whole arcade loop: stick/D-pad navigation, A to activate, B to close dialogs or instantly retry results, and Start to pause/resume. Directional focus repeats deliberately, while sliders and selects adjust in place. Touch controls appear automatically on coarse-pointer or compact touch devices, stay off fine-pointer desktops, and neutralize safely when the device rotates.
+The standard gamepad now owns the whole arcade loop: stick/D-pad navigation, A to activate, B to close dialogs or instantly retry results, and Start to pause/resume. Directional focus repeats deliberately, while sliders and selects adjust in place. Touch play uses a continuous radial analog stick plus independent Action, Trick, and Turbo pointers. Starting a mobile run requests fullscreen and a native landscape lock; unsupported browsers gate play behind a rotate-phone prompt instead of squeezing controls into portrait.
 
 ## Surf both ways
 
@@ -98,7 +98,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **230/230 tests** and the syntax gate checks **35 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, forward dead-zone scrolling in every condition, shared Simple/Advanced aerial rotation and Turbo, qualified aerial tiers, continuous orbital ascent/descent, camera-relative wildlife and pickup spawns, camera-matched panorama/coast breaker cutouts, real tutorial arrow glyphs, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide. This checkpoint is local and does not claim that GitHub Pages has refreshed.
+The native suite passes **234/234 tests** and the syntax gate checks **35 JavaScript modules**. New invariants cover analog touch magnitude and multitouch independence, fullscreen-before-landscape-lock ordering, portrait gating and rotation resume, canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, shared Simple/Advanced aerial rotation and Turbo, qualified aerial tiers, continuous orbital ascent/descent, camera-relative spawns, camera-matched panorama/coast breaker cutouts, contextual mount dismounts, whale water/collision anchors, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide.
 
 ## Static deployment and integration
 

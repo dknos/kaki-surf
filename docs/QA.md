@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **230/230 tests pass** and **35 JavaScript modules pass syntax checking**.
+Current result: **234/234 tests pass** and **35 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
@@ -28,7 +28,7 @@ Current result: **230/230 tests pass** and **35 JavaScript modules pass syntax c
 | Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation without traffic ping-pong, stable facing, breaker-aware occlusion, readable reactive text, and watercraft grounded in waterline bands | Pass |
 | Set piece | Carrier haze, arrival, deck activity, launch, Fleet Airshow and foam gates | Whimsical/nonmilitary identity, horizon scale, airshow hierarchy, no gameplay collision | Pass |
 | Conditions | Every board in Golden Coast, Twilight Glass, and Stormbreak; condition-specific traffic | Correct local strip, palette and readable player/world contrast | Pass |
-| Access | Simple keyboard/gamepad/touch, Advanced controls, Settings, High Contrast, Reduced Motion, Reduced Flash | Simple exposes line, Action, Turbo, and Trick; Advanced deliberately restores Q/E/F/T | Pass |
+| Access | Simple keyboard/gamepad/touch, Advanced controls, mobile landscape gate, Settings, High Contrast, Reduced Motion, Reduced Flash | Touch uses continuous analog X/Y with independent actions; mobile start requests fullscreen landscape; portrait falls back to a rotate gate; Advanced deliberately restores Q/E/F/T | Pass |
 | Audio lifecycle | Running, pause, visibility, resume, results, record, rapid retry, mute | No missed-beat catch-up, stale board/wind bed, stacked completion fanfare, invalid gain, or unbounded major-event peak | Pass |
 | Asset failure | Manifest and dimension rejection plus an absent-dolphin-atlas browser injection | Game starts; semantic fallback remains visible; restored production asset revalidates | Pass |
 

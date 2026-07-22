@@ -27,6 +27,16 @@ test("index uses relative stylesheet and module entry URLs that exist", () => {
   assertAllPageAssetsExist(INDEX_PATH, tags);
 });
 
+test("installable mobile launches declare fullscreen landscape presentation", () => {
+  const tags = parseHtml(read(INDEX_PATH));
+  const manifestLink = tags.find((tag) => tag.name === "link" && relTokens(tag).has("manifest"));
+  assert.ok(manifestLink, "index.html should expose its web app manifest");
+  assertLocalFileReference(INDEX_PATH, manifestLink.attributes.href, "manifest");
+  const manifest = JSON.parse(read(resolveLocalReference(INDEX_PATH, manifestLink.attributes.href)));
+  assert.equal(manifest.display, "fullscreen");
+  assert.equal(manifest.orientation, "landscape");
+});
+
 test("every native module import resolves to a local source file", () => {
   const entries = [
     ...moduleEntries(INDEX_PATH),

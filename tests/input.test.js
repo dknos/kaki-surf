@@ -11,6 +11,7 @@ import {
   createInputStep,
   dominantUiDirection,
   pollGamepad,
+  touchStickVector,
 } from "../js/input.js";
 
 const STEP_FIELDS = [
@@ -709,6 +710,55 @@ test("dead-zone helper is deterministic for external adapters", () => {
   assert.equal(applyDeadZone(-1), -1);
 });
 
+test("analog touch stick applies a radial dead zone and preserves continuous direction", () => {
+  assert.deepEqual(touchStickVector(0, 0), { x: 0, y: 0 });
+  assert.deepEqual(touchStickVector(4, -2, 42), { x: 0, y: 0 });
+  assert.deepEqual(touchStickVector(84, 0, 42), { x: 1, y: 0 });
+
+  const half = touchStickVector(21, 0, 42);
+  assert.ok(half.x > 0.42 && half.x < 0.44, `half travel remains analog, got ${half.x}`);
+  assert.equal(half.y, 0);
+
+  const diagonal = touchStickVector(42, -42, 42);
+  assert.ok(Math.abs(diagonal.x - Math.SQRT1_2) < 1e-9);
+  assert.ok(Math.abs(diagonal.y + Math.SQRT1_2) < 1e-9);
+});
+
+test("analog touch steering stays independent from simultaneous Action and Turbo pointers", () => {
+  const stick = new FakeTouchStick();
+  const action = new FakeButton("edge");
+  const turbo = new FakeButton("turbo");
+  const input = new InputManager({
+    target: new FakeTarget(),
+    touchRoot: new FakeTouchRoot([action, turbo], stick),
+    getGamepads: () => [],
+  });
+
+  stick.dispatch("pointerdown", { pointerId: 7, clientX: 60, clientY: 60 });
+  stick.dispatch("pointermove", { pointerId: 7, clientX: 90, clientY: 30 });
+  action.dispatch("pointerdown", { pointerId: 8 });
+  turbo.dispatch("pointerdown", { pointerId: 9 });
+  input.update(0);
+  let step = snapshot(input.consumeStep());
+  assert.ok(step.x > 0.6 && step.x < 0.8, `continuous x steering was ${step.x}`);
+  assert.ok(step.y < -0.6 && step.y > -0.8, `continuous y steering was ${step.y}`);
+  assert.equal(step.edge, true);
+  assert.equal(step.turbo, true);
+  assert.equal(stick.classList.contains("is-active"), true);
+  assert.notEqual(stick.styles.get("--stick-x"), "0px");
+
+  stick.dispatch("pointerup", { pointerId: 7, clientX: 90, clientY: 30 });
+  input.update(0);
+  step = snapshot(input.consumeStep());
+  assert.equal(step.x, 0);
+  assert.equal(step.y, 0);
+  assert.equal(step.edge, true, "releasing the stick does not release Action");
+  assert.equal(step.turbo, true, "releasing the stick does not release Turbo");
+  assert.equal(stick.classList.contains("is-active"), false);
+  assert.equal(stick.styles.get("--stick-x"), "0px");
+  input.destroy();
+});
+
 function createManager(target) {
   return new InputManager({
     target,
@@ -796,12 +846,47 @@ class FakeButton extends FakeTarget {
 }
 
 class FakeTouchRoot {
-  constructor(buttons) {
+  constructor(buttons, stick = null) {
     this.buttons = buttons;
+    this.stick = stick;
   }
 
   querySelectorAll(selector) {
     assert.equal(selector, "[data-control]");
     return this.buttons;
   }
+
+  querySelector(selector) {
+    assert.equal(selector, "[data-touch-stick]");
+    return this.stick;
+  }
+}
+
+class FakeTouchStick extends FakeTarget {
+  constructor() {
+    super();
+    this.dataset = { touchStick: "", stickRadius: "42" };
+    this.classes = new Set();
+    this.styles = new Map();
+    this.classList = {
+      contains: (name) => this.classes.has(name),
+      toggle: (name, active) => {
+        if (active) this.classes.add(name);
+        else this.classes.delete(name);
+        return active;
+      },
+    };
+    this.style = { setProperty: (name, value) => this.styles.set(name, value) };
+  }
+
+  getBoundingClientRect() {
+    return { left: 4, top: 4, width: 112, height: 132 };
+  }
+
+  querySelector(selector) {
+    assert.equal(selector, "[data-stick-gate]");
+    return { getBoundingClientRect: () => ({ left: 4, top: 4, width: 112, height: 112 }) };
+  }
+
+  setPointerCapture() {}
 }

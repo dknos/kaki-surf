@@ -9,7 +9,7 @@ The responsive browser matrix is separate from the canonical 1280 × 720 rendere
 | Desktop | 1280 × 720 | Keyboard first-run teaching |
 | Laptop | 1366 × 768 | Keyboard first-run teaching |
 | Tablet | 1024 × 768 | Touch controls |
-| Phone portrait | 390 × 844 | Touch controls |
+| Phone portrait | 390 × 844 | Landscape gate |
 | Phone landscape | 844 × 390 | Touch controls |
 
 Each profile captures menu, active play, pause, results, and options. Files are written to `docs/images/qa-responsive`; the script never writes to `docs/images/qa` or rebuilds the production contact sheet.
@@ -33,18 +33,19 @@ Use `KAKI_SURF_QA_URL` to point the capture pass at another local static server 
 
 ## Touch lifecycle contract
 
-- Touch controls are visible and interactive only while the lifecycle is `running`, the Allow Touch Controls setting is enabled, the settings dialog is closed, and the device has a coarse primary pointer or a compact touch viewport. Fine-pointer desktops stay clear even though touch support is allowed by default.
-- Pause, settings, results, menu, visibility loss, blur, and stable portrait/landscape transitions clear active touch pointers before hiding and making the cluster inert.
+- Touch controls are visible and interactive only while the lifecycle is `running`, the Allow Touch Controls setting is enabled, the settings dialog is closed, the device has a coarse primary pointer or a compact touch viewport, and the viewport is landscape. Fine-pointer desktops stay clear.
+- Starting or resuming mobile play requests fullscreen and then `screen.orientation.lock("landscape")` from the activating gesture. The web app manifest independently declares fullscreen landscape presentation for installed launches.
+- Browsers that reject fullscreen/orientation lock show a dedicated rotate-phone gate in portrait. Crossing into portrait pauses and neutralizes every held pointer; returning to landscape resumes an orientation-paused run automatically.
 - Page/dialog surfaces use `touch-action: pan-y` while the Canvas and gameplay clusters retain `touch-action: none`; an emulated touch drag at 844 x 390 traversed the full 383 px Settings overflow range.
 - Resuming restores the cluster only when Touch Controls remains enabled.
-- At 390 × 844, the D-pad ends at x = 152 and the action cluster starts at x = 176, leaving a 24 px gutter. Simple shows Turbo above Trick and Action; Advanced restores the Q/E band and T/Twist button without overlapping the right direction button.
-- The explicit in-run **II** control, all top controls, and every directional target retain at least a 44 px physical hit area. On short landscape screens the top controls stack in the right letterbox instead of covering the FANS panel, and the D-pad remains unscaled at 45 px.
+- Steering is one 112 px radial analog gate with a 42 px travel radius and a 12% radial dead zone. It reports continuous X/Y values and owns one pointer independently from Action, Trick, and Turbo.
+- At 844 × 390, the Canvas consumes the full dynamic viewport height. The analog deck sits in the left letterbox/edge while 60–76 px Simple actions sit at the right edge; Pause and Exit form one compact top row, with Settings available from Pause.
 
 ## Current measured pass
 
-A Chrome DevTools Protocol audit applied real device metrics rather than relying on the headless browser's minimum window width. At 390 × 844 and DPR 2, the Canvas measured x = 3..387; every touch target remained inside x = 12..378. Simple mode exposes the D-pad, Turbo, Trick, and Action. Advanced retains its non-overlapping upper Q/E/Turbo row and lower Trick/T/Action row. At 844 × 390, both clusters retain a visible gutter and the 44 px top controls occupy the right letterbox. A held Action pointer was then carried through a real emulated orientation change: play paused, the active class cleared, and the touch layer became hidden/inert. Settings made the entire touch layer `display: none`, `hidden`, and inert.
+A fresh Chrome DevTools Protocol audit applied true mobile device metrics. At 844 × 390, the Canvas measured 693.33 × 389.98 at x=75.34; the 116 × 126 stick deck begins at x=12 and the 164 × 120 Simple action deck ends at x=832. A diagonal DOM pointer drag reported x=0.564/y=-0.705 while Action and Turbo remained held, then releasing only the stick returned X/Y to zero without releasing either action. At 390 × 844, active play becomes the opaque `TURN PHONE / SURF HORIZONTAL` gate and the touch layer stays hidden/inert. The probe reported zero runtime exceptions.
 
-A supplemental 320 × 700 pass covered menu, Settings, Simple touch, and Advanced touch. It keeps a 24 px gap between clusters, preserves 44–45 px essential targets without transform scaling, and keeps Advanced's Q/E/Turbo and Trick/T/Action grid distinct from the compact three-button Simple surface. The compact Settings value column remains wide enough to show the complete control-mode label.
+The portrait menu and Settings remain scrollable so a player can choose a run before the landscape request. Gameplay itself no longer maintains a second, squeezed portrait control layout.
 
 The 2026-07-20 hero-tube rerun captured 25 shell states to a temporary review directory and passed at 1280 x 720, 844 x 390, and 390 x 844. The crest clears the top HUD, Kaki/board remain centered inside the pocket, the bottom Tube panel clears Speed/Flow, the gravity front stays readable, and neither the whitewater edge nor the playfield clips. Because the active-scene override replaces the ordinary mobile fixture, this focused rerun validates composition only; the separate lifecycle matrix above remains the touch-control evidence.
 

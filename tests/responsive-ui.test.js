@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   isTouchControlEnvironment,
   KakiSurfGame,
+  lockMobileLandscape,
   qaWorldOverride,
   resolveViewportTransition,
   shouldShowTouchControls,
@@ -55,6 +56,34 @@ test("only a stable portrait-landscape transition interrupts play", () => {
   });
 });
 
+test("mobile run entry requests fullscreen before locking the screen to landscape", async () => {
+  const calls = [];
+  const result = await lockMobileLandscape({
+    host: {
+      async requestFullscreen(options) {
+        calls.push(["fullscreen", options]);
+      },
+    },
+    documentRef: { fullscreenElement: null },
+    screenRef: {
+      orientation: {
+        async lock(value) {
+          calls.push(["orientation", value]);
+        },
+      },
+    },
+  });
+  assert.deepEqual(calls, [
+    ["fullscreen", { navigationUI: "hide" }],
+    ["orientation", "landscape"],
+  ]);
+  assert.deepEqual(result, { fullscreen: true, locked: true });
+
+  calls.length = 0;
+  assert.deepEqual(await lockMobileLandscape({ enabled: false }), { fullscreen: false, locked: false });
+  assert.deepEqual(calls, []);
+});
+
 test("a significant live orientation transition clears held input and pauses with an explicit reason", () => {
   const originalWindow = globalThis.window;
   const calls = { clear: 0, layer: null, announcement: "" };
@@ -82,6 +111,29 @@ test("a significant live orientation transition clears held input and pauses wit
     assert.equal(calls.clear, 1);
     assert.equal(calls.layer, "pause");
     assert.equal(calls.announcement, "Surfing paused.");
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+  }
+});
+
+test("turning a landscape-gated run sideways resumes it automatically", () => {
+  const originalWindow = globalThis.window;
+  let resumes = 0;
+  globalThis.window = { innerWidth: 844, innerHeight: 390 };
+  const game = {
+    viewportOrientation: "portrait",
+    state: "paused",
+    pausedFrom: "orientation",
+    input: { clear() {} },
+    resume: () => { resumes += 1; },
+    syncTouchControlsVisibility() {},
+    syncOrientationGate() {},
+  };
+  try {
+    KakiSurfGame.prototype.handleViewportChange.call(game, false);
+    assert.equal(game.viewportOrientation, "landscape");
+    assert.equal(resumes, 1);
   } finally {
     if (originalWindow === undefined) delete globalThis.window;
     else globalThis.window = originalWindow;
@@ -147,87 +199,21 @@ test("every layer transition re-synchronizes touch visibility and inert state", 
   assert.match(STYLES, /\.touch-controls\[inert\][\s\S]*pointer-events:\s*none\s*!important;/);
 });
 
-test("390px portrait touch clusters have a deterministic non-overlapping gutter", () => {
-  assert.match(STYLES, /@media \(max-width:\s*430px\) and \(orientation:\s*portrait\)/);
-  assert.match(STYLES, /\.touch-actions\s*\{[\s\S]*?width:\s*202px;[\s\S]*?height:\s*132px;/);
-  assert.match(STYLES, /\.touch-actions \.touch-spin\s*\{[\s\S]*?top:\s*0;[\s\S]*?bottom:\s*auto;[\s\S]*?width:\s*44px;/);
-
-  const viewportWidth = 390;
-  const safeEdge = 12;
-  const dpadWidth = 140;
-  const actionClusterWidth = 202;
-  const dpadRight = safeEdge + dpadWidth;
-  const actionClusterLeft = viewportWidth - safeEdge - actionClusterWidth;
-  assert.equal(dpadRight, 152);
-  assert.equal(actionClusterLeft, 176);
-  assert.ok(actionClusterLeft - dpadRight >= 24, "portrait controls retain a 24px gutter");
+test("portrait mobile play is gated instead of rendering a second control layout", () => {
+  assert.match(GAME_SOURCE, /touchEnvironment && this\.viewportOrientation !== "portrait"/);
+  assert.match(GAME_SOURCE, /class="game-layer orientation-gate" hidden inert/);
+  assert.match(STYLES, /\.orientation-gate\s*\{[\s\S]*?z-index:\s*20;/);
+  assert.match(STYLES, /@keyframes turn-phone/);
 });
 
-test("320px portrait keeps every essential touch target at least 44px without scaling", () => {
-  assert.match(
-    STYLES,
-    /@media \(max-width:\s*370px\) and \(orientation:\s*portrait\)[\s\S]*?\.touch-dpad\s*\{[\s\S]*?transform:\s*none;/,
-  );
-  assert.match(
-    STYLES,
-    /@media \(max-width:\s*370px\) and \(orientation:\s*portrait\)[\s\S]*?\.touch-actions\s*\{[\s\S]*?width:\s*140px;[\s\S]*?height:\s*92px;[\s\S]*?transform:\s*none;/,
-  );
-  assert.doesNotMatch(STYLES, /@media \(max-width:\s*350px\)[\s\S]*?transform:\s*scale\(0\.8\)/);
-
-  const viewportWidth = 320;
-  const dpadRight = 8 + 140;
-  const actionsLeft = viewportWidth - 8 - 140;
-  assert.equal(actionsLeft - dpadRight, 24);
-  for (const size of [45, 44]) assert.ok(size >= 44);
-
-  const topRow = [
-    [0, 44],
-    [48, 92],
-    [96, 140],
-  ];
-  for (let index = 0; index < topRow.length - 1; index += 1) {
-    assert.ok(topRow[index][1] <= topRow[index + 1][0], "spin and Turbo targets do not overlap");
-  }
-});
-
-test("short landscape touch clusters clear the lower HUD", () => {
-  assert.match(
-    STYLES,
-    /@media \(max-height: 560px\) and \(orientation: landscape\)[\s\S]*?bottom:\s*max\(62px,/,
-  );
-  assert.match(
-    STYLES,
-    /@media \(max-height: 560px\) and \(orientation: landscape\)[\s\S]*?\.touch-dpad\s*\{[\s\S]*?transform:\s*none;/,
-  );
-  assert.match(
-    STYLES,
-    /@media \(max-height: 560px\) and \(orientation: landscape\)[\s\S]*?\.top-controls\s*\{[\s\S]*?flex-direction:\s*column;/,
-  );
-  assert.match(
-    STYLES,
-    /@media \(max-height: 560px\) and \(orientation: landscape\)[\s\S]*?\.touch-actions\s*\{[\s\S]*?width:\s*140px;[\s\S]*?height:\s*92px;[\s\S]*?transform:\s*none;/,
-  );
-
-  const targetSize = 45;
-  const buttonPositions = [[47, 0], [0, 48], [47, 48], [94, 48]];
-  for (const [index, [x, y]] of buttonPositions.entries()) {
-    assert.ok(targetSize >= 44, `direction ${index} retains a 44px physical target`);
-    for (const [otherX, otherY] of buttonPositions.slice(index + 1)) {
-      const overlaps = x < otherX + targetSize
-        && x + targetSize > otherX
-        && y < otherY + targetSize
-        && y + targetSize > otherY;
-      assert.equal(overlaps, false, `direction ${index} does not overlap another target`);
-    }
-  }
-
-  const landscapeTopRow = [[0, 44], [46, 90], [102, 156]];
-  const landscapeBottomRow = [[32, 90], [92, 156]];
-  for (const row of [landscapeTopRow, landscapeBottomRow]) {
-    for (let index = 0; index < row.length - 1; index += 1) {
-      assert.ok(row[index][1] <= row[index + 1][0], "landscape actions keep distinct hit areas");
-    }
-  }
+test("short landscape uses a continuous stick, large actions, and dynamic viewport units", () => {
+  assert.match(GAME_SOURCE, /data-touch-stick data-stick-radius="42"/);
+  assert.doesNotMatch(GAME_SOURCE, /class="touch-dpad"/);
+  assert.match(STYLES, /\.touch-stick__gate\s*\{[\s\S]*?width:\s*112px;[\s\S]*?height:\s*112px;/);
+  assert.match(STYLES, /\.touch-stick__knob\s*\{[\s\S]*?--stick-x/);
+  assert.match(STYLES, /width:\s*min\(100dvw,\s*177\.7778dvh\)/);
+  assert.match(STYLES, /Keep the mobile deck last[\s\S]*?\.touch-actions[\s\S]*?width:\s*164px;[\s\S]*?height:\s*120px;/);
+  assert.match(STYLES, /Keep the mobile deck last[\s\S]*?\[data-control="edge"\][\s\S]*?width:\s*76px;[\s\S]*?height:\s*76px;/);
 });
 
 test("settings dialog has a programmatic accessible name", () => {

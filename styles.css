@@ -723,25 +723,6 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: inset 0 0 0 2px #efa444;
 }
 
-.touch-dpad {
-  position: absolute;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(15px, env(safe-area-inset-bottom));
-  width: 140px;
-  height: 105px;
-}
-
-.touch-dpad button {
-  position: absolute;
-  width: 45px;
-  height: 45px;
-}
-
-.touch-dpad [data-control="up"] { left: 47px; top: 0; }
-.touch-dpad [data-control="left"] { left: 0; top: 48px; }
-.touch-dpad [data-control="down"] { left: 47px; top: 48px; }
-.touch-dpad [data-control="right"] { left: 94px; top: 48px; }
-
 .touch-actions {
   position: absolute;
   right: max(16px, env(safe-area-inset-right));
@@ -1315,6 +1296,270 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+/* Mobile surf deck: continuous analog steering and a landscape-first stage. */
+.touch-stick {
+  --stick-x: 0px;
+  --stick-y: 0px;
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: 120px;
+  height: 132px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.touch-stick__gate {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border: 3px solid rgb(247 242 215 / 72%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 0 43%, rgb(13 16 37 / 24%) 44% 61%, rgb(13 16 37 / 68%) 62%),
+    rgb(36 127 162 / 22%);
+  box-shadow:
+    inset 0 0 0 3px rgb(13 16 37 / 58%),
+    0 3px 0 rgb(5 7 19 / 64%);
+}
+
+.touch-stick__gate::before,
+.touch-stick__gate::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78px;
+  height: 2px;
+  translate: -50% -50%;
+  background: rgb(157 217 200 / 38%);
+}
+
+.touch-stick__gate::after {
+  rotate: 90deg;
+}
+
+.touch-stick__ticks {
+  position: absolute;
+  inset: 8px;
+  border: 2px dashed rgb(255 209 102 / 38%);
+  border-radius: 50%;
+}
+
+.touch-stick__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 30px;
+  translate: calc(-50% + var(--stick-x)) calc(-50% + var(--stick-y));
+  border: 3px solid var(--ink);
+  background: linear-gradient(90deg, #efa444 0 15%, var(--gold) 15% 85%, #efa444 85%);
+  box-shadow: inset 0 0 0 2px rgb(247 242 215 / 48%), 2px 3px 0 rgb(5 7 19 / 72%);
+  clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%);
+}
+
+.touch-stick.is-active .touch-stick__gate {
+  border-color: var(--gold);
+  background-color: rgb(36 127 162 / 38%);
+}
+
+.touch-stick.is-active .touch-stick__knob {
+  background: linear-gradient(90deg, #f7f2d7 0 15%, var(--gold) 15% 85%, #f7f2d7 85%);
+}
+
+.touch-stick__label {
+  margin-top: 4px;
+  padding: 2px 5px;
+  color: var(--foam);
+  background: rgb(13 16 37 / 74%);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: 1px 1px 0 var(--ink);
+}
+
+.orientation-gate {
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto auto;
+  place-content: center;
+  align-items: center;
+  gap: 22px;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  background:
+    repeating-linear-gradient(135deg, transparent 0 18px, rgb(255 209 102 / 4%) 18px 20px),
+    rgb(13 16 37 / 96%);
+}
+
+.orientation-gate__phone {
+  width: 54px;
+  height: 92px;
+  padding: 7px;
+  border: 4px solid var(--foam);
+  box-shadow: 5px 5px 0 var(--ink);
+  animation: turn-phone 1.4s steps(4, end) infinite;
+}
+
+.orientation-gate__phone span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--ink);
+  background: linear-gradient(160deg, var(--sky), var(--water) 55%, var(--foam) 56% 62%, var(--water) 63%);
+}
+
+.orientation-gate p,
+.orientation-gate p span {
+  display: block;
+  margin: 0;
+}
+
+.orientation-gate p b {
+  color: var(--gold);
+  font-size: clamp(24px, 9vw, 48px);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+
+.orientation-gate p span {
+  margin-top: 5px;
+  color: var(--foam-shadow);
+  font-size: clamp(10px, 3.5vw, 17px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+@keyframes turn-phone {
+  0%, 30% { rotate: 0deg; }
+  70%, 100% { rotate: 90deg; }
+}
+
+#kaki-surf-root[data-touch-ui="true"] .surf-shell,
+#kaki-surf-root[data-touch-ui="true"] .stage-frame {
+  height: 100dvh;
+  min-height: 100dvh;
+  touch-action: none;
+}
+
+#kaki-surf-root[data-touch-ui="true"] .top-controls [data-action="settings"],
+#kaki-surf-root[data-touch-ui="true"] .top-controls [data-action="fullscreen"] {
+  display: none;
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .stage-frame > canvas,
+  .scanlines {
+    width: min(100dvw, 177.7778dvh);
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .touch-stick {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 116px;
+    height: 126px;
+  }
+
+  .touch-stick__gate {
+    width: 108px;
+    height: 108px;
+  }
+
+  .touch-actions,
+  #kaki-surf-root[data-control-mode="simple"] .touch-actions {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: 164px;
+    height: 120px;
+    transform: none;
+  }
+
+  .touch-actions .touch-turbo {
+    left: 0;
+    right: auto;
+    top: 0;
+    width: 76px;
+    height: 42px;
+    border-radius: 18px 4px 4px 18px;
+  }
+
+  .touch-actions .touch-trick {
+    left: 0;
+    right: auto;
+    top: auto;
+    bottom: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+  }
+
+  .touch-actions .touch-action,
+  .touch-actions [data-control="edge"] {
+    left: auto;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions {
+    width: 210px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin {
+    top: 0;
+    bottom: auto;
+    width: 40px;
+    height: 40px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin--left { left: 0; }
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin--right { left: 42px; }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-turbo {
+    left: 86px;
+    width: 72px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-special {
+    left: auto;
+    right: 0;
+    top: 0;
+    width: 48px;
+    height: 42px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-trick {
+    left: 20px;
+  }
+
+  .top-controls {
+    right: max(8px, env(safe-area-inset-right));
+    top: max(8px, env(safe-area-inset-top));
+    flex-direction: row;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 560px) and (orientation: portrait) {
+  .orientation-gate {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .orientation-gate__phone {
+    justify-self: center;
+  }
+}
+
 /* Native-pixel presentation and authored condition art. */
 .stage-frame > canvas,
 .scanlines {
@@ -1522,35 +1767,6 @@ input[type="range"]::-moz-range-thumb {
   content: " TRICK";
 }
 
-@media (max-width: 430px) and (orientation: portrait) {
-  .touch-dpad {
-    left: max(12px, env(safe-area-inset-left));
-  }
-
-  .touch-actions {
-    right: max(12px, env(safe-area-inset-right));
-    width: 202px;
-    height: 132px;
-  }
-
-  .touch-actions .touch-spin {
-    top: 0;
-    bottom: auto;
-    width: 44px;
-    height: 44px;
-  }
-
-  .touch-actions .touch-spin--left {
-    left: 0;
-    top: 0;
-  }
-
-  .touch-actions .touch-spin--right {
-    left: 46px;
-    top: 0;
-  }
-}
-
 @media (max-width: 370px) and (orientation: portrait) {
   .settings-card > header {
     padding-inline: 12px;
@@ -1570,109 +1786,104 @@ input[type="range"]::-moz-range-thumb {
     font-size: 8px;
   }
 
-  .touch-dpad {
-    left: max(8px, env(safe-area-inset-left));
-    transform: none;
-  }
-
-  .touch-actions {
-    right: max(8px, env(safe-area-inset-right));
-    width: 140px;
-    height: 92px;
-    transform: none;
-  }
-
-  .touch-actions .touch-spin--left,
-  .touch-actions .touch-spin--right,
-  .touch-actions .touch-turbo,
-  .touch-actions .touch-trick,
-  .touch-actions .touch-special,
-  .touch-actions .touch-action,
-  .touch-actions [data-control="edge"] {
-    width: 44px;
-    height: 44px;
-    border-radius: 0;
-  }
-
-  .touch-actions .touch-spin--left { left: 0; top: 0; }
-  .touch-actions .touch-spin--right { left: 48px; top: 0; }
-  .touch-actions .touch-turbo { left: 96px; right: auto; top: 0; }
-  .touch-actions .touch-trick { left: 0; right: auto; top: 48px; bottom: auto; }
-  .touch-actions .touch-special { left: 48px; right: auto; top: 48px; }
-  .touch-actions .touch-action,
-  .touch-actions [data-control="edge"] { left: 96px; right: auto; top: 48px; bottom: auto; }
-
 }
 
+/* Keep the mobile deck last in the cascade: the native-pixel and deluxe UI
+   passes above intentionally share these selectors. */
 @media (max-height: 560px) and (orientation: landscape) {
-  .top-controls {
-    right: max(8px, env(safe-area-inset-right));
-    top: max(8px, env(safe-area-inset-top));
-    flex-direction: column;
-    gap: 3px;
+  .stage-frame > canvas,
+  .scanlines {
+    width: min(100dvw, 177.7778dvh);
+    height: auto;
+    aspect-ratio: 16 / 9;
   }
 
-  .touch-dpad,
-  .touch-actions {
-    /* Clear the contextual combo panel and preserve the playfield read. */
-    bottom: max(62px, calc(env(safe-area-inset-bottom) + 52px));
+  .touch-stick {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 116px;
+    height: 126px;
   }
 
-  .touch-dpad {
-    /* Never scale directional hit targets below their physical 45px size. */
+  .touch-stick__gate {
+    width: 108px;
+    height: 108px;
+  }
+
+  .touch-actions,
+  #kaki-surf-root[data-control-mode="simple"] .touch-actions {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: 164px;
+    height: 120px;
     transform: none;
   }
-
-  .touch-actions {
-    width: 140px;
-    height: 92px;
-    transform: none;
-  }
-
-  .touch-actions .touch-spin {
-    top: 0;
-    bottom: auto;
-    width: 44px;
-    height: 44px;
-  }
-
-  .touch-actions .touch-spin--left { left: 0; top: 0; }
-  .touch-actions .touch-spin--right { left: 48px; top: 0; }
 
   .touch-actions .touch-turbo {
-    left: 96px;
+    left: 0;
     right: auto;
     top: 0;
-    width: 44px;
-    height: 44px;
-  }
-
-  .touch-actions .touch-special {
-    left: 48px;
-    right: auto;
-    top: 48px;
-    width: 44px;
-    height: 44px;
+    width: 76px;
+    height: 42px;
+    border-radius: 18px 4px 4px 18px;
   }
 
   .touch-actions .touch-trick {
     left: 0;
     right: auto;
-    top: 48px;
-    bottom: auto;
-    width: 44px;
-    height: 44px;
-    border-radius: 0;
+    top: auto;
+    bottom: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
   }
 
   .touch-actions .touch-action,
   .touch-actions [data-control="edge"] {
-    left: 96px;
-    right: auto;
-    top: 48px;
+    left: auto;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions {
+    width: 210px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin {
+    top: 0;
     bottom: auto;
-    width: 44px;
-    height: 44px;
-    border-radius: 0;
+    width: 40px;
+    height: 40px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin--left { left: 0; }
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-spin--right { left: 42px; }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-turbo {
+    left: 86px;
+    width: 72px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-special {
+    left: auto;
+    right: 0;
+    top: 0;
+    width: 48px;
+    height: 42px;
+  }
+
+  #kaki-surf-root[data-control-mode="advanced"] .touch-actions .touch-trick {
+    left: 20px;
+  }
+
+  .top-controls {
+    right: max(8px, env(safe-area-inset-right));
+    top: max(8px, env(safe-area-inset-top));
+    flex-direction: row;
+    gap: 4px;
   }
 }
