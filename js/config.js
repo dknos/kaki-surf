@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.2.2";
+export const GAME_VERSION = "2.3.0";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -315,6 +315,7 @@ export const TUNING = {
   sideScrollSteerSpeed: 0.1,
   sideScrollMaxSpeed: 112,
   launchForce: 112,
+  maximumAerialLaunchSpeed: 370,
   gravity: 176,
   rotationAcceleration: 13.6,
   angularDrag: 1.65,
@@ -331,8 +332,8 @@ export const TUNING = {
   tuckPreloadDuration: 0.5,
   tuckPreloadSpeedBoost: 6,
   tuckPreloadSteeringScale: 0.82,
-  perfectLandingCarry: 0.58,
-  cleanLandingCarry: 0.4,
+  perfectLandingCarry: 3.2,
+  cleanLandingCarry: 1.6,
   wobbleLandingCarry: 0.18,
   perfectLandingSpeedBoost: 1.18,
   cleanLandingSpeedBoost: 1.1,

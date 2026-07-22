@@ -78,6 +78,35 @@ test("carried momentum unlocks extra height only when real boosts are stacked", 
   assert.ok(fullStack.expectedHeight > turboMomentum.expectedHeight);
 });
 
+test("a perfect landing, steep scoop, full preload, and Turbo form one rebound chain", () => {
+  const chain = {
+    ...STRONG_LINE,
+    launchStrength: 1.3,
+    speedRatio: 1,
+    uphillApproach: 0.82,
+    charge: 1,
+    turboActive: true,
+    turboOverdrive: 1,
+    waveMomentum: 0.7,
+    landingCarry: 1,
+    landingQuality: "perfect",
+  };
+  const perfect = qualifyAerialLaunch(chain);
+  const clean = qualifyAerialLaunch({ ...chain, landingQuality: "clean" });
+  const expired = qualifyAerialLaunch({ ...chain, landingCarry: 0 });
+  const noTurbo = qualifyAerialLaunch({ ...chain, turboActive: false, turboOverdrive: 0 });
+  const noPreload = qualifyAerialLaunch({ ...chain, charge: 0.2 });
+  const flat = qualifyAerialLaunch({ ...chain, uphillApproach: 0.1 });
+
+  assert.ok(perfect.reboundReadiness > 0.95);
+  assert.ok(perfect.reboundLiftMultiplier > 1.6);
+  assert.ok(clean.reboundLiftMultiplier > 1.25 && clean.reboundLiftMultiplier < perfect.reboundLiftMultiplier);
+  for (const brokenLink of [expired, noTurbo, noPreload, flat]) {
+    assert.equal(brokenLink.reboundReadiness, 0);
+    assert.equal(brokenLink.reboundLiftMultiplier, 1);
+  }
+});
+
 test("canonical altitude rises nonlinearly and anticipates the wave on descent", () => {
   const profile = qualifyAerialLaunch({ ...STRONG_LINE, turboActive: true, turboOverdrive: 1 });
   const low = aerialAltitudeForFlight({

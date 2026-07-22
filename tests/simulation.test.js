@@ -638,6 +638,53 @@ test("launch energy is led by approach speed and uphill slope while Pump remains
   assert.equal(fast.launchData.slopeDrive, -0.45);
 });
 
+test("a carried perfect landing can rebound into the highest real launch", () => {
+  const launch = ({ quality = "perfect", carry = 1, turbo = true, charge = 1, slopeDrive = -0.82 }) => {
+    const simulation = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
+    Object.assign(simulation.player, {
+      state: "lip",
+      stateTime: 0.1,
+      face: 0.02,
+      faceVelocity: slopeDrive,
+      slopeDrive,
+      speed: 154,
+      charge,
+      waveMomentum: 0.7,
+      turboActive: turbo,
+      turboOverdrive: turbo ? 1 : 0,
+      lastLandingQuality: quality,
+      landingCarryDuration: TUNING.perfectLandingCarry,
+      landingCarryTimer: TUNING.perfectLandingCarry * carry,
+    });
+    Object.assign(simulation.player.speedPotential, { pocket: 0.78, seamDrive: 0.86 });
+    simulation.wave.curlX = -520;
+    simulation.launch({ x: 0 });
+    return {
+      airVY: simulation.player.airVY,
+      launchData: { ...simulation.player.trickManifest.launchData },
+      events: collectEvents(simulation),
+    };
+  };
+
+  const ordinary = launch({ carry: 0 });
+  const clean = launch({ quality: "clean" });
+  const perfect = launch({});
+  assert.ok(perfect.airVY < clean.airVY && clean.airVY < ordinary.airVY);
+  assert.ok(perfect.airVY <= -350, `perfect rebound launch was only ${perfect.airVY.toFixed(1)}px/s`);
+  assert.ok(perfect.airVY >= -TUNING.maximumAerialLaunchSpeed);
+  assert.ok(perfect.launchData.reboundReadiness > 0.95);
+  assert.ok(perfect.events.some((event) => event.type === "callout"
+    && event.payload.text === "PERFECT REBOUND!"));
+
+  for (const broken of [
+    launch({ turbo: false }),
+    launch({ charge: 0.2 }),
+    launch({ slopeDrive: -0.1 }),
+  ]) {
+    assert.equal(broken.launchData.reboundLiftMultiplier, 1);
+  }
+});
+
 test("all boards produce measurably different steering, speed, pop, and landing outcomes", () => {
   const foam = boardProbe(BOARDS.foamPuff);
   const fish = boardProbe(BOARDS.mangoFish);

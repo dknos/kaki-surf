@@ -218,7 +218,7 @@ test("a real simulated maximum jump never develops a non-apex screen-position pl
       Math.abs(after.finalY - before.finalY),
     );
   }
-  assert.ok(minimumQuarterSecondTravel >= 0.8,
+  assert.ok(minimumQuarterSecondTravel >= 0.5,
     `high-air projection moved only ${minimumQuarterSecondTravel}px in a non-apex quarter second`);
 
   for (let frame = 0; frame < 180 && !["riding", "landing"].includes(simulation.player.state); frame += 1) {

@@ -80,9 +80,11 @@ The rider samples the same animated ride surface used for drawing and landing. T
 
 The old narrow seam is no longer required to unlock the board's maximum speed. The readable fast line remains useful guidance and improves pump efficiency, but `currentRideSpeedCap()` is the board's actual hard cap. A poor line can still move; it simply gives back speed through slope and reduced local drive.
 
-Launch height comes from current speed, uphill approach, Action charge, pocket position, board launch identity, and bonuses such as Moon Pop. A basic lip pop retains a useful floor. A fast bottom turn and climb makes the larger arc. Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample. Large aerials never pan the surf world: the horizon, wave, water, craft, and wildlife stay planted while a rider-only projection keeps an exceptional upright silhouette below the HUD. The authored atmosphere transforms independently and returns before contact; Reduced Motion preserves rider visibility while removing stage shake.
+Launch height comes from current speed, uphill approach, Action charge, pocket position, board launch identity, and bonuses such as Moon Pop. A basic lip pop retains a useful floor. The highest launch is an earned rebound chain: match a perfect landing angle, carry its speed into a steep scoop, hold the full 0.5-second preload, and engage Turbo at the lip. Clean landings retain a smaller rebound; an expired carry, flat approach, partial preload, or missing Turbo receives no rebound multiplier. Launch velocity is capped at 370 logical pixels per second so the supported maximum returns to the wave within a playable flight.
 
-Perfect, clean, and wobble landings preserve progressively less speed. A short carry timer prevents a successful landing from collapsing immediately back to baseline glide.
+Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample. Large aerials never pan the surf world. The selected condition panorama is drawn once on its fixed coastal shelf for the entire run: no cloud overlay, altitude crop, shelf replacement, or second background pass is permitted. The horizon, wave, water, craft, wildlife, and HUD stay planted while the full-size rider follows the stateless high-air projection.
+
+Perfect, clean, and wobble landings preserve progressively less speed. A perfect landing carries rebound energy for 3.2 seconds and a clean landing for 1.6 seconds, giving enough time to bottom-turn and scoop without making the next launch automatic.
 
 ## Aerial tricks
 

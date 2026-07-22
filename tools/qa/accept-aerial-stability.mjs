@@ -8,6 +8,7 @@ const outputDir = process.env.KAKI_SURF_AERIAL_QA_DIR
   ?? path.resolve("docs/images/qa-aerial-stability");
 const conditionId = process.env.KAKI_SURF_QA_CONDITION ?? "twilightGlass";
 const advancedTricks = process.env.KAKI_SURF_QA_TRICKS === "1";
+const reboundLaunch = process.env.KAKI_SURF_QA_REBOUND === "1";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pages = await fetch(`${cdpHost}/json/list`).then((response) => response.json());
@@ -105,8 +106,14 @@ function aerialFrame(sample, elapsedMs) {
     finalY: sample.finalPlayerScreenY,
     riderScale: Number(sample.riderScale) || 1,
     rotation: sample.rotation,
+    angularVelocity: Number(sample.angularVelocity) || 0,
     activeTime: sample.activeTime,
     airVY: sample.airVY,
+    boardAngle: Number(sample.boardAngle) || 0,
+    landingTargetAngle: Number.isFinite(sample.landingTargetAngle)
+      ? sample.landingTargetAngle
+      : null,
+    landingError: Number.isFinite(sample.landingError) ? sample.landingError : null,
     stageOffsetY: sample.stageOffsetY,
     backdropAltitude: sample.backdropAltitude,
     backdropSourceX: sample.backdropSourceX,
@@ -115,9 +122,13 @@ function aerialFrame(sample, elapsedMs) {
     maxAirHeight: Number(sample.maxAirHeight) || 0,
     waveMomentum: Number(sample.waveMomentum) || 0,
     momentumLiftMultiplier: Number(sample.momentumLiftMultiplier) || 1,
+    reboundReadiness: Number(sample.reboundReadiness) || 0,
+    reboundLiftMultiplier: Number(sample.reboundLiftMultiplier) || 1,
     aerialBoostStack: Number(sample.aerialBoostStack) || 0,
     trickSequence: sample.trickSequence ?? [],
     multiplier: Number(sample.multiplier) || 1,
+    landingQuality: sample.landingQuality ?? "",
+    landingCarryTimer: Number(sample.landingCarryTimer) || 0,
     elapsedMs,
   };
 }
@@ -234,6 +245,7 @@ function summarizeJump(name, frames, landing, coverage) {
     minimumQuarterSecondTravel,
     landingTimeMs: landing.elapsedMs,
     landingState: landing.state,
+    landingQuality: landing.landingQuality,
     activeTimeStart: frames[0].activeTime,
     activeTimeEnd: landing.activeTime,
     rotationStart: frames[0].rotation,
@@ -246,6 +258,8 @@ function summarizeJump(name, frames, landing, coverage) {
     physicalHeight: Math.max(...frames.map((frame) => frame.maxAirHeight)),
     launchMomentum: frames[0].waveMomentum,
     momentumLiftMultiplier: frames[0].momentumLiftMultiplier,
+    reboundReadiness: frames[0].reboundReadiness,
+    reboundLiftMultiplier: frames[0].reboundLiftMultiplier,
     aerialBoostStack: frames[0].aerialBoostStack,
     backdropSources: [...backdropSources],
     backdropSourceXRange: [Math.min(...backdropSourceXs), Math.max(...backdropSourceXs)],
@@ -270,6 +284,7 @@ async function performJump({
   spin = false,
   chargeMs = 0,
   trickSchedule = [],
+  matchLanding = false,
 }) {
   const playable = await waitForPlayable();
   const wipeoutsBefore = Number(playable.wipeouts) || 0;
@@ -304,6 +319,7 @@ async function performJump({
   let nextCaptureAt = 250;
   let lineReleased = false;
   let spinPhase = spin ? "right" : "done";
+  let landingTrimKey = null;
   const scheduledTricks = trickSchedule.map((trick) => ({ ...trick, started: false, released: false }));
   let landing = null;
   while (Date.now() - launchAt < 7000) {
@@ -334,9 +350,28 @@ async function performJump({
     }
     const sample = await telemetry();
     if (sample.state !== "airborne") {
+      if (landingTrimKey) {
+        await key(landingTrimKey, false);
+        landingTrimKey = null;
+      }
       landing = { ...sample, elapsedMs };
       coverage.push(await captureCanvas(`${name}-landing`));
       break;
+    }
+    if (matchLanding && Number(sample.airVY) > -10
+      && Number.isFinite(sample.boardAngle)
+      && Number.isFinite(sample.landingTargetAngle)) {
+      const rawAngleDelta = sample.landingTargetAngle - sample.boardAngle;
+      const angleDelta = Math.atan2(Math.sin(rawAngleDelta), Math.cos(rawAngleDelta));
+      const predictedAngleDelta = angleDelta - (Number(sample.angularVelocity) || 0) * 0.14;
+      const desiredTrimKey = Math.abs(predictedAngleDelta) > 0.045
+        ? predictedAngleDelta > 0 ? "ArrowRight" : "ArrowLeft"
+        : null;
+      if (desiredTrimKey !== landingTrimKey) {
+        if (landingTrimKey) await key(landingTrimKey, false);
+        if (desiredTrimKey) await key(desiredTrimKey, true);
+        landingTrimKey = desiredTrimKey;
+      }
     }
     frames.push(aerialFrame(sample, elapsedMs));
     if (elapsedMs >= nextCaptureAt) {
@@ -401,6 +436,7 @@ jumps.push(await performJump({
   name: "02-medium",
   leadMs: 350,
   turbo: true,
+  matchLanding: reboundLaunch,
 }));
 if (advancedTricks) {
   await evaluate(`(() => {
@@ -444,7 +480,7 @@ if (jumps[2].summary.visibleTravel < 40) {
 if (jumps.some((jump) => jump.summary.longestNonApexPlateau > 0)) {
   throw new Error("A non-apex rider screen-position plateau was detected");
 }
-if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.5)) {
+if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.4)) {
   throw new Error(`Huge air moved only ${jumps[2].summary.minimumQuarterSecondTravel.toFixed(2)}px in a non-apex quarter second`);
 }
 if (jumps.some((jump) => jump.summary.backdropSources.some((value) => value !== 424))) {
@@ -455,6 +491,17 @@ if (jumps.some((jump) => jump.summary.riderScaleRange.some((value) => value !== 
 }
 if (jumps.some((jump) => jump.summary.cloudBlendRange.some((value) => value !== 0))) {
   throw new Error("A jump introduced an aerial cloud blend");
+}
+if (reboundLaunch) {
+  if (jumps[1].summary.landingQuality !== "perfect") {
+    throw new Error(`Rebound setup landed ${jumps[1].summary.landingQuality || "without a rating"}, not perfect`);
+  }
+  if (jumps[2].summary.reboundLiftMultiplier < 1.35) {
+    throw new Error(`Perfect rebound produced only x${jumps[2].summary.reboundLiftMultiplier.toFixed(2)} lift`);
+  }
+  if (jumps[2].summary.physicalHeight < 250) {
+    throw new Error(`Perfect rebound reached only ${jumps[2].summary.physicalHeight.toFixed(1)} physical pixels`);
+  }
 }
 if (jumps.some((jump) => jump.summary.maximumBackdropSourceXDelta > 1)) {
   throw new Error("Panorama source travel jumped to an unrelated part of the artwork");

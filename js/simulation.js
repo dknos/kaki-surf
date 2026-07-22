@@ -1250,6 +1250,9 @@ export class SurfSimulation {
     );
     const pocketLaunch = clamp(player.speedPotential?.pocket ?? this.wave.pocketRisk(player.x), 0, 1);
     const launchCharge = clamp(Number(player.charge) || 0, 0, 1);
+    const landingCarryRatio = player.landingCarryDuration > 0
+      ? clamp(player.landingCarryTimer / player.landingCarryDuration, 0, 1)
+      : 0;
     const turboAtLaunch = Boolean(player.turboActive);
     const turboOverdriveAtLaunch = clamp(Number(player.turboOverdrive) || 0, 0, 1);
     const lipAngle = Math.abs(Number(player.boardAngle) || 0);
@@ -1278,6 +1281,8 @@ export class SurfSimulation {
       launchScale: worldModifiers.launchScale,
       waveMomentum: launchMomentum,
       mangoRushActive: worldModifiers.mangoRushRemaining > 0,
+      landingCarry: landingCarryRatio,
+      landingQuality: player.lastLandingQuality,
     });
     const launchMultiplier = this.currentMultiplier() * (this.tuning.scoreAir / 1.25);
     const launchRisk = this.wave.pocketRisk(player.x);
@@ -1288,12 +1293,17 @@ export class SurfSimulation {
     player.airVX = player.travelDirection * (player.speed - 52) * 0.14
       + player.travelVelocity * 0.28
       + input.x * 3;
-    player.airVY = -this.tuning.launchForce
+    const launchSpeed = this.tuning.launchForce
       * this.board.launch
       * launchEnergy
       * worldModifiers.launchScale
       * aerialProfile.turboLiftMultiplier
-      * aerialProfile.momentumLiftMultiplier;
+      * aerialProfile.momentumLiftMultiplier
+      * aerialProfile.reboundLiftMultiplier;
+    player.airVY = -Math.min(
+      finiteTuning(this.tuning.maximumAerialLaunchSpeed, TUNING.maximumAerialLaunchSpeed),
+      launchSpeed,
+    );
     player.launchY = player.airY;
     player.maxAirHeight = 0;
     player.aerialAltitude = 0;
@@ -1341,6 +1351,10 @@ export class SurfSimulation {
         speedRatio,
         waveMomentum: launchMomentum,
         momentumLiftMultiplier: aerialProfile.momentumLiftMultiplier,
+        reboundReadiness: aerialProfile.reboundReadiness,
+        reboundLiftMultiplier: aerialProfile.reboundLiftMultiplier,
+        landingCarry: landingCarryRatio,
+        landingQuality: player.lastLandingQuality,
         boostStack: aerialProfile.boostStack,
         seamDrive: player.speedPotential.seamDrive,
         slopeDrive: player.slopeDrive,
@@ -1381,11 +1395,20 @@ export class SurfSimulation {
       aerialCeiling: aerialProfile.ceiling,
       spaceQualified: aerialProfile.spaceQualified,
       wingedLaunch,
+      reboundReadiness: aerialProfile.reboundReadiness,
+      reboundLiftMultiplier: aerialProfile.reboundLiftMultiplier,
     });
     if (wingedLaunch) {
       this.emit("callout", {
         text: "WING IT!",
         subtext: "45 DEGREE CURL",
+        tone: "perfect",
+      });
+    }
+    if (player.lastLandingQuality === "perfect" && aerialProfile.reboundReadiness >= 0.3) {
+      this.emit("callout", {
+        text: "PERFECT REBOUND!",
+        subtext: "LAND  SCOOP  TURBO",
         tone: "perfect",
       });
     }
