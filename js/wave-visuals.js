@@ -138,17 +138,17 @@ export function breakerSkyWindow(wave) {
   const curl = clamp(Number(wave?.curlX ?? 0), 0, LOGICAL_WIDTH);
   const crest = clamp(Number(wave?.crestY?.(curl) ?? 78), 54, 112);
   const right = clamp(curl - 8, 0, LOGICAL_WIDTH - 20);
-  const bottom = clamp(crest + 18, 96, 110);
+  const horizon = 80;
   return {
     right,
     shoulder: Math.max(0, right - 44),
     top: 0,
-    horizon: 80,
-    fold: clamp(crest + 8, 84, bottom - 3),
-    // Keep the revealed sky above the distant-water band. Extending the mask
-    // deep into the face creates another solid triangle, while this shallow
-    // curved edge reads as open air behind a breaker that has already passed.
-    bottom,
+    horizon,
+    fold: clamp(crest - 1, 60, horizon - 3),
+    // This cutout reveals only sky. Repainting the aerial panorama below the
+    // horizon creates the large yellow bite that looked like missing scenery
+    // after a breaker passed.
+    bottom: horizon,
   };
 }
 

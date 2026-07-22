@@ -1635,7 +1635,7 @@ function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. In Simple Controls, carve with arrows or WASD, use Space or A for action, and F or X for one context trick."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. In Simple Controls, carve with arrows or WASD, use Space or A for action, hold Shift for Turbo, and use F or X for one context trick."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="pause-run" aria-label="Pause surfing">II</button>
@@ -1671,7 +1671,7 @@ function gameMarkup() {
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>
           </dl>
-          <p class="controls-line"><b>CHOOSE + CARVE</b> ARROWS / WASD <b>ACTION</b> SPACE / A <b>TRICK</b> F / X</p>
+          <p class="controls-line"><b>CHOOSE + CARVE</b> ARROWS / WASD <b>ACTION</b> SPACE / A <b>TURBO</b> SHIFT / L3 <b>TRICK</b> F / X</p>
         </div>
 
         <div class="game-layer compact-layer" data-layer="pause" hidden>
@@ -1734,7 +1734,7 @@ function gameMarkup() {
           </section>
           <section aria-labelledby="access-heading">
             <h3 id="access-heading">ACCESS</h3>
-            <label><span>CONTROLS</span><select data-setting="controlMode" aria-label="Control mode"><option value="simple">SIMPLE · ACTION + TRICK</option><option value="advanced">ADVANCED · Q E F T + TURBO</option></select></label>
+            <label><span>CONTROLS</span><select data-setting="controlMode" aria-label="Control mode"><option value="simple">SIMPLE · ACTION + TRICK + TURBO</option><option value="advanced">ADVANCED · Q E F T + TURBO</option></select></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedMotion"><span>REDUCED MOTION</span></label>
             <label><span>SCREEN SHAKE <output data-setting-output="screenShake">70%</output></span><input type="range" min="0" max="1" step="0.05" data-setting="screenShake" aria-label="Screen shake intensity"></label>
             <label class="toggle"><input type="checkbox" data-setting="reducedFlash"><span>FLASH REDUCTION</span></label>

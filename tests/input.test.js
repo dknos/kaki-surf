@@ -89,7 +89,7 @@ test("gameplay keys leave native settings controls alone", () => {
   input.destroy();
 });
 
-test("Simple mode exposes only line input, Action, and the context trick", () => {
+test("Simple mode exposes line input, Action, Turbo, and the context trick", () => {
   const target = new FakeTarget();
   const input = new InputManager({ target, getGamepads: () => [] });
   assert.equal(input.controlMode, CONTROL_MODES.SIMPLE);
@@ -99,12 +99,12 @@ test("Simple mode exposes only line input, Action, and the context trick", () =>
   }
   input.update(0);
   let step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick"]) {
+  for (const action of ["edge", "turbo", "trick"]) {
     assert.equal(step[action], true, `${action} held`);
     assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
   }
   for (const action of [
-    "turbo", "special", "spinLeft", "spinRight",
+    "special", "spinLeft", "spinRight",
     "trick1", "trick2", "trick3", "trick4", "style",
   ]) {
     assert.equal(step[action], false, `${action} stays inactive in Simple mode`);
@@ -116,11 +116,11 @@ test("Simple mode exposes only line input, Action, and the context trick", () =>
   }
   input.update(0);
   step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick"]) {
+  for (const action of ["edge", "turbo", "trick"]) {
     assert.equal(step[action], false, `${action} released hold`);
     assert.equal(step[`${action}Released`], true, `${action} release buffered`);
   }
-  for (const action of ["turbo", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["special", "spinLeft", "spinRight"]) {
     assert.equal(step[`${action}Released`], false, `${action} never entered Simple state`);
   }
 
@@ -144,7 +144,7 @@ test("Simple keyboard aliases share one trick edge and Advanced deliberately res
   target.dispatch("keydown", { code: "ShiftLeft" });
   input.update(0);
   let shifted = input.consumeStep();
-  assert.equal(shifted.turboPressed, false, "Simple mode has no manual Turbo");
+  assert.equal(shifted.turboPressed, true, "Simple mode keeps the common Turbo action");
   assert.equal(shifted.specialPressed, false, "Shift no longer spends an animal special");
   target.dispatch("keydown", { code: "KeyT" });
   input.update(0);
@@ -154,7 +154,7 @@ test("Simple keyboard aliases share one trick edge and Advanced deliberately res
   target.dispatch("keyup", { code: "ShiftLeft" });
   input.update(0);
   shifted = input.consumeStep();
-  assert.equal(shifted.turboReleased, false);
+  assert.equal(shifted.turboReleased, true);
   assert.equal(shifted.specialReleased, false);
   target.dispatch("keyup", { code: "KeyT" });
   input.update(0);
@@ -492,19 +492,19 @@ test("gamepad polling walks sparse pad lists without an intermediate array pipel
   assert.equal(pollGamepad(() => { throw new Error("denied"); }).connected, false);
 });
 
-test("Simple gamepad maps A/RT and X/B without exposing Turbo, Special, or spin buttons", () => {
+test("Simple gamepad maps A/RT, L3 Turbo, and X/B without exposing Special or spin buttons", () => {
   const pad = createPad();
   const input = new InputManager({ target: new FakeTarget(), getGamepads: () => [pad] });
 
   pressButtons(pad, 0, 7, 10, 2, 1, 3, 4, 5);
   input.update(0);
   let step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick"]) {
+  for (const action of ["edge", "turbo", "trick"]) {
     assert.equal(step[action], true, `${action} held`);
     assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
   }
   for (const action of [
-    "turbo", "special", "spinLeft", "spinRight",
+    "special", "spinLeft", "spinRight",
     "trick1", "trick2", "trick3", "trick4",
   ]) {
     assert.equal(step[action], false, `${action} inactive`);
@@ -514,10 +514,10 @@ test("Simple gamepad maps A/RT and X/B without exposing Turbo, Special, or spin 
   releaseButtons(pad);
   input.update(0);
   step = snapshot(input.consumeStep());
-  for (const action of ["edge", "trick"]) {
+  for (const action of ["edge", "turbo", "trick"]) {
     assert.equal(step[`${action}Released`], true, `${action} released`);
   }
-  for (const action of ["turbo", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["special", "spinLeft", "spinRight"]) {
     assert.equal(step[`${action}Released`], false, `${action} was never active`);
   }
   input.destroy();
@@ -593,7 +593,7 @@ test("touch tracks independent direction and action pointers with visible active
   input.destroy();
 });
 
-test("Simple multitouch keeps direction, Action, and Trick independent while hiding extra systems", () => {
+test("Simple multitouch keeps direction, Action, Turbo, and Trick independent while hiding extra systems", () => {
   const controls = ["left", "up", "edge", "turbo", "trick", "special", "spinLeft", "spinRight"];
   const buttons = Object.fromEntries(controls.map((control) => [control, new FakeButton(control)]));
   const input = new InputManager({
@@ -607,11 +607,11 @@ test("Simple multitouch keeps direction, Action, and Trick independent while hid
   let step = snapshot(input.consumeStep());
   assert.equal(step.x, -1);
   assert.equal(step.y, -1);
-  for (const action of ["edge", "trick"]) {
+  for (const action of ["edge", "turbo", "trick"]) {
     assert.equal(step[action], true, `${action} held`);
     assert.equal(step[`${action}Pressed`], true, `${action} pressed`);
   }
-  for (const action of ["turbo", "special", "spinLeft", "spinRight"]) {
+  for (const action of ["special", "spinLeft", "spinRight"]) {
     assert.equal(step[action], false, `${action} is unavailable in Simple mode`);
   }
 

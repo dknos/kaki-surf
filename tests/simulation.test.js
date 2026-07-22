@@ -465,32 +465,34 @@ test("movement alone reaches the hard board cap and wave momentum is not a permi
   assert.ok(first.simulation.player.charge < 0.01, "cap is reachable without pumping");
 });
 
-test("Advanced Shift Turbo spends a finite tank and creates real overdrive speed", () => {
-  const boosted = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
-  const control = beginRiding(BOARDS.mangoFish, { controlMode: "advanced" });
-  boosted.wave.curlX = -1_000;
-  control.wave.curlX = -1_000;
-  boosted.player.speed = 72;
-  control.player.speed = 72;
-  boosted.player.turbo = 0.6;
-  control.player.turbo = 0.6;
+test("Turbo spends a finite tank and creates real overdrive speed in both control modes", () => {
+  for (const controlMode of ["simple", "advanced"]) {
+    const boosted = beginRiding(BOARDS.mangoFish, { controlMode });
+    const control = beginRiding(BOARDS.mangoFish, { controlMode });
+    boosted.wave.curlX = -1_000;
+    control.wave.curlX = -1_000;
+    boosted.player.speed = 72;
+    control.player.speed = 72;
+    boosted.player.turbo = 0.6;
+    control.player.turbo = 0.6;
 
-  for (let step = 0; step < 120; step += 1) {
-    boosted.update(FIXED_STEP, { turbo: true, turboPressed: step === 0 });
-    control.update(FIXED_STEP, {});
+    for (let step = 0; step < 120; step += 1) {
+      boosted.update(FIXED_STEP, { turbo: true, turboPressed: step === 0 });
+      control.update(FIXED_STEP, {});
+    }
+
+    assert.equal(boosted.player.turboActive, true, controlMode);
+    assert.ok(boosted.player.turbo < 0.25, `${controlMode} Turbo tank remained ${boosted.player.turbo}`);
+    assert.ok(boosted.player.turbo > 0.2, `${controlMode} Turbo drained too quickly to ${boosted.player.turbo}`);
+    assert.ok(boosted.player.speed > control.player.speed + 28, controlMode);
+    assert.ok(boosted.currentRideSpeedCap() > boosted.baseRideSpeedCap(), controlMode);
+
+    boosted.update(FIXED_STEP, { turboReleased: true });
+    assert.equal(boosted.player.turboActive, false, controlMode);
+    const events = collectEvents(boosted);
+    assert.equal(events.filter((event) => event.type === "turboStart").length, 1, controlMode);
+    assert.equal(events.filter((event) => event.type === "turboStop").length, 1, controlMode);
   }
-
-  assert.equal(boosted.player.turboActive, true);
-  assert.ok(boosted.player.turbo < 0.25, `Turbo tank remained ${boosted.player.turbo}`);
-  assert.ok(boosted.player.turbo > 0.2, `Turbo drained too quickly to ${boosted.player.turbo}`);
-  assert.ok(boosted.player.speed > control.player.speed + 28);
-  assert.ok(boosted.currentRideSpeedCap() > boosted.baseRideSpeedCap());
-
-  boosted.update(FIXED_STEP, { turboReleased: true });
-  assert.equal(boosted.player.turboActive, false);
-  const events = collectEvents(boosted);
-  assert.equal(events.filter((event) => event.type === "turboStart").length, 1);
-  assert.equal(events.filter((event) => event.type === "turboStop").length, 1);
 });
 
 test("only successfully banked tricks refill Turbo, with quality and repetition scaling", () => {

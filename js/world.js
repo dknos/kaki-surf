@@ -26,6 +26,7 @@ import {
   projectWorldX,
   sweptCircleContact,
   sweptCircleDistanceSquared,
+  worldXForScreenX,
 } from "./world-collision.js";
 import { whaleFrameMetadata } from "./whale-contract.js";
 
@@ -186,7 +187,12 @@ export class WorldSimulation {
     entity.phaseTime = 0;
     entity.spawnTime = this.elapsed;
     entity.despawnTime = this.elapsed + Math.max(0.25, duration);
-    entity.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
+    entity.worldX = worldXForScreenX(
+      screenX,
+      this.context.cameraWorldX,
+      layerConfig.parallax,
+      WORLD_LIMITS.centerX,
+    );
     entity.previousWorldX = entity.worldX;
     entity.y = y;
     entity.previousY = y;
@@ -243,10 +249,16 @@ export class WorldSimulation {
   forceFeatherThread(options = {}) {
     const kind = isFlockBirdKind(options.kind) ? options.kind : "gullFlock";
     const layer = options.layer === "mid" ? "mid" : "near";
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
     const entity = this.spawnTraffic(kind, {
       ...options,
       layer,
-      screenX: finite(options.screenX, finite(options.x, this.context.player.x)),
+      screenX: finite(options.screenX, finite(options.x, playerScreenX)),
       y: finite(options.y, this.context.player.y + this.context.player.radius + 13),
       speed: finite(options.speed, 0),
       duration: finite(options.duration, 3),
@@ -512,9 +524,15 @@ export class WorldSimulation {
       const layer = definition.layers.includes(requestedLayer)
         ? requestedLayer
         : definition.layers.includes("near") ? "near" : definition.layers[0];
+      const playerScreenX = projectWorldX(
+        this.context.player.x,
+        this.context.cameraWorldX,
+        1,
+        WORLD_LIMITS.centerX,
+      );
       const entity = this.spawnTraffic(kind, {
         layer,
-        screenX: finite(options.screenX, finite(options.x, this.context.player.x + 54 * -this.context.direction)),
+        screenX: finite(options.screenX, finite(options.x, playerScreenX + 54 * -this.context.direction)),
         y: finite(options.y, clamp(this.context.player.y - 28, WORLD_LAYER_CONFIG[layer].yRange[0], WORLD_LAYER_CONFIG[layer].yRange[1])),
         direction: signOr(options.direction, this.context.direction),
         speed: finite(options.speed, 18),
@@ -630,10 +648,22 @@ export class WorldSimulation {
 
     const direction = signOr(options.direction, this.context.direction);
     const dropDelay = COURIER_PHASES.telegraph + COURIER_PHASES.carry;
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
     const dropX = clamp(
-      finite(options.dropX, finite(options.x, this.context.player.x + direction * 18)),
+      finite(options.dropX, finite(options.x, playerScreenX + direction * 18)),
       46,
       338,
+    );
+    const dropWorldX = worldXForScreenX(
+      dropX,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
     );
     const dropY = clamp(
       finite(options.dropY, finite(options.y, this.context.player.y - 10 + finite(options.yOffset))),
@@ -644,7 +674,7 @@ export class WorldSimulation {
     const dropVy = finite(options.dropVy, 7);
     if (!force && !isReachablePickup({
       player: this.context.player,
-      target: { x: dropX, y: dropY },
+      target: { x: dropWorldX, y: dropY },
       interceptTime: dropDelay + 0.85,
       pickupRadius: POWERUP_CATALOG[powerupKind].radius,
       playerRadius: this.context.player.radius,
@@ -675,7 +705,7 @@ export class WorldSimulation {
     this.courier.birdId = bird.id;
     this.courier.powerupKind = powerupKind;
     this.courier.direction = direction;
-    this.courier.dropWorldX = this.context.player.x + dropX - WORLD_LIMITS.centerX;
+    this.courier.dropWorldX = dropWorldX;
     this.courier.dropY = dropY;
     this.courier.dropVx = dropVx;
     this.courier.dropVy = dropVy;
@@ -759,10 +789,24 @@ export class WorldSimulation {
     if (this.race.active) return null;
     if (!force && (this.hasActiveInteractive() || this.elapsed < this.interactiveQuietUntil)) return null;
     const direction = signOr(options.direction, this.context.direction);
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
+    const curlScreenX = Number.isFinite(this.context.curlWorldX)
+      ? projectWorldX(
+        this.context.curlWorldX,
+        this.context.cameraWorldX,
+        1,
+        WORLD_LIMITS.centerX,
+      )
+      : 40;
     const safeRaceX = clamp(
       Math.max(
-        finite(this.context.curlWorldX, 40) + 148,
-        finite(this.context.player?.x, WORLD_LIMITS.centerX) + 98,
+        curlScreenX + 148,
+        playerScreenX + 98,
       ),
       294,
       WORLD_LIMITS.logicalWidth - 46,
@@ -877,10 +921,22 @@ export class WorldSimulation {
 
     const direction = signOr(options.direction, this.context.direction);
     const dropDelay = AIRCRAFT_DROP_PHASES.telegraph + AIRCRAFT_DROP_PHASES.approach;
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
     const dropX = clamp(
-      finite(options.dropX, finite(options.x, this.context.player.x + direction * 16)),
+      finite(options.dropX, finite(options.x, playerScreenX + direction * 16)),
       48,
       336,
+    );
+    const dropWorldX = worldXForScreenX(
+      dropX,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
     );
     const dropY = clamp(
       finite(options.dropY, finite(options.y, this.context.player.y - 34 + finite(options.yOffset))),
@@ -891,7 +947,7 @@ export class WorldSimulation {
     const dropVy = finite(options.dropVy, 12);
     if (!force && !isReachablePickup({
       player: this.context.player,
-      target: { x: dropX, y: dropY },
+      target: { x: dropWorldX, y: dropY },
       interceptTime: dropDelay + 0.9,
       pickupRadius: POWERUP_CATALOG[powerupKind].radius,
       playerRadius: this.context.player.radius,
@@ -921,7 +977,7 @@ export class WorldSimulation {
     this.aircraftDrop.trafficId = plane.id;
     this.aircraftDrop.powerupKind = powerupKind;
     this.aircraftDrop.direction = direction;
-    this.aircraftDrop.dropWorldX = this.context.player.x + dropX - WORLD_LIMITS.centerX;
+    this.aircraftDrop.dropWorldX = dropWorldX;
     this.aircraftDrop.dropY = dropY;
     this.aircraftDrop.dropVx = dropVx;
     this.aircraftDrop.dropVy = dropVy;
@@ -1034,7 +1090,13 @@ export class WorldSimulation {
     this.foamGateSeries.count = count;
     this.foamGateSeries.eventSeed = eventSeed;
     this.foamGateSeries.message = normalizedOwner;
-    const desiredFirstX = finite(options.screenX, this.context.player.x + direction * baseDistance);
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
+    const desiredFirstX = finite(options.screenX, playerScreenX + direction * baseDistance);
     const firstX = direction > 0
       ? clamp(desiredFirstX, 38, 346 - (count - 1) * spacing)
       : clamp(desiredFirstX, 38 + (count - 1) * spacing, 346);
@@ -1047,7 +1109,12 @@ export class WorldSimulation {
       gate.phase = "available";
       gate.previousPhase = "available";
       gate.collidable = false;
-      gate.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
+      gate.worldX = worldXForScreenX(
+        screenX,
+        this.context.cameraWorldX,
+        1,
+        WORLD_LIMITS.centerX,
+      );
       gate.previousWorldX = gate.worldX;
       gate.y = clamp(baseY + yPattern[index], 38, 190);
       gate.previousY = gate.y;
@@ -1332,8 +1399,20 @@ export class WorldSimulation {
       : kind === "shark"
         ? definition.phases.crossing * 0.48
         : definition.phases.breach + definition.phases.ramp * 0.35;
-    const defaultX = this.context.player.x - direction * Math.abs(speed) * approachTime;
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
+    const defaultX = playerScreenX - direction * Math.abs(speed) * approachTime;
     const screenX = finite(options.screenX, finite(options.x, defaultX));
+    const worldX = worldXForScreenX(
+      screenX,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
     const waterlineY = clamp(finite(this.context.waterlineY, 79), 64, 100);
     const requestedY = finite(
       options.y,
@@ -1348,7 +1427,7 @@ export class WorldSimulation {
       ? clamp(requestedY, waterlineY + 28, Math.min(172, waterlineY + 72))
       : clamp(requestedY, 36, 190);
     const sharkCandidate = {
-      x: screenX,
+      x: worldX,
       y: screenY,
       vx: direction * Math.abs(speed),
       vy: 0,
@@ -1368,7 +1447,7 @@ export class WorldSimulation {
     entity.previousPhase = phase;
     entity.phaseTime = clamp(finite(options.phaseTime), 0, finite(definition.phases[phase], 1));
     entity.spawnTime = this.elapsed;
-    entity.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
+    entity.worldX = worldX;
     entity.previousWorldX = entity.worldX;
     entity.y = screenY;
     entity.previousY = screenY;
@@ -1587,12 +1666,24 @@ export class WorldSimulation {
     const direction = signOr(options.direction, 1);
     const speed = finite(options.speed, 11 + finite(options.speedRoll, 0.5) * 7);
     const screenVelocity = direction * Math.abs(speed);
-    const screenX = finite(options.screenX, finite(options.x, this.context.player.x - screenVelocity * 1.2));
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
+    const screenX = finite(options.screenX, finite(options.x, playerScreenX - screenVelocity * 1.2));
+    const worldX = worldXForScreenX(
+      screenX,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
     const screenY = clamp(finite(options.y, this.context.player.y + finite(options.yOffset)), 34, 190);
     const interceptTime = phase === "available" ? 0.35 : 1.45;
     if (!force && !isReachablePickup({
       player: this.context.player,
-      target: { x: screenX, y: screenY, vx: screenVelocity, vy: finite(options.vy) },
+      target: { x: worldX, y: screenY, vx: screenVelocity, vy: finite(options.vy) },
       interceptTime,
       pickupRadius: definition.radius,
       playerRadius: this.context.player.radius,
@@ -1604,7 +1695,7 @@ export class WorldSimulation {
     entity.previousPhase = phase;
     entity.phaseTime = 0;
     entity.spawnTime = this.elapsed;
-    entity.worldX = this.context.player.x + screenX - WORLD_LIMITS.centerX;
+    entity.worldX = worldX;
     entity.previousWorldX = entity.worldX;
     entity.y = screenY;
     entity.previousY = screenY;

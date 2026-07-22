@@ -1,6 +1,6 @@
 # Validation checklist and results
 
-Date: 2026-07-21.
+Date: 2026-07-22.
 
 ## Automated checkpoint
 
@@ -12,27 +12,27 @@ npm run check
 git diff --check
 ```
 
-The current native Node run passed **212 tests with 0 failures**. `npm run check` parsed **34 JavaScript modules** successfully.
+The current native Node run passed **229 tests with 0 failures**. `npm run check` parsed **35 JavaScript modules** successfully.
 
 The current suite covers:
 
-- Simple line/Action/Trick-only input and HUD contracts, Advanced Turbo plus Q/E/F/T, mode-switch clearing, aliases, edge buffering, gamepad selection, dead zone, and independent touch pointers.
+- Simple line/Action/Trick/Turbo input and HUD contracts, Advanced Q/E/F/T, mode-switch clearing, aliases, edge buffering, gamepad selection, dead zone, and independent touch pointers.
 - Controller UI confirm/back edges, dominant-axis navigation, deliberate hold repeat, spatial focus selection, in-place range/select adjustment, and an allocation-free no-pad poll/consume path.
 - Native slider/select/checkbox/button keyboard behavior while Settings is open, modal gameplay-input suppression, safe Escape cleanup, and scrollable touch surfaces outside the Canvas control zone.
-- Simple context-Trick buffering, tap/hold interpretation, scored held Tube Tuck/Soul Arch in the eligible pocket, entry/hold hysteresis, pocket-exit grace, release-required re-arm, exclusive tube maneuver ownership, coherent best-ride duration/score records, finish-run grading, short foreground exit tail, pose cleanup, gated aerial fallback, horizontal air steering without accidental body rotation, board-specific auto-level, and nearest regular/opposite landing alignment.
+- Simple context-Trick buffering, tap/hold interpretation, scored held Tube Tuck/Soul Arch in the eligible pocket, entry/hold hysteresis, pocket-exit grace, release-required re-arm, exclusive tube maneuver ownership, coherent best-ride duration/score records, finish-run grading, short foreground exit tail, pose cleanup, gated aerial fallback, shared air steering/rotation, board-specific auto-level, and nearest regular/opposite landing alignment.
 - Advanced Q/E/F/T on-wave context, direct aerial actions, ordered multi-trick manifests, rotation naming, trick gates, provisional scoring, exact-repeat decay, landing bank, and wipeout loss.
 - Canonical screen/world velocity, exact board/path heading, mirrored left/right wakes, no front-facing wake, 0.35–0.5 second cutbacks, speed scrub, full-face traversal, airborne wake suppression, and signed landing/mount direction.
 - Four-tier launch qualification, earned Turbo-only space access, nonlinear canonical aerial altitude, descent anticipation, rider-only high-air framing with a vertically fixed wave shelf, continuous signed panorama cropping, zone milestones, altitude-filtered surf/wind, and fixed-step orbital ascent/descent continuity.
 - Signed scenic parallax, seven accumulated nonnegative decorative-water clocks, a pause-safe fall clock driven by simulation wave time rather than rider speed/direction, bounded camera influence that prevents traffic ping-pong, and boat-only far/mid waterline bands.
 - Prioritized gameplay callouts with duplicate suppression, stale-message expiry, a bounded queue, readable minimum display beats, mechanic-channel replacement for Tube Open/Tuck/Clean Exit, and no simultaneous text overlap; the polite live region independently queues 1.25-second announcements and promotes danger instead of replacing speech mid-phrase.
-- Six-step Surf School progression driven by real drop, climb, cutback, lip, trick, and landing outcomes.
+- Six-step Surf School progression driven by real drop, climb, cutback, lip, trick, and landing outcomes, with explicit direction-marker glyph coverage.
 - Event-led Flow integrity: idle and rapid input flicks cannot farm combo, while sustained arcs and rhythmically valid pumps beat spam.
 - Escalating monotonic curl pressure, eight-second opening grace, skilled relief, bounded respawn recovery, deterministic idle/skilled threat windows, and collision-aligned profile-specific contact.
-- Condition-first wave-profile installation, shared forward dead-zone camera behavior across `classic` and `heroBarrel` physics, x=30 opening contact, expanded ride/air bounds, six staged travelling-break sections, a monotonically growing passed-sky window, fixed-grid gravity columns with persistent contrails, one nonmirroring collision edge, and canonical aerial collision at the visible pitching lip.
+- Condition-first wave-profile installation, shared forward dead-zone camera behavior across `classic` and `heroBarrel` physics, x=30 opening contact, expanded ride/air bounds, six staged travelling-break sections, a sky-only passed-wave window, fixed-grid gravity columns with persistent contrails, one nonmirroring collision edge, and canonical aerial collision at the visible pitching lip.
 - Carried-energy downhill acceleration, low-drag traverse, uphill cost without instant momentum erasure, reversal scrub, pump enhancement, and landing carry.
 - Finite face-only Turbo drain, real acceleration and 14% overdrive headroom, release decay, wipeout preservation/loss, and clean/perfect landed-trick refill scaling by completed entries, rotation, grade, and exact-repeat decay; empty pops and wobble returns stay at zero.
 - Board-specific steering, pop, air correction, landing windows, Simple correction strengths, and the 18% scoring reduction for explicit Steering/Landing assists.
-- Seeded `WorldSimulation` traffic pools, layer capacity and culling, stable stream isolation, quiet periods, wildlife phase machines, swept collision/reachability, powerup collection/consumption, carrier/airshow state, and bounded signal queues.
+- Seeded `WorldSimulation` traffic pools, layer capacity and culling, stable stream isolation, quiet periods, camera-relative wildlife/traffic/pickup spawning, wildlife phase machines, swept collision/reachability, powerup collection/consumption, carrier/airshow state, and bounded signal queues.
 - Bird reactions and harmless final-moment dodge, one-shot Feather Thread, courier and aircraft drops, no-penalty speedboat/jet-ski races, Dolphin/Fleet foam gates, and deterministic style-score integration.
 - Whale per-phase draw/water/collision/foam metadata, deterministic breach endpoints, foreground masking, zero production spawn weights, plus forced QA ramp/mount/splash coverage.
 - Lifecycle-owned audio transport with bounded scheduling after long pauses, finite saved gain values, separate board-contact and airborne-wind layers, priority ducking, a dynamics limiter, suspended-context resume, and persistent master mute.

@@ -24,10 +24,11 @@ Simple Controls are the default:
 | --- | --- | --- | --- |
 | Travel and carve; rotate and trim in air | Arrows or WASD | Left stick or D-pad | Direction pad |
 | Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
+| Turbo Boost | Hold either Shift | Left-stick press / L3 | Hold **Turbo** |
 | Context trick / tube hold | F or X | X or B | **Trick** |
 | Pause | Escape or P | Start | **II** pause button; Settings also pauses |
 
-Advanced Controls preserve manual Turbo and the original Q/E/F/T map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
+Advanced Controls preserve the original Q/E/F/T trick map and can be selected in Settings: Q is Rail, E is Tail, F is Flip, and T is Twist. See [Controls and gameplay feel](docs/CONTROLS-AND-FEEL.md) for the complete contextual mappings.
 
 The standard gamepad now owns the whole arcade loop: stick/D-pad navigation, A to activate, B to close dialogs or instantly retry results, and Start to pause/resume. Directional focus repeats deliberately, while sliders and selects adjust in place. Touch controls appear automatically on coarse-pointer or compact touch devices, stay off fine-pointer desktops, and neutralize safely when the device rotates.
 
@@ -40,10 +41,10 @@ Wave geometry now supplies the main drive without continuously attracting the bo
 Speed, Turbo, and Flow have separate jobs:
 
 - **Speed** is canonical path motion and is communicated primarily by the trajectory wake, tail spray, parallax, pose, and audio.
-- **Turbo** remains an optional Advanced-only overdrive. Simple mode has no manual Turbo control or meter.
+- **Turbo** is a common short overdrive in both control modes. Hold Shift, L3, or the touch Turbo button on the face to spend it; landed tricks refill it.
 - **Flow** is the run's combo/style state. Valid full carves, timed pumps, direction changes, varied tricks, clean landings, and wildlife moments build it. A strong line can briefly sustain earned Flow, but passive riding, repetition, stalling, wobble, and wipeouts reduce it.
 
-The persistent play HUD is limited to score, time or paws, and a compact combo only while it is active. Speed, Turbo, Flow, Set, powerup, and pump meters no longer compete with the wave read.
+The persistent play HUD is limited to score, time or paws, Turbo, and a compact combo only while it is active. Speed, Flow, Set, powerup, and pump meters no longer compete with the wave read.
 
 Simple Controls make Trick contextual: hold it inside Twilight's critical pocket to tuck into the tube, or use it around a launch to buffer an eligible aerial move. A large move that no longer fits falls back to a readable grab, and late descent begins helping the board toward the nearest valid landing tangent. Advanced Controls retain direct on-wave maneuvers, a dedicated held Tube Tuck/Soul Arch, and compositional Q/E/F/T aerial inputs. Aerial points remain provisional until landing.
 
@@ -97,7 +98,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **226/226 tests** and the syntax gate checks **35 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, forward dead-zone scrolling in every condition, shared Simple/Advanced aerial rotation, rider-only aerial framing, qualified aerial tiers, continuous orbital ascent/descent, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, the reduced Simple HUD, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide. This checkpoint is local and does not claim that GitHub Pages has refreshed.
+The native suite passes **229/229 tests** and the syntax gate checks **35 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, forward dead-zone scrolling in every condition, shared Simple/Advanced aerial rotation and Turbo, qualified aerial tiers, continuous orbital ascent/descent, camera-relative wildlife and pickup spawns, sky-only breaker cutouts, real tutorial arrow glyphs, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide. This checkpoint is local and does not claim that GitHub Pages has refreshed.
 
 ## Static deployment and integration
 

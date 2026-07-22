@@ -171,6 +171,48 @@ test("spatial helpers catch swept contacts, invert projection, and distinguish r
   );
 });
 
+test("camera-relative spawns stay visible after the surfer advances through the world", () => {
+  const cameraWorldX = 1_200;
+  const playerWorldX = 1_496;
+  const shifted = context({
+    cameraWorldX,
+    previousCameraWorldX: cameraWorldX,
+    player: { x: playerWorldX, previousX: playerWorldX, y: 128 },
+  });
+  const world = new WorldSimulation({ seed: 0x5c4e3e });
+  world.update(STEP, shifted);
+  world.interactiveQuietUntil = 0;
+
+  const shark = world.requestWildlife("shark", {
+    phase: "telegraph",
+    direction: 1,
+    speed: 86,
+    y: 128,
+  });
+  assert.ok(shark, "the ordinary fairness-gated shark path remains available at a progressed camera");
+  const sharkScreenX = projectWorldX(shark.worldX, cameraWorldX, 1);
+  assert.ok(sharkScreenX > 0 && sharkScreenX < WORLD_LIMITS.logicalWidth,
+    `shark telegraph spawned offscreen at ${sharkScreenX}`);
+  assert.ok(Math.abs(sharkScreenX - (296 - 86 * 1.65 * 0.48)) < 0.001);
+
+  const bird = world.spawnTraffic("gullFlock", {
+    layer: "mid",
+    screenX: 72,
+    y: 56,
+    speed: 0,
+    duration: 4,
+  });
+  assert.equal(projectWorldX(bird.worldX, cameraWorldX, WORLD_LAYER_CONFIG.mid.parallax), 72);
+
+  const powerup = world.forcePowerup("mangoRush", {
+    phase: "available",
+    screenX: 248,
+    y: 118,
+    speed: 0,
+  });
+  assert.equal(projectWorldX(powerup.worldX, cameraWorldX, 1), 248);
+});
+
 test("shark fairness rejects unavoidable or untelegraphed paths and accepts a real escape", () => {
   const trapped = {
     player: { x: 192, y: 128, vx: 0, vy: 0, state: "riding" },

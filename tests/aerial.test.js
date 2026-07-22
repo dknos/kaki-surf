@@ -139,9 +139,9 @@ test("high-air framing moves only the rider after the real path leaves the safe 
 });
 
 test("only a strong Turbo lip launch reaches orbit in the fixed-step simulation", () => {
-  const launch = ({ turbo, speed, slopeDrive, charge }) => {
-    const simulation = new SurfSimulation({ seed: 0xa3117, controlMode: "advanced" });
-    simulation.reset({ board: BOARDS.moonLog, controlMode: "advanced", worldQa: { quiet: true } });
+  const launch = ({ turbo, speed, slopeDrive, charge, controlMode = "advanced" }) => {
+    const simulation = new SurfSimulation({ seed: 0xa3117, controlMode });
+    simulation.reset({ board: BOARDS.moonLog, controlMode, worldQa: { quiet: true } });
     simulation.begin();
     Object.assign(simulation.player, {
       state: "lip",
@@ -170,12 +170,21 @@ test("only a strong Turbo lip launch reaches orbit in the fixed-step simulation"
   const weakTurbo = launch({ turbo: true, speed: 62, slopeDrive: -0.08, charge: 0.12 });
   const huge = launch({ turbo: false, speed: 154, slopeDrive: -0.82, charge: 0.92 });
   const orbit = launch({ turbo: true, speed: 154, slopeDrive: -0.82, charge: 0.92 });
+  const simpleOrbit = launch({
+    turbo: true,
+    speed: 154,
+    slopeDrive: -0.82,
+    charge: 0.92,
+    controlMode: "simple",
+  });
 
   assert.equal(weakTurbo.simulation.player.aerialSpaceQualified, false);
   assert.equal(huge.simulation.player.aerialSpaceQualified, false);
   assert.equal(orbit.simulation.player.aerialSpaceQualified, true);
+  assert.equal(simpleOrbit.simulation.player.aerialSpaceQualified, true);
   assert.ok(huge.maxAltitude >= 0.62 && huge.maxAltitude < 0.8);
   assert.ok(orbit.maxAltitude >= 0.88);
+  assert.ok(simpleOrbit.maxAltitude >= 0.88);
   assert.ok(orbit.initialVY < huge.initialVY * 1.3, "qualified Turbo adds a materially larger launch impulse");
   assert.ok(orbit.events.some((event) => event.type === "aerialMilestone" && event.payload.index === 4));
   assert.equal(huge.events.some((event) => event.type === "aerialMilestone" && event.payload.index === 4), false);

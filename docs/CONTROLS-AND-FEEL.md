@@ -10,6 +10,7 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 | --- | --- | --- | --- |
 | Travel left/right; carve up/down; rotate/trim in air | Arrows or WASD | Left stick or D-pad | Direction pad |
 | Action: compress, pump, and commit a lip pop | Space or Z | A (0) or right trigger (7) | **Action** |
+| Turbo Boost | Hold either Shift | Left-stick press / L3 (10) | Hold **Turbo** |
 | Context trick | F or X | X (2) or B (1) | **Trick** |
 | Pause | Escape or P | Start (9) | **II** pause button; Settings also pauses |
 | Restart / retry | R; Space on results | B on results; A on results | Results button |
@@ -22,9 +23,9 @@ In the air, left/right keeps steering the flight line and also rotates Kaki's bo
 
 Late in descent, Simple mode nudges the board toward whichever landing tangent is nearer: normal or opposite-facing. The board-specific correction is strongest on Foam Puff and lightest on Moon Log. This is not a guaranteed landing; speed, trick-relative board motion, contact error, and the normal landing bands still apply.
 
-### Advanced Controls
+Turbo is the same common action in both modes: hold either Shift, L3 (10), or the touch **Turbo** button while on the wave. T remains the direct Advanced Twist input, so Turbo never steals an aerial trick key.
 
-Turbo remains the same common action in Advanced mode: hold either Shift, L3 (10), or the touch **Turbo** button. T remains the direct Twist input, so Turbo never steals an aerial trick key.
+### Advanced Controls
 
 | Action | Keyboard | Standard gamepad | Touch control | On the wave | In the air |
 | --- | --- | --- | --- | --- | --- |
@@ -45,7 +46,7 @@ Advanced gamepad B is Board Varial during a run and retry only on the results sc
 
 Keyboard repeat cannot create duplicate edges. In Advanced mode Q/X/C are aliases for one action, so releasing one alias while another remains held does not generate a release. The legacy `style`, `stylePressed`, and `styleReleased` fields mirror `trick1` for old host adapters.
 
-Simple mode exposes only `edge` and contextual `trick`; manual `turbo`, `special`, spin impulses, and direct trick slots remain false. Advanced mode exposes `edge`, `turbo`, and `trick1` through `trick4`. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers.
+Simple mode exposes `edge`, `turbo`, and contextual `trick`; `special`, spin impulses, and direct trick slots remain false. Advanced mode exposes `edge`, `turbo`, and `trick1` through `trick4`. Analog axes use an 18% dead zone and are rescaled outside it. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, gamepad state, and buffers.
 
 Touch pointers are independent, allowing direction plus Action or a held Trick at the same time. Releasing one pointer does not cancel another.
 
@@ -107,7 +108,7 @@ Speed is physical velocity. Its fixed presentation tiers are:
 
 Wake length, tail spray, water flecks, parallax, pose, and wave-filter pitch reinforce those tiers. The persistent HUD exposes only score, time or paws, and a contextual combo while active.
 
-Turbo is an Advanced-only finite physical overdrive layered on top of earned speed. Simple mode neither accepts its input nor displays its meter. In Advanced, a full tank lasts about 2.8 seconds and opens up to 14% headroom above the selected board's normal cap.
+Turbo is a finite physical overdrive shared by Simple and Advanced controls. A full tank lasts about 2.8 seconds and opens up to 14% headroom above the selected board's normal cap. It can be spent only on a rideable face, not in the air or during an animal mount; carrying it into a strong lip approach materially increases launch height.
 
 Only an aerial with a completed trick or at least a half-turn, followed by a clean or perfect landing, adds fuel. Completed trick entries, rotation, and a perfect grade increase the refill; exact-repeat decay also reduces fuel, closing the easiest farming loop. Empty pops, wobble recoveries, and failed landings add none. Wipeout keeps the mechanic legible by removing 25% of the remaining tank rather than silently resetting it.
 

@@ -1510,7 +1510,6 @@ input[type="range"]::-moz-range-thumb {
 .touch-actions .touch-spin--right { left: 42px; top: auto; }
 
 #kaki-surf-root[data-control-mode="simple"] .touch-actions .touch-spin,
-#kaki-surf-root[data-control-mode="simple"] .touch-actions .touch-turbo,
 #kaki-surf-root[data-control-mode="simple"] .touch-actions .touch-special {
   display: none !important;
 }

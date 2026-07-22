@@ -94,6 +94,15 @@ test("the passed hero break can only reveal the sky above the horizon", () => {
     `the sky cutout reaches ${window.bottom}, below horizon ${window.horizon}`);
 });
 
+test("the passed classic break cannot repaint panorama below the horizon", () => {
+  const wave = new GameplayWave(0x434c4153, "classic");
+  wave.curlWorldX = 148;
+  const window = breakerSkyWindow(wave);
+  assert.ok(window.right > 0, "the classic break exposes a trailing opening");
+  assert.ok(window.bottom <= window.horizon,
+    `the classic sky cutout reaches ${window.bottom}, below horizon ${window.horizon}`);
+});
+
 test("hero barrel has a broad readable pocket but one canonical contact edge", () => {
   const wave = new GameplayWave(0x54574c47, "heroBarrel");
   wave.curlX = 100;

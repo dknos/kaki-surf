@@ -1,6 +1,6 @@
 # QA matrix
 
-Date: 2026-07-21.
+Date: 2026-07-22.
 
 This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 141 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, all four aerial tiers in all three conditions, and whale takeoff/apex/return.
 
@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **212/212 tests pass** and **34 JavaScript modules pass syntax checking**.
+Current result: **229/229 tests pass** and **35 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
@@ -22,13 +22,13 @@ Current result: **212/212 tests pass** and **34 JavaScript modules pass syntax c
 | --- | --- | --- | --- |
 | Entry/UI | Endless/Score Attack selector, menu, settings Simple, settings Advanced, six-step Surf School, results | Immediate start action before customization on portrait; mode-specific labels and records; Twilight travelling break and Simple selected for a fresh save; action-gated teaching and replay; no stale POWER meter or overlapping long result rows | Pass |
 | Core ride | Core Surf Lab, right/left travel, downhill-right/downhill-left, uphill, reversal, launch, landing | One canonical path vector owns board, rider, wake, spray, camera, and audio; every condition scrolls at the forward dead zone; trajectory foam always trails; the drop/climb/cutback line reads without rewards or wildlife | Pass |
-| Air/landing | Small/medium/huge air, Coastal Sky/Cloud Layer/Upper Atmosphere/Kaki Space in all conditions, re-entry, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Canonical nonlinear altitude samples a seamless tall panorama behind a vertically fixed wave; only a qualified Turbo lip launch reaches space; Simple steering does not rotate the board; rider-only framing, signed horizontal travel, cloud depth, altitude audio, landing guide, and landing tangent remain legible | Pass |
+| Air/landing | Small/medium/huge air, Coastal Sky/Cloud Layer/Upper Atmosphere/Kaki Space in all conditions, re-entry, clockwise/counter spin, grabs, varial, Kaki Twist, perfect, wobble, switch landing, wipeout | Canonical nonlinear altitude samples a seamless tall panorama behind a vertically fixed wave; only a qualified Turbo lip launch reaches space; Simple and Advanced steering both rotate the board; rider-only framing, signed horizontal travel, cloud depth, altitude audio, landing guide, and landing tangent remain legible | Pass |
 | Wildlife | Dolphin and shark phases; whale distant, breach start/apex/return, ramp, rides, and splash | Whale art, collision, foam, and foreground mask share one water anchor; production whale weights remain zero | Pass |
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, expiration, consumption, protected event, plane drop | Unique silhouettes and temporary callouts; no persistent powerup meter; consumption and harmless misses remain visible | Pass |
 | Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation without traffic ping-pong, stable facing, breaker-aware occlusion, readable reactive text, and watercraft grounded in waterline bands | Pass |
 | Set piece | Carrier haze, arrival, deck activity, launch, Fleet Airshow and foam gates | Whimsical/nonmilitary identity, horizon scale, airshow hierarchy, no gameplay collision | Pass |
 | Conditions | Every board in Golden Coast, Twilight Glass, and Stormbreak; condition-specific traffic | Correct local strip, palette and readable player/world contrast | Pass |
-| Access | Simple keyboard/gamepad/touch, Advanced controls, Settings, High Contrast, Reduced Motion, Reduced Flash | Simple shows only line, Action, and Trick; Advanced deliberately restores Turbo and Q/E/F/T | Pass |
+| Access | Simple keyboard/gamepad/touch, Advanced controls, Settings, High Contrast, Reduced Motion, Reduced Flash | Simple exposes line, Action, Turbo, and Trick; Advanced deliberately restores Q/E/F/T | Pass |
 | Audio lifecycle | Running, pause, visibility, resume, results, record, rapid retry, mute | No missed-beat catch-up, stale board/wind bed, stacked completion fanfare, invalid gain, or unbounded major-event peak | Pass |
 | Asset failure | Manifest and dimension rejection plus an absent-dolphin-atlas browser injection | Game starts; semantic fallback remains visible; restored production asset revalidates | Pass |
 
@@ -47,7 +47,7 @@ Current result: **212/212 tests pass** and **34 JavaScript modules pass syntax c
 - Force a whale while the rider is high in the air and verify its anchor, shadow, wake, and splash remain registered to the ocean rather than inheriting the rider's airborne Y.
 - While mounted on a whale, commit left and right reversals and verify the whale, Kaki, wake, and eventual dismount carry all follow the active direction.
 - Trigger several callouts rapidly and verify only one message is visible at a time; danger may follow a readable minimum beat while stale hints expire instead of surfacing late.
-- Verify Simple mode has no Turbo, Flow, Set, pump, powerup, or Special HUD/control clutter; verify Advanced Turbo separately.
+- Verify Simple and Advanced Turbo work through keyboard, gamepad, and touch; Simple still hides Special and direct Q/E/F/T controls.
 - Verify Surf School waits for drop, climb, cutback, lip, trick, and landing actions.
 - Verify Reduced Motion scales down aerial framing and suppresses foreground-cloud occlusion without changing seeded spawns or collisions; Reduced Flash suppresses flashes without removing state cues.
 - Verify High Contrast remains readable when raster backgrounds or generated families fall back.

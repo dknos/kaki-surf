@@ -10,6 +10,7 @@ const RIGHT = { x: 1, y: 0, turbo: false };
 
 function riding(seed = 41, cameraSettings = {}, controlMode = "simple") {
   const simulation = new SurfSimulation({ seed, cameraSettings, controlMode });
+  simulation.reset({ controlMode, worldQa: { quiet: true } });
   simulation.begin();
   simulation.player.state = "riding";
   simulation.wave.curlWorldX = -1000;

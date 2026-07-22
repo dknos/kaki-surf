@@ -524,8 +524,7 @@ export class SurfSimulation {
     const player = this.player;
     const rideable = ["riding", "lip", "landing", "wobble"].includes(player.state);
     const wasActive = Boolean(player.turboActive);
-    const requested = this.controlMode === "advanced"
-      && Boolean(input.turbo)
+    const requested = Boolean(input.turbo)
       && rideable
       && !player.animalMount;
     const drain = finiteTuning(
