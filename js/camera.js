@@ -3,8 +3,11 @@ import { clamp } from "./math.js";
 export const DEFAULT_CAMERA_SETTINGS = Object.freeze({
   left: 88,
   right: 296,
-  upper: 48,
-  returnY: 72,
+  upper: 72,
+  returnY: 88,
+  riderSafeY: 52,
+  exceptionalRiderSafeY: 68,
+  exceptionalTrackingAir: 64,
   horizontalFrequency: 5.2,
   verticalRiseFrequency: 6.4,
   verticalReturnFrequency: 3.2,
@@ -12,7 +15,7 @@ export const DEFAULT_CAMERA_SETTINGS = Object.freeze({
   maxVelocityX: 180,
   maxAccelerationX: 720,
   maxVelocityY: 120,
-  maxAccelerationY: 620,
+  maxAccelerationY: 1800,
 });
 
 export function createCameraState(settings = {}) {
@@ -41,9 +44,13 @@ export function updateCamera(camera, player, dt) {
   const airborne = player?.state === "airborne" || player?.state === "wipeout";
   const playerWorldY = Number(player?.airY) || 0;
   const screenY = playerWorldY - camera.worldY;
+  const qualifiedAirHeight = Math.max(
+    Number(player?.maxAirHeight) || 0,
+    Number(player?.aerialExpectedHeight) || 0,
+  );
   if (airborne && !camera.verticalTracking
     && screenY < settings.upper
-    && (Number(player?.maxAirHeight) || 0) >= settings.minimumTrackingAir) {
+    && qualifiedAirHeight >= settings.minimumTrackingAir) {
     camera.verticalTracking = true;
     camera.verticalAnchorY = Math.min(0, playerWorldY - settings.upper);
   } else if ((!airborne || screenY > settings.returnY) && camera.verticalTracking) {
@@ -67,11 +74,44 @@ export function updateCamera(camera, player, dt) {
 }
 
 export function cameraLayerOffset(layer, camera, shakeX = 0, shakeY = 0, reducedMotion = false) {
-  if (layer !== "world") return { x: 0, y: 0 };
+  if (layer !== "world" && layer !== "stage") return { x: 0, y: 0 };
+  return fixedStageOffset(shakeX, shakeY, reducedMotion);
+}
+
+/**
+ * Fixed surf-stage projection. Vertical rider framing is deliberately absent:
+ * wave, water, coastline, boats, wildlife, and water effects may receive only
+ * the explicitly supplied bounded impact shake.
+ */
+export function fixedStageOffset(shakeX = 0, shakeY = 0, reducedMotion = false) {
   return {
     x: reducedMotion ? 0 : Number(shakeX) || 0,
-    y: (reducedMotion ? 0 : Number(shakeY) || 0) - (Number(camera?.worldY) || 0),
+    y: reducedMotion ? 0 : Number(shakeY) || 0,
   };
+}
+
+/** Positive presentation allowance derived from the legacy signed signal. */
+export function riderFrameSignal(camera) {
+  return Math.max(0, -(Number(camera?.worldY) || 0));
+}
+
+/** Board anchor band leaves room for Kaki's upright high-air silhouette. */
+export function riderSafeTopY(player, settings = DEFAULT_CAMERA_SETTINGS) {
+  const exceptional = (Number(player?.maxAirHeight) || 0)
+      >= (Number(settings?.exceptionalTrackingAir) || 64)
+    || (Number(player?.aerialAltitudeCeiling) || 0) >= 0.5
+    || Boolean(player?.aerialSpaceQualified);
+  return exceptional
+    ? Number(settings?.exceptionalRiderSafeY) || 68
+    : Number(settings?.riderSafeY) || 52;
+}
+
+/** Settled rider-only target used by deterministic visual fixtures. */
+export function riderFrameCameraTarget(player, safeTopY = riderSafeTopY(player)) {
+  if (player?.state !== "airborne") return 0;
+  const naturalY = Number(player?.airY);
+  if (!Number.isFinite(naturalY)) return 0;
+  return Math.min(0, naturalY - (Number(safeTopY) || DEFAULT_CAMERA_SETTINGS.riderSafeY));
 }
 
 function stepAxis(camera, positionKey, velocityKey, target, frequency, maxVelocity, maxAcceleration, dt) {

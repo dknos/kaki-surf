@@ -4,10 +4,17 @@ import test from "node:test";
 
 import { BOARDS, FIXED_STEP } from "../js/config.js";
 import {
+  aerialRiderFrameOffset,
+  createAerialBackdropState,
+  updateAerialBackdropState,
+} from "../js/aerial.js";
+import { riderFrameCameraTarget } from "../js/camera.js";
+import {
   backgroundPanoramaCropY,
+  backgroundPanoramaTravel,
   backgroundParallaxPhase,
   KakiRenderer,
-  verticalCameraTarget,
+  riderScreenProjection,
 } from "../js/renderer.js";
 import { SurfSimulation } from "../js/simulation.js";
 import { resolveKakiPose } from "../js/sprites.js";
@@ -267,24 +274,48 @@ test("tube state callouts replace queued predecessors behind unrelated feedback"
   assert.deepEqual(renderer.calloutQueue.map((callout) => callout.text), ["CLEAN TUBE EXIT"]);
 });
 
-test("physical airborne position drives continuous framing independent of altitude shelves", () => {
+test("rider-only framing stays dormant until Kaki actually clears the safe top band", () => {
   const highAir = {
     state: "airborne",
     airY: -82,
     maxAirHeight: 94,
     aerialAltitude: 0.7,
   };
-  assert.equal(verticalCameraTarget(highAir), -130);
-  assert.equal(verticalCameraTarget({ ...highAir, aerialAltitude: 1 }), -130);
-  assert.equal(verticalCameraTarget(highAir, true), -130, "Reduced Motion preserves physical framing");
-  assert.equal(verticalCameraTarget({ state: "riding", airY: 18, maxAirHeight: 94 }), 0);
+  assert.equal(riderFrameCameraTarget(highAir), -150);
+  assert.equal(aerialRiderFrameOffset({ state: "riding", airY: -82 }, 130), 0);
+  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: 70 }, 130), 0);
+  assert.equal(aerialRiderFrameOffset(highAir, 130), 130);
+  assert.equal(aerialRiderFrameOffset(highAir, 200), 134,
+    "only the exact amount needed to reach the safe band is applied");
+});
 
-  const rendererSource = readFileSync(new URL("../js/renderer.js", import.meta.url), "utf8");
-  assert.doesNotMatch(
-    rendererSource,
-    /aerialRiderFrameOffset/,
-    "the retired rider-only framing path must stay absent",
-  );
+test("Kaki, board, and rider effects share one interpolated rider-space offset", () => {
+  const simulation = {
+    camera: { worldX: 40, worldY: -160 },
+    player: {
+      state: "airborne",
+      previousWorldX: 220,
+      worldX: 224,
+      previousAirY: -78,
+      airY: -82,
+      maxAirHeight: 174,
+    },
+  };
+  const projection = riderScreenProjection(simulation, 0.5);
+  assert.equal(projection.naturalY, -80);
+  assert.equal(projection.frameOffsetY, 148);
+  assert.equal(projection.finalY, 68);
+  assert.equal(projection.finalY - projection.naturalY, projection.frameOffsetY);
+
+  const latent = riderScreenProjection({
+    camera: { worldX: 40, worldY: 0 },
+    player: { ...simulation.player },
+  }, 0.5);
+  assert.equal(latent.finalY, 68, "qualified maximum air remains readable before the smooth signal catches up");
+
+  const renderer = Object.create(KakiRenderer.prototype);
+  Object.assign(renderer, { particles: [{ life: 1, maxLife: 1, foreground: true, kind: "star", size: 1, x: 224, y: -80, color: "#fff", space: "rider" }], renderCameraWorldX: 40, renderRiderOffsetY: projection.frameOffsetY });
+  assert.equal(renderer.particles[0].y + renderer.renderRiderOffsetY, projection.finalY);
 });
 
 test("aerial panorama parallax preserves signed travel and freezes to the center crop", () => {
@@ -295,9 +326,12 @@ test("aerial panorama parallax preserves signed travel and freezes to the center
   assert.ok(forward > center);
   assert.ok(reverse < center);
   assert.equal(backgroundParallaxPhase({ cameraWorldX: 900 }, true), center);
+  assert.equal(backgroundPanoramaTravel({ camera: { worldX: 420 } }), 33.6);
+  assert.equal(backgroundPanoramaTravel({ camera: { worldX: -180 } }), -14.4);
+  assert.equal(backgroundPanoramaTravel({ camera: { worldX: 900 } }, true), 0);
 });
 
-test("aerial panorama uses one continuous coast-to-space crop", () => {
+test("aerial panorama uses stable authored shelves and never camera.worldY", () => {
   const coast = backgroundPanoramaCropY({
     player: { aerialAltitude: 0 },
     camera: { worldY: 0 },
@@ -318,12 +352,52 @@ test("aerial panorama uses one continuous coast-to-space crop", () => {
   assert.equal(coast, 424);
   assert.ok(coast > cloud && cloud > upper && upper > space);
   assert.equal(space, 0);
-  assert.ok(Math.abs(
-    backgroundPanoramaCropY({
-      player: { aerialAltitude: 0.39 },
-      camera: { worldY: -24 },
-    }) - cloud,
-  ) < 12, "adjacent flight altitudes must advance through the same source image");
+  assert.equal(backgroundPanoramaCropY({ player: { aerialAltitude: 0.1 }, camera: { worldY: -132 } }), coast,
+    "routine air stays on the coastal crop regardless of camera framing");
+  assert.equal(backgroundPanoramaCropY({ player: { aerialAltitude: 0.39 }, camera: { worldY: 0 } }), cloud);
+  assert.equal(backgroundPanoramaCropY({ player: { aerialAltitude: 0.39 }, camera: { worldY: -132 } }), cloud);
+});
+
+test("atmospheric progression is hysteretic, monotonic, rate-limited, and returns without snapping", () => {
+  const state = createAerialBackdropState();
+  const rise = [];
+  for (let frame = 0; frame < 240; frame += 1) {
+    updateAerialBackdropState(state, { state: "airborne", aerialAltitude: 0.94 }, FIXED_STEP);
+    rise.push(state.altitude);
+    assert.ok(state.frameDelta <= 0.52 * FIXED_STEP + 1e-12);
+  }
+  for (let index = 1; index < rise.length; index += 1) assert.ok(rise[index] >= rise[index - 1]);
+  const apex = state.altitude;
+  assert.ok(apex > 0.9);
+
+  const descent = [];
+  for (let frame = 0; frame < 180; frame += 1) {
+    updateAerialBackdropState(state, { state: "airborne", aerialAltitude: 0.08 }, FIXED_STEP);
+    descent.push(state.altitude);
+    assert.ok(state.frameDelta <= 1.05 * FIXED_STEP + 1e-12);
+  }
+  for (let index = 1; index < descent.length; index += 1) assert.ok(descent[index] <= descent[index - 1]);
+  assert.ok(descent[0] < apex && descent[0] > 0, "re-entry starts easing instead of snapping to coast");
+
+  const routine = createAerialBackdropState();
+  for (let frame = 0; frame < 300; frame += 1) {
+    updateAerialBackdropState(routine, { state: "airborne", aerialAltitude: 0.18 }, FIXED_STEP);
+  }
+  assert.equal(routine.altitude, 0, "normal aerial never leaves the coastal dead zone");
+
+  const hitch = createAerialBackdropState();
+  updateAerialBackdropState(hitch, { state: "airborne", aerialAltitude: 1 }, 0.5);
+  assert.ok(hitch.frameDelta <= 0.52 / 60 + 1e-12,
+    "a stalled render frame slows the mask instead of jumping it");
+});
+
+test("physics, scoring, spawning, and collision never read presentation-only framing", () => {
+  for (const file of ["simulation.js", "world.js", "wave.js", "tricks.js"]) {
+    const source = readFileSync(new URL(`../js/${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /riderFrameOffset|renderRiderOffset|aerialBackdrop/i, `${file} stays presentation-agnostic`);
+  }
+  assert.doesNotMatch(backgroundPanoramaCropY.toString(), /worldY|camera\?\./,
+    "backdrop selection cannot regain a physical-camera fallback");
 });
 
 test("asset-backed coastline is never redrawn in the world camera", () => {

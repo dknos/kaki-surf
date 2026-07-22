@@ -1,4 +1,4 @@
-import { clamp, lerp } from "./math.js";
+import { clamp, lerp, smoothstep } from "./math.js";
 import { drawPixelText } from "./pixel-font.js";
 import { drawAtlasFrame } from "./asset-drawing.js";
 import { isBoatKind, WORLD_LAYER_CONFIG } from "./world-catalog.js";
@@ -66,11 +66,13 @@ const WHALE_VISUAL_FRAMES = Object.freeze({
   depart: Object.freeze(["whale", "departure"]),
 });
 
-export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha = 1, settings = {}, pass = "all") {
+export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha = 1, settings = {}, pass = "all", backdropAltitude = 0) {
   const world = simulation?.world;
   if (!world?.forEachTraffic) return;
   const config = WORLD_LAYER_CONFIG[layer];
   if (!config) return;
+  const atmosphereAlpha = trafficAtmosphereOpacity(pass, backdropAltitude);
+  if (atmosphereAlpha <= 0.01) return;
   const camera = interpolatedCamera(world, alpha);
   world.forEachTraffic(layer, (entity) => {
     const renderBand = entity.renderBand || (isBoatKind(entity.kind) ? "waterBack" : "skyTraffic");
@@ -82,9 +84,7 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       config.parallax,
     );
     if (watercraft && !watercraftClearsBreaker(entity, x, simulation)) return;
-    const y = lerp(entity.previousY, entity.y, alpha)
-      + trafficBob(entity, settings)
-      + trafficVerticalCameraOffset(simulation, pass);
+    const y = lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
     const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
     if (frame) {
@@ -92,9 +92,9 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       const drawn = drawAtlasFrame(ctx, assets, frame[0], frame[1], x, y, {
         flipX: visualDirection < 0,
         scale: baseScale * entity.scale,
-        alpha: layer === "far" ? 0.68 : 0.94,
+        alpha: (layer === "far" ? 0.68 : 0.94) * atmosphereAlpha,
       });
-      if (!drawn) drawTrafficFallback(ctx, entity, x, y, palette, layer);
+      if (!drawn) drawTrafficFallback(ctx, entity, x, y, palette, layer, atmosphereAlpha);
       if (entity.kind === "bannerPlane" && entity.message) {
         drawLiveBannerText(
           ctx,
@@ -110,19 +110,15 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       }
       drawTrafficActivity(ctx, entity, assets, palette, x, y, baseScale * entity.scale, visualDirection);
     } else {
-      drawTrafficFallback(ctx, entity, x, y, palette, layer);
+      drawTrafficFallback(ctx, entity, x, y, palette, layer, atmosphereAlpha);
     }
   });
 }
 
-/**
- * Sky traffic belongs to the lower atmosphere, not Kaki's screen position.
- * Rising camera travel scrolls it down into the later water/wave occlusion.
- */
-export function trafficVerticalCameraOffset(simulation, pass = "all") {
-  if (pass !== "sky") return 0;
-  const worldY = Number(simulation?.camera?.worldY) || 0;
-  return worldY === 0 ? 0 : -worldY;
+/** Sky traffic dissolves before upper atmosphere without moving vertically. */
+export function trafficAtmosphereOpacity(pass = "all", backdropAltitude = 0) {
+  if (pass !== "sky") return 1;
+  return 1 - smoothstep(0.18, 0.42, clamp(Number(backdropAltitude) || 0, 0, 1));
 }
 
 export function trafficPassMatches(renderBand, pass = "all") {
@@ -518,9 +514,9 @@ function wildlifeFrame(entity) {
   return WHALE_VISUAL_FRAMES[entity.phase] ?? WHALE_VISUAL_FRAMES.distant;
 }
 
-function drawTrafficFallback(ctx, entity, x, y, palette, layer) {
+function drawTrafficFallback(ctx, entity, x, y, palette, layer, alpha = 1) {
   ctx.save();
-  ctx.globalAlpha = layer === "far" ? 0.55 : 0.82;
+  ctx.globalAlpha = (layer === "far" ? 0.55 : 0.82) * alpha;
   ctx.fillStyle = palette.ink;
   const size = layer === "far" ? 2 : 3;
   const kind = String(entity.kind).toLowerCase();

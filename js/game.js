@@ -13,6 +13,7 @@ import {
 import { SurfAudio } from "./audio.js";
 import { PoliteAnnouncer } from "./announcer.js";
 import { InputManager } from "./input.js";
+import { riderFrameCameraTarget } from "./camera.js";
 import { clamp } from "./math.js";
 import {
   getRunRecord,
@@ -22,7 +23,7 @@ import {
   sanitizeSettings,
   writeSave,
 } from "./persistence.js";
-import { KakiRenderer, verticalCameraTarget } from "./renderer.js";
+import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
 import {
   adjustFormControl,
@@ -361,9 +362,15 @@ export class KakiSurfGame {
     const curlWorldX = Number(simulation.wave.curlWorldX) || 0;
     const cameraWorldX = Number(simulation.camera.worldX) || 0;
     const cameraWorldY = Number(simulation.camera.worldY) || 0;
-    const playerWorldY = ["airborne", "wipeout"].includes(player.state)
+    const naturalPlayerY = ["airborne", "wipeout"].includes(player.state)
       ? Number(player.airY) || 0
       : simulation.wave.ridingY(playerWorldX, player.face);
+    const riderFrameOffsetY = this.renderer.riderFrameOffsetY(simulation, 1);
+    const stageOffsetY = Number(this.renderer.lastStageOffset?.y) || 0;
+    const waveCrestScreenY = simulation.wave.ridingY(simulation.wave.contactX(), 0) + stageOffsetY;
+    const waterlineScreenY = 79 + stageOffsetY;
+    const backdrop = this.renderer.aerialBackdrop;
+    const backdropSourceY = this.renderer.backgroundSourceY?.() ?? 424;
     return {
       state: player.state,
       playerWorldX,
@@ -372,7 +379,20 @@ export class KakiSurfGame {
       playerScreenX: playerWorldX - cameraWorldX,
       barrelGap: playerWorldX - curlWorldX,
       cameraWorldY,
-      playerScreenY: playerWorldY - cameraWorldY,
+      playerScreenY: naturalPlayerY + riderFrameOffsetY,
+      naturalPlayerY,
+      riderFrameOffsetY,
+      finalPlayerScreenY: naturalPlayerY + riderFrameOffsetY,
+      stageOffsetY,
+      hudOffsetY: 0,
+      horizonScreenY: 79 + stageOffsetY,
+      waveCrestScreenY,
+      waterlineScreenY,
+      backdropAltitude: backdrop?.altitude ?? 0,
+      backdropSourceY,
+      backdropBlendState: { ...(backdrop?.blend ?? {}) },
+      backdropFrameDelta: (backdrop?.frameDelta ?? 0) * 424,
+      maximumPerFrameBackdropDelta: (backdrop?.maximumFrameDelta ?? 0) * 424,
       maxAirHeight: player.maxAirHeight,
       aerialAltitude: player.aerialAltitude,
       airVY: player.airVY,
@@ -1198,10 +1218,10 @@ export class KakiSurfGame {
         aerialSpaceQualified: stage.tier === 4,
         aerialMilestoneTier: stage.tier,
       });
-      this.simulation.camera.worldY = verticalCameraTarget(player, this.settings.reducedMotion);
+      this.simulation.camera.worldY = riderFrameCameraTarget(player);
       this.simulation.camera.verticalAnchorY = this.simulation.camera.worldY;
       this.simulation.camera.verticalTracking = true;
-      this.renderer.cameraY = this.simulation.camera.worldY;
+      this.renderer.setAerialBackdropFixture(stage.altitude);
       // Keep the orbital fixture honest: a real late-run launch often happens
       // after the break has advanced far enough to open its trailing cutout.
       // That overlap caught the aerial panorama/coast compositing regression.
@@ -1283,11 +1303,13 @@ export class KakiSurfGame {
         player.previousAirY = 29;
         player.airVY = 2;
         player.maxAirHeight = 96;
+        player.aerialAltitude = 0.46;
+        player.previousAerialAltitude = 0.46;
         player.provisionalScore = 2840;
-        this.simulation.camera.worldY = -42;
+        this.simulation.camera.worldY = riderFrameCameraTarget(player);
         this.simulation.camera.verticalAnchorY = -42;
         this.simulation.camera.verticalTracking = true;
-        this.renderer.cameraY = -42;
+        this.renderer.setAerialBackdropFixture(0.46);
         break;
       case "clockwiseSpin":
         makeAirborne("apex", "360 AIR SPIN", Math.PI * 2);
@@ -1544,14 +1566,16 @@ export class KakiSurfGame {
           previousAirY: 18,
           airVY: 1,
           maxAirHeight: 102,
+          aerialAltitude: 0.58,
+          previousAerialAltitude: 0.58,
           provisionalScore: 2160,
         });
         // QA freezes after its first frame, so use the settled target to prove
         // the same vertical framing that the live camera eases toward.
-        this.simulation.camera.worldY = -46;
+        this.simulation.camera.worldY = riderFrameCameraTarget(player);
         this.simulation.camera.verticalAnchorY = -46;
         this.simulation.camera.verticalTracking = true;
-        this.renderer.cameraY = -46;
+        this.renderer.setAerialBackdropFixture(0.58);
         break;
       }
       case "dolphinRide":

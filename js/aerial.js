@@ -21,6 +21,19 @@ export const AERIAL_PANORAMA = Object.freeze({
   viewportHeight: 216,
 });
 
+export const AERIAL_BACKDROP = Object.freeze({
+  enterAltitude: 0.22,
+  exitAltitude: 0.14,
+  riseRate: 0.52,
+  returnRate: 1.05,
+  cloudStart: 0.2,
+  cloudEnd: 0.46,
+  upperStart: 0.48,
+  upperEnd: 0.74,
+  spaceStart: 0.78,
+  spaceEnd: 0.94,
+});
+
 /**
  * Freeze takeoff intent into one authored aerial envelope. Space is gated by
  * the whole line: Turbo alone cannot rescue a slow, flat, uncompressed pop.
@@ -160,12 +173,71 @@ export function aerialRiderFrameOffset(
   player,
   cameraOffset = 0,
   safeBoardY = 52,
+  naturalAirY = player?.airY,
 ) {
   if (player?.state !== "airborne") return 0;
-  const airY = Number(player.airY);
+  const airY = Number(naturalAirY);
   if (!Number.isFinite(airY)) return 0;
   const required = Math.max(0, Number(safeBoardY) - airY);
   return Math.min(required, Math.max(0, Number(cameraOffset) || 0));
+}
+
+/** Stateful atmospheric presentation. It never reads physical camera state. */
+export function createAerialBackdropState(initialAltitude = 0) {
+  const altitude = clamp(Number(initialAltitude) || 0, 0, 1);
+  return {
+    active: altitude >= AERIAL_BACKDROP.enterAltitude,
+    altitude,
+    previousAltitude: altitude,
+    frameDelta: 0,
+    maximumFrameDelta: 0,
+    blend: aerialBackdropBlendState(altitude),
+  };
+}
+
+export function updateAerialBackdropState(state, player, dt) {
+  const next = state ?? createAerialBackdropState();
+  const authored = player?.state === "airborne"
+    ? clamp(Number(player?.aerialAltitude) || 0, 0, 1)
+    : 0;
+  if (!next.active && authored >= AERIAL_BACKDROP.enterAltitude) next.active = true;
+  if (next.active && authored <= AERIAL_BACKDROP.exitAltitude) next.active = false;
+  const target = next.active ? authored : 0;
+  // A browser hitch must slow the transition rather than jump the mask.
+  const seconds = Math.min(1 / 60, Math.max(0, Number(dt) || 0));
+  const rate = target > next.altitude
+    ? AERIAL_BACKDROP.riseRate
+    : AERIAL_BACKDROP.returnRate;
+  const maximumStep = rate * seconds;
+  const delta = clamp(target - next.altitude, -maximumStep, maximumStep);
+  next.previousAltitude = next.altitude;
+  next.altitude = clamp(next.altitude + delta, 0, 1);
+  next.frameDelta = Math.abs(delta);
+  next.maximumFrameDelta = Math.max(next.maximumFrameDelta, next.frameDelta);
+  next.blend = aerialBackdropBlendState(next.altitude);
+  return next;
+}
+
+export function aerialBackdropBlendState(altitude = 0) {
+  const value = clamp(Number(altitude) || 0, 0, 1);
+  return Object.freeze({
+    coastToCloud: smoothstep(AERIAL_BACKDROP.cloudStart, AERIAL_BACKDROP.cloudEnd, value),
+    cloudToUpper: smoothstep(AERIAL_BACKDROP.upperStart, AERIAL_BACKDROP.upperEnd, value),
+    upperToSpace: smoothstep(AERIAL_BACKDROP.spaceStart, AERIAL_BACKDROP.spaceEnd, value),
+  });
+}
+
+export function aerialBackdropCropShelves(
+  height = AERIAL_PANORAMA.height,
+  viewportHeight = AERIAL_PANORAMA.viewportHeight,
+) {
+  const travel = Math.max(0, Number(height) - Number(viewportHeight));
+  return Object.freeze({
+    coast: Math.round(travel),
+    cloud: Math.round(travel * (252 / 424)),
+    upper: Math.round(travel * (104 / 424)),
+    space: 0,
+  });
 }
 
 export function aerialPanoramaCropY(

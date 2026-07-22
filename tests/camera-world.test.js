@@ -2,8 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
 import { SurfSimulation } from "../js/simulation.js";
-import { cameraLayerOffset, createCameraState, updateCamera } from "../js/camera.js";
-import { KakiRenderer } from "../js/renderer.js";
+import {
+  cameraLayerOffset,
+  createCameraState,
+  fixedStageOffset,
+  riderFrameCameraTarget,
+  riderFrameSignal,
+  updateCamera,
+} from "../js/camera.js";
+import { KakiRenderer, riderScreenProjection } from "../js/renderer.js";
 import { PALETTES } from "../js/config.js";
 
 const RIGHT = { x: 1, y: 0, turbo: false };
@@ -100,12 +107,76 @@ test("ordinary hops leave the horizon fixed until physical air clears the upper 
   assert.ok(camera.velocityY < 0);
 });
 
-test("launch and landing shake is isolated from sky and HUD", () => {
-  const camera = { worldY: -96 };
-  assert.deepEqual(cameraLayerOffset("sky", camera, 7, -4), { x: 0, y: 0 });
-  assert.deepEqual(cameraLayerOffset("hud", camera, 7, -4), { x: 0, y: 0 });
-  assert.deepEqual(cameraLayerOffset("world", camera, 7, -4), { x: 7, y: 92 });
-  assert.deepEqual(cameraLayerOffset("world", camera, 7, -4, true), { x: 0, y: 96 });
+test("qualified exceptional air pre-arms rider framing without moving the rider or stage", () => {
+  const camera = createCameraState();
+  const player = {
+    state: "airborne",
+    previousAirY: 68,
+    airY: 68,
+    maxAirHeight: 2,
+    aerialExpectedHeight: 174,
+    aerialAltitudeCeiling: 1,
+    previousWorldX: 192,
+    worldX: 192,
+  };
+  updateCamera(camera, player, FIXED_STEP);
+  assert.ok(camera.velocityY < 0, "the known launch envelope prepares framing before Kaki reaches the top band");
+  assert.equal(riderScreenProjection({ camera, player }, 1).frameOffsetY, 0);
+  assert.equal(cameraLayerOffset("stage", camera).y, 0);
+});
+
+test("vertical rider framing can never translate the fixed surf stage", () => {
+  for (const worldY of [0, -42, -96, -132]) {
+    const camera = { worldY };
+    assert.deepEqual(cameraLayerOffset("sky", camera, 7, -4), { x: 0, y: 0 });
+    assert.deepEqual(cameraLayerOffset("hud", camera, 7, -4), { x: 0, y: 0 });
+    assert.deepEqual(cameraLayerOffset("world", camera, 7, -4), { x: 7, y: -4 });
+    assert.deepEqual(cameraLayerOffset("stage", camera, 0, 0), { x: 0, y: 0 });
+  }
+  assert.deepEqual(cameraLayerOffset("world", { worldY: -96 }, 7, -4), { x: 7, y: -4 },
+    "worldY=-96 cannot become a +92/+96 stage translation");
+  assert.deepEqual(cameraLayerOffset("world", { worldY: -96 }, 7, -4, true), { x: 0, y: 0 });
+  assert.deepEqual(fixedStageOffset(3, 1, false), { x: 3, y: 1 });
+});
+
+test("signed vertical camera state is converted only into positive rider allowance", () => {
+  assert.equal(riderFrameSignal({ worldY: 0 }), 0);
+  assert.equal(riderFrameSignal({ worldY: -96 }), 96);
+  assert.equal(riderFrameCameraTarget({ state: "riding", airY: -80 }), 0);
+  assert.equal(riderFrameCameraTarget({ state: "airborne", airY: -82 }), -134);
+});
+
+test("rider-only framing enters and leaves without a landing-frame discontinuity", () => {
+  const camera = createCameraState();
+  let previousFinalY = 70;
+  let previousNaturalY = 70;
+  let largestPresentationStep = 0;
+  for (let frame = 0; frame < 260; frame += 1) {
+    const phase = frame / 259;
+    const naturalY = phase < 0.5
+      ? 70 - 174 * (phase / 0.5)
+      : -104 + 174 * ((phase - 0.5) / 0.5);
+    const player = {
+      state: "airborne",
+      previousAirY: previousNaturalY,
+      airY: naturalY,
+      maxAirHeight: 174,
+      previousWorldX: 192,
+      worldX: 192,
+    };
+    updateCamera(camera, player, FIXED_STEP);
+    const projection = riderScreenProjection({ camera, player }, 1);
+    const physicalStep = naturalY - previousNaturalY;
+    const presentationStep = (projection.finalY - previousFinalY) - physicalStep;
+    largestPresentationStep = Math.max(largestPresentationStep, Math.abs(presentationStep));
+    previousFinalY = projection.finalY;
+    previousNaturalY = naturalY;
+  }
+  assert.ok(largestPresentationStep <= 2, `rider framing added a ${largestPresentationStep}px one-frame jump`);
+  assert.equal(riderScreenProjection({
+    camera,
+    player: { state: "airborne", previousAirY: 70, airY: 70, previousWorldX: 192, worldX: 192 },
+  }, 1).frameOffsetY, 0, "framing eases out before water contact");
 });
 
 test("maximum supported air keeps every sky pixel covered by authored atmosphere", () => {
@@ -116,7 +187,12 @@ test("maximum supported air keeps every sky pixel covered by authored atmosphere
     fillRect(x, y, width, height) { fills.push({ x, y, width, height, alpha: this.globalAlpha }); },
   };
   const renderer = Object.create(KakiRenderer.prototype);
-  Object.assign(renderer, { ctx, palette: PALETTES.standard, conditionId: "goldenCoast" });
+  Object.assign(renderer, {
+    ctx,
+    palette: PALETTES.standard,
+    conditionId: "goldenCoast",
+    aerialBackdrop: { altitude: 1 },
+  });
   renderer.drawAerialFallback({ camera: { worldY: -500 } });
   for (let y = 0; y < LOGICAL_HEIGHT; y += 1) {
     assert.ok(fills.some((fill) => fill.alpha > 0 && fill.x <= 0 && fill.x + fill.width >= LOGICAL_WIDTH

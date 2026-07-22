@@ -20,7 +20,7 @@ import {
 import {
   trafficPassMatches,
   trafficScreenDirection,
-  trafficVerticalCameraOffset,
+  trafficAtmosphereOpacity,
   watercraftClearsBreaker,
   wildlifeClearsWaterline,
 } from "../js/world-visuals.js";
@@ -87,18 +87,18 @@ test("catalog fixes bounded layer pools and only exposes the final three powerup
   }
 });
 
-test("sky traffic is isolated from vertically projected water traffic", () => {
+test("sky traffic fades by authored atmosphere without vertical camera projection", () => {
   assert.equal(trafficPassMatches("skyTraffic", "sky"), true);
   assert.equal(trafficPassMatches("waterBack", "sky"), false);
   assert.equal(trafficPassMatches("horizon", "sky"), false);
   assert.equal(trafficPassMatches("skyTraffic", "water"), false);
   assert.equal(trafficPassMatches("waterBack", "water"), true);
   assert.equal(trafficPassMatches("horizon", "water"), true);
-  assert.equal(trafficVerticalCameraOffset({ camera: { worldY: 0 } }, "sky"), 0);
-  assert.equal(trafficVerticalCameraOffset({ camera: { worldY: -80 } }, "sky"), 80,
-    "aircraft leave upper atmosphere framing as the camera climbs");
-  assert.equal(trafficVerticalCameraOffset({ camera: { worldY: -80 } }, "water"), 0,
-    "water traffic already receives the shared world transform");
+  assert.equal(trafficAtmosphereOpacity("sky", 0), 1);
+  assert.ok(trafficAtmosphereOpacity("sky", 0.3) < 1);
+  assert.equal(trafficAtmosphereOpacity("sky", 0.42), 0);
+  assert.equal(trafficAtmosphereOpacity("water", 1), 1,
+    "water traffic remains in the fixed stage at every backdrop altitude");
 });
 
 test("sharks stay ocean-anchored when requested during a high aerial", () => {

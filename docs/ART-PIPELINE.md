@@ -103,7 +103,7 @@ python3 tools/art/build-aerial-panoramas.py
 | `assets/backgrounds/twilightGlass-aerial.png` | Violet cloud tops, indigo atmosphere, aurora, moon and nebula | 1536 x 640 |
 | `assets/backgrounds/stormbreak-aerial.png` | Storm interior, lightning, glowing thunderhead tops, cold stars | 1536 x 640 |
 
-The renderer samples a 384 x 216 crop from these masters with signed horizontal camera parallax and canonical normalized `aerialAltitude`. The wave, collision, rider, and world traffic remain code-driven layers; the panorama never defines a gameplay surface.
+The renderer preserves signed horizontal camera parallax but does not vertically scroll these masters with Kaki. It keeps four fixed 384 x 216 authored shelves (coast, cloud, upper atmosphere, and space) and reveals them through a narrow top-down atmospheric mask driven only by the stateful, rate-limited canonical `aerialAltitude`. A coast dead zone and hysteresis keep ordinary lip pops locked; the full coastal crop always covers the canvas beneath the masks. The wave, collision, rider, and world traffic remain code-driven layers; the panorama never defines a gameplay surface.
 
 ## Grok modular atlas build
 
