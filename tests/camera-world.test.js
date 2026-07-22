@@ -1,13 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
+import { BOARDS, FIXED_STEP, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
 import { SurfSimulation } from "../js/simulation.js";
 import {
   cameraLayerOffset,
   createCameraState,
   fixedStageOffset,
-  riderFrameCameraTarget,
-  riderFrameSignal,
   updateCamera,
 } from "../js/camera.js";
 import { KakiRenderer, riderScreenProjection } from "../js/renderer.js";
@@ -107,7 +105,7 @@ test("ordinary hops leave the horizon fixed until physical air clears the upper 
   assert.ok(camera.velocityY < 0);
 });
 
-test("qualified exceptional air pre-arms rider framing without moving the rider or stage", () => {
+test("unused vertical camera state cannot alter stateless rider projection or the stage", () => {
   const camera = createCameraState();
   const player = {
     state: "airborne",
@@ -120,8 +118,13 @@ test("qualified exceptional air pre-arms rider framing without moving the rider 
     worldX: 192,
   };
   updateCamera(camera, player, FIXED_STEP);
-  assert.ok(camera.velocityY < 0, "the known launch envelope prepares framing before Kaki reaches the top band");
+  assert.ok(camera.velocityY < 0, "legacy telemetry may continue calculating without owning rendering");
   assert.equal(riderScreenProjection({ camera, player }, 1).frameOffsetY, 0);
+  player.previousAirY = player.airY = -80;
+  const expected = riderScreenProjection({ camera: { worldY: 0 }, player }, 1).finalY;
+  for (const worldY of [0, -42, -96, -132]) {
+    assert.equal(riderScreenProjection({ camera: { worldY }, player }, 1).finalY, expected);
+  }
   assert.equal(cameraLayerOffset("stage", camera).y, 0);
 });
 
@@ -139,47 +142,76 @@ test("vertical rider framing can never translate the fixed surf stage", () => {
   assert.deepEqual(fixedStageOffset(3, 1, false), { x: 3, y: 1 });
 });
 
-test("signed vertical camera state is converted only into positive rider allowance", () => {
-  assert.equal(riderFrameSignal({ worldY: 0 }), 0);
-  assert.equal(riderFrameSignal({ worldY: -96 }), 96);
-  assert.equal(riderFrameCameraTarget({ state: "riding", airY: -80 }), 0);
-  assert.equal(riderFrameCameraTarget({ state: "airborne", airY: -82 }), -134);
-});
+test("a real simulated maximum jump never develops a non-apex screen-position plateau", () => {
+  const simulation = new SurfSimulation({ seed: 0xa3117, controlMode: "simple" });
+  simulation.reset({
+    board: BOARDS.moonLog,
+    controlMode: "simple",
+    assists: { landing: true },
+    worldQa: { quiet: true },
+  });
+  simulation.begin();
+  Object.assign(simulation.player, {
+    state: "lip",
+    face: 0.01,
+    faceVelocity: -0.84,
+    slopeDrive: -0.84,
+    speed: 154,
+    charge: 0.94,
+    turboActive: true,
+    turboOverdrive: 1,
+  });
+  Object.assign(simulation.player.speedPotential, { pocket: 0.8, seamDrive: 0.9 });
+  simulation.wave.curlX = -520;
+  simulation.launch({ x: 1 });
 
-test("rider-only framing enters and leaves without a landing-frame discontinuity", () => {
-  const camera = createCameraState();
-  let previousFinalY = 70;
-  let previousNaturalY = 70;
-  let largestPresentationStep = 0;
-  for (let frame = 0; frame < 260; frame += 1) {
-    const phase = frame / 259;
-    const naturalY = phase < 0.5
-      ? 70 - 174 * (phase / 0.5)
-      : -104 + 174 * ((phase - 0.5) / 0.5);
-    const player = {
-      state: "airborne",
-      previousAirY: previousNaturalY,
-      airY: naturalY,
-      maxAirHeight: 174,
-      previousWorldX: 192,
-      worldX: 192,
-    };
-    updateCamera(camera, player, FIXED_STEP);
-    const projection = riderScreenProjection({ camera, player }, 1);
-    const physicalStep = naturalY - previousNaturalY;
-    const presentationStep = (projection.finalY - previousFinalY) - physicalStep;
-    largestPresentationStep = Math.max(largestPresentationStep, Math.abs(presentationStep));
-    previousFinalY = projection.finalY;
-    previousNaturalY = naturalY;
+  const frames = [];
+  while (simulation.player.state === "airborne" && frames.length < 480) {
+    simulation.update(FIXED_STEP, {});
+    if (simulation.player.state !== "airborne") break;
+    const projection = riderScreenProjection(simulation, 1);
+    frames.push({
+      naturalY: projection.naturalY,
+      finalY: projection.finalY,
+      state: simulation.player.state,
+      rotation: simulation.player.rotationAccum,
+      activeTime: simulation.activeTime,
+    });
+    simulation.consumeEvents(() => {});
   }
-  assert.ok(largestPresentationStep <= 2, `rider framing added a ${largestPresentationStep}px one-frame jump`);
-  assert.equal(riderScreenProjection({
-    camera,
-    player: { state: "airborne", previousAirY: 70, airY: 70, previousWorldX: 192, worldX: 192 },
-  }, 1).frameOffsetY, 0, "framing eases out before water contact");
+
+  assert.ok(frames.length > 120 && frames.length < 480, "flight completes in the expected duration");
+  assert.ok(frames.at(-1).activeTime > frames[0].activeTime);
+  assert.ok(Math.abs(frames.at(-1).rotation - frames[0].rotation) > 0.5, "rotation advances during flight");
+  let longestNonApexPlateau = 0;
+  let currentPlateau = 0;
+  for (let index = 1; index < frames.length; index += 1) {
+    const naturalDelta = frames[index].naturalY - frames[index - 1].naturalY;
+    const finalDelta = frames[index].finalY - frames[index - 1].finalY;
+    assert.ok(frames[index].activeTime > frames[index - 1].activeTime, "active simulation time advances every frame");
+    if (Math.abs(naturalDelta) > 0.001) {
+      assert.equal(Math.sign(finalDelta), Math.sign(naturalDelta), "screen movement follows physical movement");
+      assert.ok(Math.abs(finalDelta) > 1e-9, "meaningful physical motion cannot map to a fixed screen Y");
+    }
+    const nearApex = Math.abs(naturalDelta) < 0.04;
+    if (!nearApex && Math.abs(finalDelta) <= 1e-9) {
+      currentPlateau += 1;
+      longestNonApexPlateau = Math.max(longestNonApexPlateau, currentPlateau);
+    } else {
+      currentPlateau = 0;
+    }
+  }
+  assert.ok(frames[0].finalY - Math.min(...frames.map((frame) => frame.finalY)) >= 40,
+    "maximum air retains at least forty logical pixels of visible rise");
+  assert.equal(longestNonApexPlateau, 0);
+
+  for (let frame = 0; frame < 180 && !["riding", "landing"].includes(simulation.player.state); frame += 1) {
+    simulation.update(FIXED_STEP, {});
+  }
+  assert.ok(["riding", "landing"].includes(simulation.player.state), "the jump returns to playable surf state");
 });
 
-test("maximum supported air keeps every sky pixel covered by authored atmosphere", () => {
+test("stable fallback backdrop covers every logical canvas row", () => {
   const fills = [];
   const ctx = {
     fillStyle: "",

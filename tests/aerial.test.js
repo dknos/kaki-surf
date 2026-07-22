@@ -8,8 +8,8 @@ import {
   aerialCameraTarget,
   aerialPanoramaCropX,
   aerialPanoramaCropY,
-  aerialRiderFrameOffset,
   aerialZoneForAltitude,
+  projectAirY,
   qualifyAerialLaunch,
 } from "../js/aerial.js";
 import { BOARDS, FIXED_STEP } from "../js/config.js";
@@ -126,16 +126,17 @@ test("camera shelves and zone thresholds escalate without a hard image swap", ()
   ]);
 });
 
-test("high-air framing moves only the rider after the real path leaves the safe band", () => {
-  assert.equal(aerialRiderFrameOffset({ state: "riding", airY: -84 }, 170), 0);
-  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: 68 }, 42), 0);
-  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: 24 }, 80), 28);
-  assert.equal(aerialRiderFrameOffset({ state: "airborne", airY: -84 }, 170), 136);
-  assert.equal(
-    -84 + aerialRiderFrameOffset({ state: "airborne", airY: -84 }, 170),
-    52,
-    "an orbital rider is framed without translating the wave shelf",
-  );
+test("high-air projection is natural below the threshold and monotonic above it", () => {
+  assert.equal(projectAirY(140), 140);
+  assert.equal(projectAirY(80), 80);
+  assert.equal(projectAirY(60), 60);
+  const natural = [140, 110, 80, 60, 20, -20, -80];
+  const projected = natural.map((y) => projectAirY(y));
+  for (let index = 1; index < projected.length; index += 1) {
+    assert.ok(projected[index] < projected[index - 1], `${natural[index]} must remain visibly above ${natural[index - 1]}`);
+  }
+  assert.ok(projectAirY(-1e9) > 26, "the extreme rider approaches but never crosses the complete-rider top bound");
+  assert.ok(71 - projectAirY(-122) >= 40, "the supported maximum air retains at least 40 pixels of visible rise");
 });
 
 test("only a strong Turbo lip launch reaches orbit in the fixed-step simulation", () => {

@@ -174,7 +174,6 @@ export function drawLayeredWave(
   conditionId,
   assets = null,
   presentationClocks = null,
-  repaintTrailingSky = null,
 ) {
   const wave = simulation.wave;
   const player = simulation.player;
@@ -193,26 +192,7 @@ export function drawLayeredWave(
   drawPowerSeam(ctx, wave, player, palette, settings, presentationClocks?.powerSeam ?? 0);
   drawCurlMass(ctx, simulation, palette, time, conditionId, settings, assets);
   drawCrestAndLip(ctx, wave, player, palette, conditionId, settings, speedRatio, momentum, presentationClocks?.crest ?? 0);
-  // The passed-wave opening is a final compositing cutout. Painting it before
-  // the breaker would let the opaque curl mass close the sky again.
-  drawPassedSkyWindow(ctx, wave, repaintTrailingSky);
   drawWaveReadAssist(ctx, wave, player, simulation.board, palette, settings, time);
-}
-
-function drawPassedSkyWindow(ctx, wave, repaintTrailingSky) {
-  if (typeof repaintTrailingSky !== "function") return;
-  const window = breakerSkyWindow(wave);
-  if (window.right < 4) return;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(0, window.top);
-  ctx.lineTo(window.shoulder, window.top);
-  ctx.quadraticCurveTo(window.right - 7, window.top + 7, window.right, window.fold);
-  ctx.quadraticCurveTo(window.shoulder, window.bottom - 16, 0, window.bottom);
-  ctx.closePath();
-  ctx.clip();
-  repaintTrailingSky(window);
-  ctx.restore();
 }
 
 function traceWaveFace(ctx, wave, topFace, bottomFace, start = 0, end = LOGICAL_WIDTH) {

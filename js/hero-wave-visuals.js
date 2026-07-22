@@ -255,13 +255,11 @@ export function drawHeroBarrelBack(
   settings,
   assets = null,
   presentationClocks = null,
-  repaintTrailingSky = null,
 ) {
   const wave = simulation.wave;
   const geometry = heroBarrelGeometry(wave, simulation.player);
   const clock = settings?.reducedMotion ? 0 : Number(presentationClocks?.fall ?? presentationClocks?.crest ?? 0);
 
-  drawPassedSky(ctx, geometry, repaintTrailingSky);
   drawLongFaceCrest(ctx, geometry, palette, settings, clock);
   // The advancing break is built from screen-grid waterfall columns instead
   // of scaling a complete C-wave bitmap. Old columns keep their trails while
@@ -486,21 +484,6 @@ export function drawHeroBarrelFront(
     drawImpactChurn(ctx, geometry, palette, settings, assets, clock, true);
   }
   drawTubeRiderForeground(ctx, simulation, geometry, palette, settings, clock);
-}
-
-function drawPassedSky(ctx, g, repaintTrailingSky) {
-  if (typeof repaintTrailingSky !== "function" || g.passedWindow.right < 4) return;
-  const window = g.passedWindow;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(0, window.top);
-  ctx.lineTo(window.shoulder, window.top);
-  ctx.quadraticCurveTo(window.right - 5, 20, window.right, window.fold);
-  ctx.quadraticCurveTo(window.shoulder, window.bottom - 4, 0, window.bottom);
-  ctx.closePath();
-  ctx.clip();
-  repaintTrailingSky(window);
-  ctx.restore();
 }
 
 function drawTrailingWhitewater(ctx, g, p, settings, clock) {

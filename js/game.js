@@ -396,6 +396,8 @@ export class KakiSurfGame {
       maxAirHeight: player.maxAirHeight,
       aerialAltitude: player.aerialAltitude,
       airVY: player.airVY,
+      rotation: player.rotationAccum,
+      activeTime: simulation.activeTime,
       turbo: player.turbo,
       turboActive: player.turboActive,
       direction: player.travelDirection,
@@ -1221,7 +1223,6 @@ export class KakiSurfGame {
       this.simulation.camera.worldY = riderFrameCameraTarget(player);
       this.simulation.camera.verticalAnchorY = this.simulation.camera.worldY;
       this.simulation.camera.verticalTracking = true;
-      this.renderer.setAerialBackdropFixture(stage.altitude);
       // Keep the orbital fixture honest: a real late-run launch often happens
       // after the break has advanced far enough to open its trailing cutout.
       // That overlap caught the aerial panorama/coast compositing regression.
@@ -1309,7 +1310,6 @@ export class KakiSurfGame {
         this.simulation.camera.worldY = riderFrameCameraTarget(player);
         this.simulation.camera.verticalAnchorY = -42;
         this.simulation.camera.verticalTracking = true;
-        this.renderer.setAerialBackdropFixture(0.46);
         break;
       case "clockwiseSpin":
         makeAirborne("apex", "360 AIR SPIN", Math.PI * 2);
@@ -1575,7 +1575,6 @@ export class KakiSurfGame {
         this.simulation.camera.worldY = riderFrameCameraTarget(player);
         this.simulation.camera.verticalAnchorY = -46;
         this.simulation.camera.verticalTracking = true;
-        this.renderer.setAerialBackdropFixture(0.58);
         break;
       }
       case "dolphinRide":
