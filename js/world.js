@@ -1418,13 +1418,19 @@ export class WorldSimulation {
       options.y,
       kind === "whale"
         ? waterlineY + 38 + finite(options.yOffset)
-        : this.context.player.y + finite(options.yOffset),
+        : kind === "shark"
+          ? waterlineY + 50 + finite(options.yOffset)
+          : ["airborne", "wipeout"].includes(this.context.player.state)
+            ? waterlineY + 48 + finite(options.yOffset)
+            : this.context.player.y + finite(options.yOffset),
     );
-    // Whale encounters originate from the ocean, never from Kaki's current
-    // aerial height. Breach art may rise above this anchor, but its body/wake
-    // remains registered to a band below the horizon.
+    // Ocean encounters never inherit Kaki's aerial height. Sharks are always
+    // constrained below the waterline; breach art may rise from its own ocean
+    // anchor, but no wildlife can be initialized in the sky.
     const screenY = kind === "whale"
       ? clamp(requestedY, waterlineY + 28, Math.min(172, waterlineY + 72))
+      : kind === "shark"
+        ? clamp(requestedY, waterlineY + 24, Math.min(190, waterlineY + 72))
       : clamp(requestedY, 36, 190);
     const sharkCandidate = {
       x: worldX,

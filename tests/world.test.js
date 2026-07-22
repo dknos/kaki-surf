@@ -17,7 +17,13 @@ import {
   sweptCircleContact,
   worldXForScreenX,
 } from "../js/world-collision.js";
-import { trafficPassMatches, trafficScreenDirection, watercraftClearsBreaker } from "../js/world-visuals.js";
+import {
+  trafficPassMatches,
+  trafficScreenDirection,
+  trafficVerticalCameraOffset,
+  watercraftClearsBreaker,
+  wildlifeClearsWaterline,
+} from "../js/world-visuals.js";
 import { stableTrafficWorldDelta, WorldSimulation } from "../js/world.js";
 
 const STEP = 1 / 120;
@@ -88,6 +94,32 @@ test("sky traffic is isolated from vertically projected water traffic", () => {
   assert.equal(trafficPassMatches("skyTraffic", "water"), false);
   assert.equal(trafficPassMatches("waterBack", "water"), true);
   assert.equal(trafficPassMatches("horizon", "water"), true);
+  assert.equal(trafficVerticalCameraOffset({ camera: { worldY: 0 } }, "sky"), 0);
+  assert.equal(trafficVerticalCameraOffset({ camera: { worldY: -80 } }, "sky"), 80,
+    "aircraft leave upper atmosphere framing as the camera climbs");
+  assert.equal(trafficVerticalCameraOffset({ camera: { worldY: -80 } }, "water"), 0,
+    "water traffic already receives the shared world transform");
+});
+
+test("sharks stay ocean-anchored when requested during a high aerial", () => {
+  const world = new WorldSimulation({ seed: 0x5a4a });
+  const airborne = context({
+    player: { y: -84, previousY: -82, state: "airborne" },
+    waterlineY: 79,
+  });
+  world.update(STEP, airborne);
+  const shark = world.forceWildlife("shark", {
+    phase: "telegraph",
+    screenX: 190,
+    y: 36,
+    direction: 1,
+  });
+
+  assert.equal(shark.y, 103, "even an invalid explicit height is clamped below the waterline");
+  assert.equal(wildlifeClearsWaterline(shark, shark.y, 79), true);
+  assert.equal(wildlifeClearsWaterline({ kind: "shark" }, 72, 79), false);
+  assert.equal(wildlifeClearsWaterline({ kind: "dolphin" }, 72, 79), true,
+    "breaching wildlife keeps its separately authored motion");
 });
 
 test("watercraft stay in water bands and face their projected screen motion", () => {

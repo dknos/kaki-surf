@@ -1,6 +1,7 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import {
   aerialPanoramaCropX,
+  aerialPanoramaCropY,
 } from "./aerial.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
 import { cameraLayerOffset } from "./camera.js";
@@ -51,6 +52,17 @@ export function backgroundParallaxPhase(source, reducedMotion = false) {
   if (reducedMotion) return aerialPanoramaCropX(0);
   const cameraWorldX = Number(source?.camera?.worldX ?? source?.cameraWorldX ?? 0);
   return aerialPanoramaCropX(cameraWorldX);
+}
+
+/**
+ * One continuous panorama crop follows the authored flight altitude. The
+ * physical camera is a safety fallback for fixtures and exceptional airs that
+ * do not publish an aerial profile.
+ */
+export function backgroundPanoramaCropY(source) {
+  const authoredAltitude = Number(source?.player?.aerialAltitude) || 0;
+  const physicalAltitude = clamp(-(Number(source?.camera?.worldY) || 0) / 130, 0, 1);
+  return aerialPanoramaCropY(Math.max(authoredAltitude, physicalAltitude));
 }
 
 export class KakiRenderer {
@@ -397,9 +409,10 @@ export class KakiRenderer {
     }
     ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // Aircraft and birds own authored sky altitudes. Horizontal parallax is
-    // still projected from camera.worldX inside drawWorldTraffic, but the
-    // vertical world camera must never drag them down into the water.
+    // Aircraft and birds own lower-atmosphere altitudes. drawWorldTraffic
+    // applies the vertical camera offset so high jumps scroll them down behind
+    // the subsequently rendered water and wave instead of carrying them into
+    // Kaki Space.
     if (allowsBackgroundTraffic) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky");
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky");
@@ -451,24 +464,15 @@ export class KakiRenderer {
     const image = this.visualAssets?.backgrounds?.[this.conditionId];
     if (!image?.complete || !(image.naturalWidth > 0) || !(image.naturalHeight >= LOGICAL_HEIGHT)) return false;
 
-    // The aerial panorama is an authored atlas, not a camera surface. Select
-    // and crossfade a small set of complete atmospheric plates so physical
-    // altitude never scrubs a flattened coastline through the viewport.
-    const altitude = clamp(-(Number(simulation?.camera?.worldY) || 0), 0, 96);
-    const plates = [
-      { y: image.naturalHeight - LOGICAL_HEIGHT, weight: 1 - smoothstep(8, 30, altitude), parallax: 0.08 },
-      { y: Math.min(image.naturalHeight - LOGICAL_HEIGHT, 252), weight: atmospherePlateWeight(altitude, 8, 30, 54, 72), parallax: 0.055 },
-      { y: Math.min(image.naturalHeight - LOGICAL_HEIGHT, 104), weight: atmospherePlateWeight(altitude, 46, 66, 76, 92), parallax: 0.035 },
-      { y: 0, weight: smoothstep(76, 94, altitude), parallax: 0.02 },
-    ];
+    // Each supplied image is one continuous coast-to-space panorama. Draw one
+    // uninterrupted crop so the camera cannot expose crossfaded plate seams.
     const cameraX = this.settings.reducedMotion ? 0 : Number(simulation?.camera?.worldX) || 0;
-    for (const plate of plates) {
-      if (plate.weight <= 0.001) continue;
-      this.ctx.save();
-      this.ctx.globalAlpha = clamp(plate.weight, 0, 1);
-      drawWrappedPanoramaCrop(this.ctx, image, cameraX * plate.parallax, plate.y);
-      this.ctx.restore();
-    }
+    drawWrappedPanoramaCrop(
+      this.ctx,
+      image,
+      cameraX * 0.08,
+      backgroundPanoramaCropY(simulation),
+    );
     return true;
   }
 
@@ -512,16 +516,8 @@ export class KakiRenderer {
       ? this.visualAssets?.backgrounds?.[this.conditionId]
       : null;
     if (image?.complete && image.naturalWidth > 0) {
-      // Repaint only the authored horizon strip in world space. It shares the
-      // vertical camera with the wave and can therefore leave through the
-      // bottom of frame without bringing the flattened ocean/space slab back.
-      const sourceY = image.naturalHeight - LOGICAL_HEIGHT;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, LOGICAL_WIDTH, 82);
-      ctx.clip();
-      drawWrappedPanoramaCrop(ctx, image, cameraX * 0.08, sourceY);
-      ctx.restore();
+      // The panorama already owns its coastline. Redrawing the bottom strip in
+      // world space split the image horizontally whenever the camera rose.
       return;
     }
     const shift = cameraX * 0.08;
@@ -809,10 +805,9 @@ export class KakiRenderer {
   drawPassedSkyBackdrop(simulation, window) {
     const ctx = this.ctx;
     const bottom = Math.round(window?.bottom ?? 104);
-    // Rebuild the same backdrop stack that was behind the break before the
-    // wave was drawn. The panorama is screen-locked, while the authored coast
-    // shares the vertical world camera. Repainting only the panorama punched
-    // a pale wedge through the coast during high aerials.
+    // Rebuild the exact screen-locked panorama behind the break. Asset-backed
+    // conditions already include their coastline; drawCoastline is fallback
+    // art only and therefore cannot introduce a second camera space.
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawSky(simulation);
@@ -1766,11 +1761,6 @@ function signedInt(value) {
 function signedFixed(value) {
   const number = Number(value) || 0;
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
-}
-
-function atmospherePlateWeight(altitude, fadeInStart, fadeInEnd, fadeOutStart, fadeOutEnd) {
-  return smoothstep(fadeInStart, fadeInEnd, altitude)
-    * (1 - smoothstep(fadeOutStart, fadeOutEnd, altitude));
 }
 
 function drawWrappedPanoramaCrop(ctx, image, travel, sourceY) {

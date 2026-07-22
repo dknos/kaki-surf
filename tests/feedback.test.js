@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { BOARDS, FIXED_STEP } from "../js/config.js";
-import { backgroundParallaxPhase, KakiRenderer, verticalCameraTarget } from "../js/renderer.js";
+import {
+  backgroundPanoramaCropY,
+  backgroundParallaxPhase,
+  KakiRenderer,
+  verticalCameraTarget,
+} from "../js/renderer.js";
 import { SurfSimulation } from "../js/simulation.js";
 import { resolveKakiPose } from "../js/sprites.js";
 
@@ -292,7 +297,58 @@ test("aerial panorama parallax preserves signed travel and freezes to the center
   assert.equal(backgroundParallaxPhase({ cameraWorldX: 900 }, true), center);
 });
 
-test("passed-break cutouts restore the camera-matched coast over aerial panoramas", () => {
+test("aerial panorama uses one continuous coast-to-space crop", () => {
+  const coast = backgroundPanoramaCropY({
+    player: { aerialAltitude: 0 },
+    camera: { worldY: 0 },
+  });
+  const cloud = backgroundPanoramaCropY({
+    player: { aerialAltitude: 0.38 },
+    camera: { worldY: -24 },
+  });
+  const upper = backgroundPanoramaCropY({
+    player: { aerialAltitude: 0.68 },
+    camera: { worldY: -80 },
+  });
+  const space = backgroundPanoramaCropY({
+    player: { aerialAltitude: 0.94 },
+    camera: { worldY: -132 },
+  });
+
+  assert.equal(coast, 424);
+  assert.ok(coast > cloud && cloud > upper && upper > space);
+  assert.equal(space, 0);
+  assert.ok(Math.abs(
+    backgroundPanoramaCropY({
+      player: { aerialAltitude: 0.39 },
+      camera: { worldY: -24 },
+    }) - cloud,
+  ) < 12, "adjacent flight altitudes must advance through the same source image");
+});
+
+test("asset-backed coastline is never redrawn in the world camera", () => {
+  const drawCalls = [];
+  const renderer = Object.create(KakiRenderer.prototype);
+  Object.assign(renderer, {
+    ctx: {
+      save() {},
+      restore() {},
+      drawImage(...args) { drawCalls.push(args); },
+    },
+    settings: { highContrast: false },
+    conditionId: "goldenCoast",
+    visualAssets: {
+      backgrounds: {
+        goldenCoast: { complete: true, naturalWidth: 1536, naturalHeight: 640 },
+      },
+    },
+  });
+
+  renderer.drawCoastline({ camera: { worldX: 0, worldY: -80 } });
+  assert.equal(drawCalls.length, 0);
+});
+
+test("passed-break cutouts restore the continuous screen panorama", () => {
   const calls = [];
   const transforms = ["world"];
   const ctx = {

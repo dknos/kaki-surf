@@ -82,7 +82,9 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       config.parallax,
     );
     if (watercraft && !watercraftClearsBreaker(entity, x, simulation)) return;
-    const y = lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
+    const y = lerp(entity.previousY, entity.y, alpha)
+      + trafficBob(entity, settings)
+      + trafficVerticalCameraOffset(simulation, pass);
     const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
     if (frame) {
@@ -111,6 +113,16 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       drawTrafficFallback(ctx, entity, x, y, palette, layer);
     }
   });
+}
+
+/**
+ * Sky traffic belongs to the lower atmosphere, not Kaki's screen position.
+ * Rising camera travel scrolls it down into the later water/wave occlusion.
+ */
+export function trafficVerticalCameraOffset(simulation, pass = "all") {
+  if (pass !== "sky") return 0;
+  const worldY = Number(simulation?.camera?.worldY) || 0;
+  return worldY === 0 ? 0 : -worldY;
 }
 
 export function trafficPassMatches(renderBand, pass = "all") {
@@ -217,6 +229,7 @@ export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, f
     if (front !== foreground) return;
     let x = projectWorldX(lerp(entity.previousWorldX, entity.worldX, alpha), camera, 1);
     let y = lerp(entity.previousY, entity.y, alpha);
+    if (!wildlifeClearsWaterline(entity, y, world.context?.waterlineY)) return;
     const [family, frame] = wildlifeFrame(entity);
     let scale = entity.kind === "whale" ? 1 : entity.kind === "dolphin" ? 0.9 : 0.82;
     let rotation = 0;
@@ -251,6 +264,13 @@ export function drawWorldWildlife(ctx, simulation, assets, palette, alpha = 1, f
       drawDangerWake(ctx, x, y, palette, entity.phaseTime);
     }
   });
+}
+
+/** A bad fixture or stale entity may never draw a shark above the ocean. */
+export function wildlifeClearsWaterline(entity, y, waterlineY = 79) {
+  if (entity?.kind !== "shark") return true;
+  const waterline = clamp(Number(waterlineY) || 79, 64, 100);
+  return (Number(y) || 0) >= waterline + 16;
 }
 
 export function drawWorldWildlifeContact(ctx, simulation, palette, alpha = 1, settings = {}) {
