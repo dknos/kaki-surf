@@ -173,6 +173,7 @@ test("a real simulated maximum jump never develops a non-apex screen-position pl
     frames.push({
       naturalY: projection.naturalY,
       finalY: projection.finalY,
+      airVY: simulation.player.airVY,
       state: simulation.player.state,
       rotation: simulation.player.rotationAccum,
       activeTime: simulation.activeTime,
@@ -204,6 +205,21 @@ test("a real simulated maximum jump never develops a non-apex screen-position pl
   assert.ok(frames[0].finalY - Math.min(...frames.map((frame) => frame.finalY)) >= 40,
     "maximum air retains at least forty logical pixels of visible rise");
   assert.equal(longestNonApexPlateau, 0);
+
+  let minimumQuarterSecondTravel = Number.POSITIVE_INFINITY;
+  const quarterSecondFrames = Math.round(0.25 / FIXED_STEP);
+  for (let index = 0; index + quarterSecondFrames < frames.length; index += 1) {
+    const before = frames[index];
+    const after = frames[index + quarterSecondFrames];
+    if (Math.abs(before.airVY) < 10 || Math.abs(after.airVY) < 10) continue;
+    if (Math.min(before.naturalY, after.naturalY) > 30) continue;
+    minimumQuarterSecondTravel = Math.min(
+      minimumQuarterSecondTravel,
+      Math.abs(after.finalY - before.finalY),
+    );
+  }
+  assert.ok(minimumQuarterSecondTravel >= 0.8,
+    `high-air projection moved only ${minimumQuarterSecondTravel}px in a non-apex quarter second`);
 
   for (let frame = 0; frame < 180 && !["riding", "landing"].includes(simulation.player.state); frame += 1) {
     simulation.update(FIXED_STEP, {});

@@ -1,7 +1,7 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import {
+  AERIAL_PANORAMA,
   aerialBackdropCropShelves,
-  aerialPanoramaCropX,
   projectAirY,
 } from "./aerial.js";
 import { clamp, damp, lerp, smoothstep } from "./math.js";
@@ -41,15 +41,19 @@ const CALLOUT_MIN_READ_TIME = 1.05;
 
 /** Signed panoramic travel remains coherent through either aerial direction. */
 export function backgroundParallaxPhase(source, reducedMotion = false) {
-  if (reducedMotion) return aerialPanoramaCropX(0);
-  const cameraWorldX = Number(source?.camera?.worldX ?? source?.cameraWorldX ?? 0);
-  return aerialPanoramaCropX(cameraWorldX);
+  return backgroundPanoramaTravel(source, reducedMotion);
 }
 
-/** Exact renderer parallax retained from v2.1.1 for signed world travel. */
-export function backgroundPanoramaTravel(source, reducedMotion = false) {
+/** Continuous panorama source X that never wraps across non-tileable art. */
+export function backgroundPanoramaTravel(
+  source,
+  reducedMotion = false,
+  imageWidth = AERIAL_PANORAMA.width,
+) {
   if (reducedMotion) return 0;
-  return (Number(source?.camera?.worldX ?? source?.cameraWorldX) || 0) * 0.08;
+  const maximum = Math.max(0, Number(imageWidth) - LOGICAL_WIDTH);
+  const travel = (Number(source?.camera?.worldX ?? source?.cameraWorldX) || 0) * 0.08;
+  return clamp(travel, 0, maximum);
 }
 
 /** The stability repair keeps every condition on its authored coastal shelf. */
@@ -103,6 +107,7 @@ export class KakiRenderer {
     this.wakeScratch = [];
     this.calloutGap = 0;
     this.aerialBackdrop = stableBackdropState();
+    this.lastBackdropSourceX = 0;
     this.renderRiderOffsetY = 0;
     this.lastStageOffset = { x: 0, y: 0 };
     this.shake = 0;
@@ -133,6 +138,7 @@ export class KakiRenderer {
     this.particleSerial = 0;
     this.calloutGap = 0;
     this.aerialBackdrop = stableBackdropState();
+    this.lastBackdropSourceX = 0;
     this.renderRiderOffsetY = 0;
     this.lastStageOffset = { x: 0, y: 0 };
     this.shake = 0;
@@ -397,6 +403,7 @@ export class KakiRenderer {
 
   render(simulation, alpha = 1) {
     const ctx = this.ctx;
+    const player = simulation.player;
     this.conditionId = conditionIdFor(simulation, this.settings);
     this.palette = this.settings.highContrast ? PALETTES.contrast : paletteForCondition(this.conditionId);
     ctx.imageSmoothingEnabled = false;
@@ -454,7 +461,8 @@ export class KakiRenderer {
     drawWorldFoamGates(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
     this.drawParticles(false);
     this.drawTrajectoryWake(simulation);
-    this.drawSurfer(simulation, alpha);
+    const deferredAerialRider = player.state === "airborne";
+    if (!deferredAerialRider) this.drawSurfer(simulation, alpha);
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true, this.settings);
     if (heroBarrel) this.drawWaveFront(simulation);
     drawWorldWildlifeContact(ctx, simulation, palette, alpha, this.settings);
@@ -463,6 +471,12 @@ export class KakiRenderer {
     this.drawAerialDepthLayer(simulation, true);
     this.drawLandingIndicator(simulation);
     this.drawHud(simulation);
+    if (deferredAerialRider) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
+      this.drawSurfer(simulation, alpha);
+      ctx.restore();
+    }
     if (this.cameraDebug) this.drawCameraTelemetry(simulation);
     if (!simulation.coreSurfLab) this.drawCallouts();
 
@@ -487,9 +501,14 @@ export class KakiRenderer {
 
     // Draw one complete stable condition crop. Aerial presentation never
     // repaints this panorama or selects a second vertical shelf.
-    const travel = backgroundPanoramaTravel(simulation, this.settings.reducedMotion);
+    const sourceX = backgroundPanoramaTravel(
+      simulation,
+      this.settings.reducedMotion,
+      image.naturalWidth,
+    );
     const crops = aerialBackdropCropShelves(image.naturalHeight, LOGICAL_HEIGHT);
-    drawWrappedPanoramaCrop(this.ctx, image, travel, crops.coast);
+    this.lastBackdropSourceX = sourceX;
+    drawPanoramaCrop(this.ctx, image, sourceX, crops.coast);
     return true;
   }
 
@@ -925,7 +944,10 @@ export class KakiRenderer {
     }
     x -= Number(simulation.camera?.worldX) || 0;
     x = Math.round(x);
-    y = Math.round(y);
+    // Preserve sub-pixel aerial travel. Rounding the compressed projection
+    // here made a physically moving rider occupy one logical row for many
+    // consecutive frames near the apex.
+    if (player.state !== "airborne") y = Math.round(y);
 
     if (player.state === "airborne") this.drawLandingGuide(simulation);
     if (player.state === "wipeout") {
@@ -944,6 +966,21 @@ export class KakiRenderer {
     const boardAngle = resolvedBoardAngle(player);
     const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? player.takeoffDirection ?? 1) || 1;
     const mounted = Boolean(player.animalMount || player.mountKind || player.mountType);
+    if (player.state === "airborne") {
+      this.ctx.save();
+      this.ctx.translate(x, y);
+      if (!mounted) {
+        drawBoardSprite(this.ctx, 0, 1, boardAngle, simulation.board, this.palette, {
+          compression: player.compression,
+          direction,
+          assets: this.visualAssets,
+          airborne: true,
+        });
+      }
+      drawKittySprite(this.ctx, 0, mounted ? -5 : 0, player.bodyAngle, this.presentationPlayer(player), this.palette, { direction });
+      this.ctx.restore();
+      return;
+    }
     if (!mounted) {
       drawBoardSprite(this.ctx, x, y + 1, boardAngle, simulation.board, this.palette, {
         compression: player.compression,
@@ -1784,35 +1821,24 @@ function signedFixed(value) {
   return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
 }
 
-function drawWrappedPanoramaCrop(ctx, image, travel, sourceY) {
-  drawWrappedPanoramaSlice(ctx, image, travel, sourceY, 0, LOGICAL_HEIGHT, 1);
-}
-
-function drawWrappedPanoramaSlice(ctx, image, travel, sourceY, destinationY, height, alpha = 1) {
-  if (!(height > 0)) return;
-  const maxSourceX = Math.max(1, image.naturalWidth);
-  let sourceX = ((Number(travel) % maxSourceX) + maxSourceX) % maxSourceX;
-  let destinationX = 0;
-  let remaining = LOGICAL_WIDTH;
+function drawPanoramaCrop(ctx, image, sourceX, sourceY) {
+  const clampedX = clamp(
+    Number(sourceX) || 0,
+    0,
+    Math.max(0, image.naturalWidth - LOGICAL_WIDTH),
+  );
   ctx.save();
-  ctx.globalAlpha *= clamp(Number(alpha) || 0, 0, 1);
-  while (remaining > 0) {
-    const width = Math.min(remaining, maxSourceX - sourceX);
-    ctx.drawImage(
-      image,
-      sourceX,
-      sourceY + destinationY,
-      width,
-      height,
-      destinationX,
-      destinationY,
-      width,
-      height,
-    );
-    destinationX += width;
-    remaining -= width;
-    sourceX = 0;
-  }
+  ctx.drawImage(
+    image,
+    clampedX,
+    sourceY,
+    LOGICAL_WIDTH,
+    LOGICAL_HEIGHT,
+    0,
+    0,
+    LOGICAL_WIDTH,
+    LOGICAL_HEIGHT,
+  );
   ctx.restore();
 }
 

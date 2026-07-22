@@ -22,8 +22,10 @@ export const AERIAL_PANORAMA = Object.freeze({
 });
 
 export const AIR_PROJECTION = Object.freeze({
-  compressionStartY: 50,
-  minimumY: 26,
+  compressionStartY: 40,
+  supportedMinimumY: -122,
+  supportedFinalY: 16,
+  minimumY: 8,
 });
 
 /**
@@ -165,22 +167,33 @@ export function aerialCameraTarget(altitude = 0, reducedMotion = false) {
 export function projectAirY(
   naturalY,
   compressionStartY = AIR_PROJECTION.compressionStartY,
-  minimumY = AIR_PROJECTION.minimumY,
 ) {
   const physicalY = Number(naturalY);
   if (!Number.isFinite(physicalY)) return 0;
   const start = Number.isFinite(Number(compressionStartY))
     ? Number(compressionStartY)
     : AIR_PROJECTION.compressionStartY;
-  const requestedMinimum = Number.isFinite(Number(minimumY))
-    ? Number(minimumY)
-    : AIR_PROJECTION.minimumY;
-  const top = Math.min(start - 0.001, requestedMinimum);
   if (physicalY >= start) return physicalY;
-  const span = start - top;
-  const physicalRise = start - physicalY;
-  const visibleRise = (span * physicalRise) / (span + physicalRise);
-  return start - visibleRise;
+
+  // Use a constant derivative through the complete authored flight range.
+  // The retired rational curve approached its top bound asymptotically, which
+  // collapsed 7+ physical pixels into the same rendered row near the apex.
+  const supportedBottom = Math.min(start - 1, AIR_PROJECTION.supportedMinimumY);
+  const supportedFinal = Math.max(
+    AIR_PROJECTION.minimumY + 0.001,
+    Math.min(start - 0.001, AIR_PROJECTION.supportedFinalY),
+  );
+  const compressionRatio = (start - supportedFinal) / (start - supportedBottom);
+  if (physicalY >= supportedBottom) {
+    return start + (physicalY - start) * compressionRatio;
+  }
+
+  // Unsupported heights retain the same derivative at the join, then ease
+  // toward the canvas top without a clamp or discontinuity.
+  const tailSpan = supportedFinal - AIR_PROJECTION.minimumY;
+  const tailRise = supportedBottom - physicalY;
+  return AIR_PROJECTION.minimumY
+    + tailSpan / (1 + (compressionRatio / tailSpan) * tailRise);
 }
 
 export function aerialBackdropCropShelves(

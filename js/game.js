@@ -389,6 +389,7 @@ export class KakiSurfGame {
       waveCrestScreenY,
       waterlineScreenY,
       backdropAltitude: backdrop?.altitude ?? 0,
+      backdropSourceX: Number(this.renderer.lastBackdropSourceX) || 0,
       backdropSourceY,
       backdropBlendState: { ...(backdrop?.blend ?? {}) },
       backdropFrameDelta: (backdrop?.frameDelta ?? 0) * 424,

@@ -6,6 +6,7 @@ const baseUrl = process.env.KAKI_SURF_QA_URL
   ?? `http://127.0.0.1:4173/index.html?stabilityBuild=${Date.now()}`;
 const outputDir = process.env.KAKI_SURF_AERIAL_QA_DIR
   ?? path.resolve("docs/images/qa-aerial-stability");
+const conditionId = process.env.KAKI_SURF_QA_CONDITION ?? "twilightGlass";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pages = await fetch(`${cdpHost}/json/list`).then((response) => response.json());
@@ -102,6 +103,7 @@ function aerialFrame(sample, elapsedMs) {
     airVY: sample.airVY,
     stageOffsetY: sample.stageOffsetY,
     backdropAltitude: sample.backdropAltitude,
+    backdropSourceX: sample.backdropSourceX,
     backdropSourceY: sample.backdropSourceY,
     elapsedMs,
   };
@@ -155,6 +157,8 @@ function summarizeJump(name, frames, landing, coverage) {
   const apex = frames.reduce((best, frame) => frame.naturalY < best.naturalY ? frame : best);
   let currentPlateau = 0;
   let longestNonApexPlateau = 0;
+  let renderedPlateau = 0;
+  let longestRenderedNonApexPlateau = 0;
   for (let index = 1; index < frames.length; index += 1) {
     const before = frames[index - 1];
     const after = frames[index];
@@ -167,12 +171,41 @@ function summarizeJump(name, frames, landing, coverage) {
     } else {
       currentPlateau = 0;
     }
+    if (!nearApex && Math.abs(naturalDelta) > 0.02
+      && Math.round(before.finalY) === Math.round(after.finalY)) {
+      renderedPlateau += 1;
+      longestRenderedNonApexPlateau = Math.max(longestRenderedNonApexPlateau, renderedPlateau);
+    } else {
+      renderedPlateau = 0;
+    }
     if (Math.abs(naturalDelta) > 0.02 && Math.sign(finalDelta) !== Math.sign(naturalDelta)) {
       throw new Error(`${name}: projected Y moved opposite physical Y at frame ${index}`);
     }
   }
   const backdropSources = new Set(frames.map((frame) => frame.backdropSourceY));
   const stageOffsets = frames.map((frame) => frame.stageOffsetY);
+  const backdropSourceXs = frames.map((frame) => frame.backdropSourceX);
+  let maximumBackdropSourceXDelta = 0;
+  for (let index = 1; index < backdropSourceXs.length; index += 1) {
+    maximumBackdropSourceXDelta = Math.max(
+      maximumBackdropSourceXDelta,
+      Math.abs(backdropSourceXs[index] - backdropSourceXs[index - 1]),
+    );
+  }
+  let minimumQuarterSecondTravel = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < frames.length; index += 1) {
+    const before = frames[index];
+    let later = index + 1;
+    while (later < frames.length && frames[later].elapsedMs - before.elapsedMs < 240) later += 1;
+    if (later >= frames.length || frames[later].elapsedMs - before.elapsedMs > 300) continue;
+    const after = frames[later];
+    if (Math.abs(before.airVY) < 10 || Math.abs(after.airVY) < 10) continue;
+    if (Math.min(before.naturalY, after.naturalY) > 30) continue;
+    minimumQuarterSecondTravel = Math.min(
+      minimumQuarterSecondTravel,
+      Math.abs(after.finalY - before.finalY),
+    );
+  }
   return {
     takeoffNaturalY: frames[0].naturalY,
     takeoffFinalY: frames[0].finalY,
@@ -180,6 +213,8 @@ function summarizeJump(name, frames, landing, coverage) {
     apexFinalY: apex.finalY,
     visibleTravel: frames[0].finalY - apex.finalY,
     longestNonApexPlateau,
+    longestRenderedNonApexPlateau,
+    minimumQuarterSecondTravel,
     landingTimeMs: landing.elapsedMs,
     landingState: landing.state,
     activeTimeStart: frames[0].activeTime,
@@ -191,6 +226,8 @@ function summarizeJump(name, frames, landing, coverage) {
     stageOffsetRange: [Math.min(...stageOffsets), Math.max(...stageOffsets)],
     backdropAltitudes: [Math.min(...frames.map((frame) => frame.backdropAltitude)), Math.max(...frames.map((frame) => frame.backdropAltitude))],
     backdropSources: [...backdropSources],
+    backdropSourceXRange: [Math.min(...backdropSourceXs), Math.max(...backdropSourceXs)],
+    maximumBackdropSourceXDelta,
     capturedFrames: coverage.length,
     fullCanvasCoverage: coverage.every((entry) => entry.allOpaque
       && entry.lastRowOpaque
@@ -290,11 +327,17 @@ await call("Emulation.setDeviceMetricsOverride", {
   mobile: false,
 });
 await call("Page.navigate", { url: baseUrl });
+const expectedUrl = new URL(baseUrl).href;
 for (let attempt = 0; attempt < 200; attempt += 1) {
-  if (await evaluate("Boolean(globalThis.kakiSurf && document.readyState === 'complete')")) break;
+  if (await evaluate(`location.href === ${JSON.stringify(expectedUrl)}
+    && Boolean(globalThis.kakiSurf && document.readyState === 'complete')`)) break;
   await sleep(50);
 }
+// Runtime.enable may replay an exception from the page that existed before
+// navigation. Only failures from the build under test belong to this run.
+browserFailures.length = 0;
 await evaluate(`(() => {
+  document.querySelector(${JSON.stringify(`[data-condition="${conditionId}"]`)})?.click();
   const select = document.querySelector('[data-setting="controlMode"]');
   select.value = 'simple';
   select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -318,12 +361,13 @@ jumps.push(await performJump({
 jumps.push(await performJump({
   name: "03-huge",
   prep: ["ArrowDown", "ArrowRight"],
-  prepMs: 1200,
+  prepMs: 2000,
   turbo: true,
   spin: true,
 }));
 
 const report = {
+  conditionId,
   logicalCanvas: { width: 384, height: 216 },
   consecutiveWithoutRestart: true,
   captureIntervalMs: 250,
@@ -342,9 +386,15 @@ if (jumps[2].summary.visibleTravel < 40) {
 if (jumps.some((jump) => jump.summary.longestNonApexPlateau > 0)) {
   throw new Error("A non-apex rider screen-position plateau was detected");
 }
+if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.8)) {
+  throw new Error(`Huge air moved only ${jumps[2].summary.minimumQuarterSecondTravel.toFixed(2)}px in a non-apex quarter second`);
+}
 if (jumps.some((jump) => jump.summary.backdropAltitudes.some((value) => value !== 0)
   || jump.summary.backdropSources.some((value) => value !== 424))) {
   throw new Error("A jump changed the stable condition backdrop");
+}
+if (jumps.some((jump) => jump.summary.maximumBackdropSourceXDelta > 1)) {
+  throw new Error("Panorama source travel jumped to an unrelated part of the artwork");
 }
 if (jumps.some((jump) => !jump.summary.fullCanvasCoverage)) {
   throw new Error("A captured frame failed full-canvas coverage");

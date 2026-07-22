@@ -135,7 +135,10 @@ test("high-air projection is natural below the threshold and monotonic above it"
   for (let index = 1; index < projected.length; index += 1) {
     assert.ok(projected[index] < projected[index - 1], `${natural[index]} must remain visibly above ${natural[index - 1]}`);
   }
-  assert.ok(projectAirY(-1e9) > 26, "the extreme rider approaches but never crosses the complete-rider top bound");
+  assert.ok(projectAirY(-1e9) > 8, "unsupported height approaches but never crosses the rider top bound");
+  assert.ok(projectAirY(-122) >= 16, "the authored maximum remains inside the complete-rider band");
+  assert.ok(projectAirY(-35) - projectAirY(-40) > 0.7,
+    "five physical pixels near a real apex must remain visibly separated");
   assert.ok(71 - projectAirY(-122) >= 40, "the supported maximum air retains at least 40 pixels of visible rise");
 });
 

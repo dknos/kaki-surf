@@ -287,6 +287,8 @@ test("air projection is continuous, stateless, and never forms a fixed-Y clamp",
     assert.ok(final[index] < final[index - 1], "every meaningful physical rise remains a visible screen rise");
   }
   assert.ok(final.at(-1) > AIR_PROJECTION.minimumY);
+  assert.ok(projectAirY(-35) - projectAirY(-40) > 0.7,
+    "real high-air motion cannot collapse into one logical row");
   assert.ok(73 - projectAirY(-122) >= 40, "maximum supported air preserves forty logical pixels of travel");
 });
 
@@ -320,20 +322,26 @@ test("Kaki, board, and rider effects share one interpolated rider-space offset",
   assert.ok(Math.abs(renderer.particles[0].y + renderer.renderRiderOffsetY - projection.finalY) < 1e-9);
   const surferSource = KakiRenderer.prototype.drawSurfer.toString();
   assert.match(surferSource, /y = projection\.finalY/);
-  assert.match(surferSource, /drawBoardSprite\(this\.ctx, x, y \+ 1/);
-  assert.match(surferSource, /drawKittySprite\(this\.ctx, x, y -/);
+  assert.match(surferSource, /this\.ctx\.translate\(x, y\)/);
+  assert.match(surferSource, /drawBoardSprite\(this\.ctx, 0, 1/);
+  assert.match(surferSource, /drawKittySprite\(this\.ctx, 0,/);
+  const renderSource = KakiRenderer.prototype.render.toString();
+  assert.match(renderSource, /deferredAerialRider = player\.state === "airborne"/);
+  assert.ok(renderSource.indexOf("this.drawHud(simulation)") < renderSource.lastIndexOf("this.drawSurfer(simulation, alpha)"),
+    "airborne Kaki is composited after the fixed HUD instead of disappearing behind it");
 });
 
-test("aerial panorama parallax preserves signed travel and freezes to the center crop", () => {
+test("aerial panorama parallax is clamped and never wraps to unrelated artwork", () => {
   const center = backgroundParallaxPhase({ cameraWorldX: 0 });
   const forward = backgroundParallaxPhase({ cameraWorldX: 420 });
   const reverse = backgroundParallaxPhase({ cameraWorldX: -180 });
 
   assert.ok(forward > center);
-  assert.ok(reverse < center);
+  assert.equal(reverse, center);
   assert.equal(backgroundParallaxPhase({ cameraWorldX: 900 }, true), center);
   assert.equal(backgroundPanoramaTravel({ camera: { worldX: 420 } }), 33.6);
-  assert.equal(backgroundPanoramaTravel({ camera: { worldX: -180 } }), -14.4);
+  assert.equal(backgroundPanoramaTravel({ camera: { worldX: -180 } }), 0);
+  assert.equal(backgroundPanoramaTravel({ camera: { worldX: 1e9 } }), 1152);
   assert.equal(backgroundPanoramaTravel({ camera: { worldX: 900 } }, true), 0);
 });
 
@@ -385,6 +393,11 @@ test("the full panorama is drawn once and covers both bottom corners and the fin
   assert.equal(sourceHeight, 216);
   assert.ok(destinationX <= 0 && destinationX + width >= 384, "bottom-right column is covered");
   assert.ok(destinationY <= 0 && destinationY + height >= 216, "last canvas row and both bottom corners are covered");
+
+  calls.length = 0;
+  assert.equal(renderer.drawBackgroundAsset({ camera: { worldX: -200 } }), true);
+  assert.equal(calls.length, 1, "negative travel cannot wrap into a second panorama fragment");
+  assert.equal(calls[0][1], 0);
 });
 
 test("physics, scoring, spawning, and collision never read presentation-only framing", () => {
