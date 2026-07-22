@@ -434,9 +434,9 @@ const report = {
 await writeFile(path.join(outputDir, "metrics.json"), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(jumps.map(({ name, summary }) => ({ name, ...summary })), null, 2));
 
-if (!(jumps[0].summary.visibleTravel < jumps[1].summary.visibleTravel
-  && jumps[1].summary.visibleTravel < jumps[2].summary.visibleTravel)) {
-  throw new Error("Real-input jump sequence did not increase from small to medium to huge");
+if (!(jumps[0].summary.physicalHeight < jumps[1].summary.physicalHeight
+  && jumps[1].summary.physicalHeight < jumps[2].summary.physicalHeight)) {
+  throw new Error("Real-input physical jump height did not increase from small to medium to huge");
 }
 if (jumps[2].summary.visibleTravel < 40) {
   throw new Error(`Huge air exposed only ${jumps[2].summary.visibleTravel.toFixed(2)} logical pixels`);

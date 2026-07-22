@@ -27,7 +27,7 @@ export const AIR_PROJECTION = Object.freeze({
   // above the lip. Keep that complete range on the constant-slope branch so
   // even the highest earned air continues to move visibly on screen.
   highAirPivotY: -140,
-  highAirPivotFinalY: 17.5,
+  highAirPivotFinalY: 13.5,
   supportedMinimumY: -340,
   supportedFinalY: 9,
   minimumY: 6,
