@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.3.0";
+export const GAME_VERSION = "2.3.1";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -332,8 +332,8 @@ export const TUNING = {
   tuckPreloadDuration: 0.5,
   tuckPreloadSpeedBoost: 6,
   tuckPreloadSteeringScale: 0.82,
-  perfectLandingCarry: 3.2,
-  cleanLandingCarry: 1.6,
+  perfectLandingCarry: 4.5,
+  cleanLandingCarry: 2.2,
   wobbleLandingCarry: 0.18,
   perfectLandingSpeedBoost: 1.18,
   cleanLandingSpeedBoost: 1.1,

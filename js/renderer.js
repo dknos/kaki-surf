@@ -2,7 +2,6 @@ import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
 import {
   AERIAL_PANORAMA,
   aerialBackdropCropShelves,
-  projectAirY,
 } from "./aerial.js";
 import { clamp, lerp, smoothstep } from "./math.js";
 import { cameraLayerOffset } from "./camera.js";
@@ -56,13 +55,18 @@ export function backgroundPanoramaTravel(
   return clamp(travel, 0, maximum);
 }
 
-/** The stability repair keeps every condition on its authored coastal shelf. */
-export function backgroundPanoramaCropY(source) {
-  void source;
-  return aerialBackdropCropShelves().coast;
+/** One camera-continuous crop: coast + signed worldY, never a shelf swap. */
+export function backgroundPanoramaCropY(
+  source,
+  imageHeight = AERIAL_PANORAMA.height,
+  viewportHeight = AERIAL_PANORAMA.viewportHeight,
+) {
+  const coast = aerialBackdropCropShelves(imageHeight, viewportHeight).coast;
+  const cameraY = Math.min(0, Number(source?.camera?.worldY) || 0);
+  return clamp(coast + cameraY, 0, coast);
 }
 
-/** Keep aerial presentation on the selected condition's fixed coastal shelf. */
+/** No second altitude controller: render derives atmosphere from camera crop. */
 export function advanceAerialBackdropState(previousState, player, dt) {
   void previousState;
   void player;
@@ -70,7 +74,7 @@ export function advanceAerialBackdropState(previousState, player, dt) {
   return stableBackdropState();
 }
 
-/** One interpolation/projection is shared by Kaki, board, and rider effects. */
+/** Rider geometry stays in world space; the shared stage camera moves it. */
 export function riderScreenProjection(simulation, alpha = 1) {
   const player = simulation?.player;
   const interpolation = clamp(Number(alpha) || 0, 0, 1);
@@ -86,8 +90,8 @@ export function riderScreenProjection(simulation, alpha = 1) {
       interpolation,
     )
     : Number.NaN;
-  const finalY = player?.state === "airborne" ? projectAirY(naturalY) : naturalY;
-  const frameOffsetY = player?.state === "airborne" ? finalY - naturalY : 0;
+  const finalY = naturalY;
+  const frameOffsetY = 0;
   return Object.freeze({
     worldX,
     naturalY,
@@ -117,6 +121,7 @@ export class KakiRenderer {
     this.calloutGap = 0;
     this.aerialBackdrop = stableBackdropState();
     this.lastBackdropSourceX = 0;
+    this.lastBackdropSourceY = aerialBackdropCropShelves().coast;
     this.renderRiderOffsetY = 0;
     this.lastStageOffset = { x: 0, y: 0 };
     this.shake = 0;
@@ -148,6 +153,7 @@ export class KakiRenderer {
     this.calloutGap = 0;
     this.aerialBackdrop = stableBackdropState();
     this.lastBackdropSourceX = 0;
+    this.lastBackdropSourceY = aerialBackdropCropShelves().coast;
     this.renderRiderOffsetY = 0;
     this.lastStageOffset = { x: 0, y: 0 };
     this.shake = 0;
@@ -433,8 +439,8 @@ export class KakiRenderer {
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
     this.drawSky(simulation);
 
-    // Screen/aerial backdrop space is locked. The fixed surf stage receives
-    // only bounded impact shake, never the rider's vertical framing signal.
+    // The complete surf stage shares one vertical camera. The panorama crop
+    // above moved by the exact inverse amount, preserving its ocean anchor.
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
     this.drawCoastline(simulation);
@@ -448,12 +454,11 @@ export class KakiRenderer {
     }
     ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // Sky traffic remains on the condition's stable coastal presentation; it
-    // never inherits rider framing or rides a physical camera translation.
+    const backdropAltitude = this.aerialBackdrop?.altitude ?? 0;
     if (allowsBackgroundTraffic) {
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky", 0);
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky", 0);
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky", 0);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky", backdropAltitude);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky", backdropAltitude);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky", backdropAltitude);
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
@@ -507,16 +512,28 @@ export class KakiRenderer {
     const image = this.visualAssets?.backgrounds?.[this.conditionId];
     if (!image?.complete || !(image.naturalWidth > 0) || !(image.naturalHeight >= LOGICAL_HEIGHT)) return false;
 
-    // Draw one complete stable condition crop. Aerial presentation never
-    // repaints this panorama or selects a second vertical shelf.
+    // Draw exactly one complete camera-continuous crop. No masks, fragments,
+    // overlays, or plate swaps can expose a seam.
     const sourceX = backgroundPanoramaTravel(
       simulation,
       this.settings.reducedMotion,
       image.naturalWidth,
     );
     const crops = aerialBackdropCropShelves(image.naturalHeight, LOGICAL_HEIGHT);
+    const sourceY = backgroundPanoramaCropY(simulation, image.naturalHeight, LOGICAL_HEIGHT);
+    const previousSourceY = Number(this.lastBackdropSourceY) || crops.coast;
+    const frameDelta = Math.abs(sourceY - previousSourceY);
     this.lastBackdropSourceX = sourceX;
-    drawPanoramaCrop(this.ctx, image, sourceX, crops.coast);
+    this.lastBackdropSourceY = sourceY;
+    this.aerialBackdrop = {
+      altitude: crops.coast > 0 ? (crops.coast - sourceY) / crops.coast : 0,
+      previousAltitude: crops.coast > 0 ? (crops.coast - previousSourceY) / crops.coast : 0,
+      frameDelta: crops.coast > 0 ? frameDelta / crops.coast : 0,
+      maximumFrameDelta: Math.max(Number(this.aerialBackdrop?.maximumFrameDelta) || 0,
+        crops.coast > 0 ? frameDelta / crops.coast : 0),
+      blend: { coastToCloud: 0, cloudToUpper: 0, upperToSpace: 0 },
+    };
+    drawPanoramaCrop(this.ctx, image, sourceX, sourceY);
     return true;
   }
 
@@ -626,7 +643,8 @@ export class KakiRenderer {
   drawLandingIndicator(simulation) {
     const player = simulation?.player;
     if (player?.state !== "airborne" || (Number(player.airVY) || 0) <= 16) return;
-    const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace);
+    const stageOffsetY = -(Number(simulation.camera?.worldY) || 0);
+    const surfaceY = simulation.wave.ridingY(player.airX, player.landingFace) + stageOffsetY;
     if (surfaceY < LOGICAL_HEIGHT - 20) return;
     const ctx = this.ctx;
     const x = clamp(Math.round((Number(player.worldX) || LOGICAL_WIDTH / 2)
@@ -978,7 +996,7 @@ export class KakiRenderer {
   }
 
   backgroundSourceY() {
-    return aerialBackdropCropShelves().coast;
+    return Number(this.lastBackdropSourceY) || aerialBackdropCropShelves().coast;
   }
 
   presentationPlayer(player) {

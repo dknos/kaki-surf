@@ -114,10 +114,13 @@ function aerialFrame(sample, elapsedMs) {
       ? sample.landingTargetAngle
       : null,
     landingError: Number.isFinite(sample.landingError) ? sample.landingError : null,
+    cameraWorldY: Number(sample.cameraWorldY) || 0,
     stageOffsetY: sample.stageOffsetY,
     backdropAltitude: sample.backdropAltitude,
     backdropSourceX: sample.backdropSourceX,
     backdropSourceY: sample.backdropSourceY,
+    backdropFrameDelta: Number(sample.backdropFrameDelta) || 0,
+    maximumPerFrameBackdropDelta: Number(sample.maximumPerFrameBackdropDelta) || 0,
     cloudBlend: Number(sample.backdropBlendState?.coastToCloud) || 0,
     maxAirHeight: Number(sample.maxAirHeight) || 0,
     waveMomentum: Number(sample.waveMomentum) || 0,
@@ -177,7 +180,20 @@ async function waitForPlayable(timeout = 5000) {
   throw new Error("Timed out waiting for the next playable riding state");
 }
 
-function summarizeJump(name, frames, landing, coverage) {
+async function waitForRiding(timeout = 5000) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    const sample = await telemetry();
+    if (sample.state === "riding") return sample;
+    if (sample.state === "wipeout" || sample.state === "complete") {
+      throw new Error(`Run became unplayable while settling the camera: ${sample.state}`);
+    }
+    await sleep(16);
+  }
+  throw new Error("Timed out waiting for the rider and camera to settle");
+}
+
+function summarizeJump(name, frames, landing, ready, coverage) {
   const apex = frames.reduce((best, frame) => frame.naturalY < best.naturalY ? frame : best);
   let currentPlateau = 0;
   let longestNonApexPlateau = 0;
@@ -202,18 +218,28 @@ function summarizeJump(name, frames, landing, coverage) {
     } else {
       renderedPlateau = 0;
     }
-    if (Math.abs(naturalDelta) > 0.02 && Math.sign(finalDelta) !== Math.sign(naturalDelta)) {
-      throw new Error(`${name}: projected Y moved opposite physical Y at frame ${index}`);
-    }
   }
   const backdropSources = new Set(frames.map((frame) => frame.backdropSourceY));
   const stageOffsets = frames.map((frame) => frame.stageOffsetY);
   const backdropSourceXs = frames.map((frame) => frame.backdropSourceX);
+  const backdropSourceYs = frames.map((frame) => frame.backdropSourceY);
   let maximumBackdropSourceXDelta = 0;
+  let maximumBackdropSourceYDelta = 0;
+  let maximumOceanAnchorError = 0;
   for (let index = 1; index < backdropSourceXs.length; index += 1) {
     maximumBackdropSourceXDelta = Math.max(
       maximumBackdropSourceXDelta,
       Math.abs(backdropSourceXs[index] - backdropSourceXs[index - 1]),
+    );
+    maximumBackdropSourceYDelta = Math.max(
+      maximumBackdropSourceYDelta,
+      Math.abs(backdropSourceYs[index] - backdropSourceYs[index - 1]),
+    );
+  }
+  for (let index = 0; index < backdropSourceYs.length; index += 1) {
+    maximumOceanAnchorError = Math.max(
+      maximumOceanAnchorError,
+      Math.abs(backdropSourceYs[index] + stageOffsets[index] - 424),
     );
   }
   let minimumQuarterSecondTravel = Number.POSITIVE_INFINITY;
@@ -253,6 +279,10 @@ function summarizeJump(name, frames, landing, coverage) {
     rotationRange: Math.max(...frames.map((frame) => frame.rotation))
       - Math.min(...frames.map((frame) => frame.rotation)),
     stageOffsetRange: [Math.min(...stageOffsets), Math.max(...stageOffsets)],
+    cameraWorldYRange: [
+      Math.min(...frames.map((frame) => frame.cameraWorldY)),
+      Math.max(...frames.map((frame) => frame.cameraWorldY)),
+    ],
     backdropAltitudes: [Math.min(...frames.map((frame) => frame.backdropAltitude)), Math.max(...frames.map((frame) => frame.backdropAltitude))],
     cloudBlendRange: [Math.min(...frames.map((frame) => frame.cloudBlend)), Math.max(...frames.map((frame) => frame.cloudBlend))],
     physicalHeight: Math.max(...frames.map((frame) => frame.maxAirHeight)),
@@ -262,6 +292,10 @@ function summarizeJump(name, frames, landing, coverage) {
     reboundLiftMultiplier: frames[0].reboundLiftMultiplier,
     aerialBoostStack: frames[0].aerialBoostStack,
     backdropSources: [...backdropSources],
+    backdropSourceYRange: [Math.min(...backdropSourceYs), Math.max(...backdropSourceYs)],
+    maximumBackdropSourceYDelta,
+    maximumRenderedBackdropDelta: Math.max(...frames.map((frame) => frame.maximumPerFrameBackdropDelta)),
+    maximumOceanAnchorError,
     backdropSourceXRange: [Math.min(...backdropSourceXs), Math.max(...backdropSourceXs)],
     maximumBackdropSourceXDelta,
     capturedFrames: coverage.length,
@@ -270,6 +304,8 @@ function summarizeJump(name, frames, landing, coverage) {
       && entry.width === 384
       && entry.height === 216),
     bottomCorners: coverage.map(({ bottomLeft, bottomRight }) => ({ bottomLeft, bottomRight })),
+    readyCameraWorldY: Number(ready.cameraWorldY) || 0,
+    readyBackdropSourceY: Number(ready.backdropSourceY) || 0,
   };
 }
 
@@ -384,9 +420,9 @@ async function performJump({
   if (landing.state === "wipeout") {
     throw new Error(`${name}: jump ended in a wipeout (${landing.wipeoutCause || "unknown"}; ${landing.elapsedMs}ms; gap ${Number(landing.barrelGap).toFixed(2)})`);
   }
-  await waitForPlayable();
+  const ready = await waitForRiding();
   coverage.push(await captureCanvas(`${name}-ready`));
-  return { name, frames, summary: summarizeJump(name, frames, landing, coverage) };
+  return { name, frames, summary: summarizeJump(name, frames, landing, ready, coverage) };
 }
 
 await mkdir(outputDir, { recursive: true });
@@ -474,17 +510,24 @@ if (!(jumps[0].summary.physicalHeight < jumps[1].summary.physicalHeight
   && jumps[1].summary.physicalHeight < jumps[2].summary.physicalHeight)) {
   throw new Error("Real-input physical jump height did not increase from small to medium to huge");
 }
-if (jumps[2].summary.visibleTravel < 40) {
-  throw new Error(`Huge air exposed only ${jumps[2].summary.visibleTravel.toFixed(2)} logical pixels`);
+if (jumps[2].summary.stageOffsetRange[1] < 180) {
+  throw new Error(`Huge air panned only ${jumps[2].summary.stageOffsetRange[1].toFixed(1)} logical pixels`);
 }
-if (jumps.some((jump) => jump.summary.longestNonApexPlateau > 0)) {
-  throw new Error("A non-apex rider screen-position plateau was detected");
+if (jumps[2].summary.backdropSourceYRange[0] > 244) {
+  throw new Error(`Huge air never reached the upper authored panorama (${jumps[2].summary.backdropSourceYRange[0].toFixed(1)})`);
 }
-if (!(jumps[2].summary.minimumQuarterSecondTravel >= 0.4)) {
-  throw new Error(`Huge air moved only ${jumps[2].summary.minimumQuarterSecondTravel.toFixed(2)}px in a non-apex quarter second`);
+if (jumps.some((jump) => jump.summary.maximumBackdropSourceYDelta > 12)) {
+  throw new Error("Vertical panorama telemetry exceeded its sampled rate limit");
 }
-if (jumps.some((jump) => jump.summary.backdropSources.some((value) => value !== 424))) {
-  throw new Error("A jump changed the stable condition panorama crop");
+if (jumps.some((jump) => jump.summary.maximumRenderedBackdropDelta > 8)) {
+  throw new Error("Vertical panorama camera exceeded its rendered-frame rate limit");
+}
+if (jumps.some((jump) => jump.summary.maximumOceanAnchorError > 3)) {
+  throw new Error("Panorama and surf stage separated from their shared ocean anchor");
+}
+if (jumps.some((jump) => Math.abs(jump.summary.readyCameraWorldY) > 1
+  || Math.abs(jump.summary.readyBackdropSourceY - 424) > 1)) {
+  throw new Error("Camera failed to settle back onto the coastal shelf before the next jump");
 }
 if (jumps.some((jump) => jump.summary.riderScaleRange.some((value) => value !== 1))) {
   throw new Error("A jump resized the rider or board");

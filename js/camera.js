@@ -3,19 +3,19 @@ import { clamp } from "./math.js";
 export const DEFAULT_CAMERA_SETTINGS = Object.freeze({
   left: 88,
   right: 296,
-  upper: 72,
+  upper: 40,
   returnY: 88,
   riderSafeY: 52,
   exceptionalRiderSafeY: 68,
   exceptionalTrackingAir: 64,
   horizontalFrequency: 5.2,
   verticalRiseFrequency: 6.4,
-  verticalReturnFrequency: 3.2,
+  verticalReturnFrequency: 4.2,
   minimumTrackingAir: 36,
   maxVelocityX: 180,
   maxAccelerationX: 720,
-  maxVelocityY: 120,
-  maxAccelerationY: 1800,
+  maxVelocityY: 340,
+  maxAccelerationY: 2800,
 });
 
 export function createCameraState(settings = {}) {
@@ -53,18 +53,41 @@ export function updateCamera(camera, player, dt) {
     && qualifiedAirHeight >= settings.minimumTrackingAir) {
     camera.verticalTracking = true;
     camera.verticalAnchorY = Math.min(0, playerWorldY - settings.upper);
-  } else if ((!airborne || screenY > settings.returnY) && camera.verticalTracking) {
+    // Match most of the launch velocity immediately without moving position.
+    // This prevents a powerful rebound from outrunning the camera in its first
+    // few frames while preserving a continuous takeoff screen coordinate.
+    camera.velocityY = Math.min(
+      camera.velocityY,
+      clamp(Number(player?.airVY) || 0, -settings.maxVelocityY, 0),
+    );
+  } else if (!airborne && camera.verticalTracking) {
     camera.verticalTracking = false;
   }
+  let targetVelocityY = 0;
   if (camera.verticalTracking) {
-    camera.verticalAnchorY = Math.min(camera.verticalAnchorY, playerWorldY - settings.upper);
+    if ((Number(player?.airVY) || 0) <= 0) {
+      camera.verticalAnchorY = Math.min(camera.verticalAnchorY, playerWorldY - settings.upper);
+      targetVelocityY = Number(player?.airVY) || 0;
+    } else {
+      // Follow re-entry down on the same camera path. Keeping tracking armed
+      // for the complete flight prevents release/reacquire oscillation.
+      const descentTarget = playerWorldY - settings.returnY;
+      if (descentTarget > camera.verticalAnchorY) {
+        camera.verticalAnchorY = Math.min(0, descentTarget);
+        targetVelocityY = descentTarget < 0 ? Number(player?.airVY) || 0 : 0;
+      }
+    }
   }
   const targetY = camera.verticalTracking ? camera.verticalAnchorY : 0;
   const frequency = targetY < camera.worldY
     ? settings.verticalRiseFrequency
     : settings.verticalReturnFrequency;
   stepAxis(camera, "worldY", "velocityY", targetY, frequency,
-    settings.maxVelocityY, settings.maxAccelerationY, dt);
+    settings.maxVelocityY, settings.maxAccelerationY, dt, targetVelocityY);
+  if (camera.worldY > 0) {
+    camera.worldY = 0;
+    camera.velocityY = 0;
+  }
   if (!airborne && Math.abs(camera.worldY) < 0.001 && Math.abs(camera.velocityY) < 0.01) {
     camera.worldY = 0;
     camera.velocityY = 0;
@@ -75,14 +98,22 @@ export function updateCamera(camera, player, dt) {
 
 export function cameraLayerOffset(layer, camera, shakeX = 0, shakeY = 0, reducedMotion = false) {
   if (layer !== "world" && layer !== "stage") return { x: 0, y: 0 };
-  return fixedStageOffset(shakeX, shakeY, reducedMotion);
+  return worldCameraOffset(camera, shakeX, shakeY, reducedMotion);
 }
 
 /**
- * Fixed surf-stage projection. Vertical rider framing is deliberately absent:
- * wave, water, coastline, boats, wildlife, and water effects may receive only
- * the explicitly supplied bounded impact shake.
+ * One physical presentation camera owns the complete surf stage. Looking up
+ * makes worldY negative, so world content moves down by the inverse amount.
+ * Reduced Motion removes impact shake but retains required camera framing.
  */
+export function worldCameraOffset(camera, shakeX = 0, shakeY = 0, reducedMotion = false) {
+  return {
+    x: reducedMotion ? 0 : Number(shakeX) || 0,
+    y: -(Number(camera?.worldY) || 0) + (reducedMotion ? 0 : Number(shakeY) || 0),
+  };
+}
+
+/** Bounded shake helper retained for non-camera impact effects. */
 export function fixedStageOffset(shakeX = 0, shakeY = 0, reducedMotion = false) {
   return {
     x: reducedMotion ? 0 : Number(shakeX) || 0,
@@ -114,12 +145,13 @@ export function riderFrameCameraTarget(player, safeTopY = riderSafeTopY(player))
   return Math.min(0, naturalY - (Number(safeTopY) || DEFAULT_CAMERA_SETTINGS.riderSafeY));
 }
 
-function stepAxis(camera, positionKey, velocityKey, target, frequency, maxVelocity, maxAcceleration, dt) {
+function stepAxis(camera, positionKey, velocityKey, target, frequency, maxVelocity, maxAcceleration, dt, targetVelocity = 0) {
   if (!(dt > 0)) return;
   const position = Number(camera[positionKey]) || 0;
   const velocity = Number(camera[velocityKey]) || 0;
   const omega = Math.max(0.01, Number(frequency) || 1) * 2;
-  const desiredAcceleration = omega * omega * (target - position) - 2 * omega * velocity;
+  const desiredAcceleration = omega * omega * (target - position)
+    + 2 * omega * ((Number(targetVelocity) || 0) - velocity);
   const acceleration = clamp(desiredAcceleration, -maxAcceleration, maxAcceleration);
   const nextVelocity = clamp(velocity + acceleration * dt, -maxVelocity, maxVelocity);
   camera[velocityKey] = nextVelocity;

@@ -7,6 +7,7 @@ import {
   AIR_PROJECTION,
   projectAirY,
 } from "../js/aerial.js";
+import { cameraLayerOffset } from "../js/camera.js";
 import {
   advanceAerialBackdropState,
   backgroundPanoramaCropY,
@@ -305,7 +306,7 @@ test("air projection is continuous, stateless, and never forms a fixed-Y clamp",
     "maximum supported air preserves at least fifty logical pixels of travel");
 });
 
-test("Kaki, board, and rider effects share one interpolated rider-space offset", () => {
+test("Kaki, board, and rider effects share the same stage-camera transform", () => {
   const simulation = {
     camera: { worldX: 40, worldY: -160 },
     player: {
@@ -319,7 +320,7 @@ test("Kaki, board, and rider effects share one interpolated rider-space offset",
   };
   const projection = riderScreenProjection(simulation, 0.5);
   assert.equal(projection.naturalY, -80);
-  assert.equal(projection.finalY, projectAirY(-80));
+  assert.equal(projection.finalY, -80);
   assert.equal(projection.finalY - projection.naturalY, projection.frameOffsetY);
   assert.equal(projection.riderScale, 1, "air height must never resize Kaki or the board");
 
@@ -328,12 +329,14 @@ test("Kaki, board, and rider effects share one interpolated rider-space offset",
       camera: { worldX: 40, worldY },
       player: { ...simulation.player },
     }, 0.5);
-    assert.equal(samePhysicalPose.finalY, projection.finalY, "camera state cannot change rider projection");
+    assert.equal(samePhysicalPose.finalY, projection.finalY, "camera remains outside rider geometry");
   }
 
   const renderer = Object.create(KakiRenderer.prototype);
   Object.assign(renderer, { particles: [{ life: 1, maxLife: 1, foreground: true, kind: "star", size: 1, x: 224, y: -80, color: "#fff", space: "rider" }], renderCameraWorldX: 40, renderRiderOffsetY: projection.frameOffsetY });
   assert.ok(Math.abs(renderer.particles[0].y + renderer.renderRiderOffsetY - projection.finalY) < 1e-9);
+  assert.equal(projection.finalY + cameraLayerOffset("stage", simulation.camera).y, 80,
+    "rider and rider-space effects receive the same world camera once");
   const surferSource = KakiRenderer.prototype.drawSurfer.toString();
   assert.match(surferSource, /y = projection\.finalY/);
   assert.match(surferSource, /this\.ctx\.translate\(x, y\)/);
@@ -363,7 +366,7 @@ test("aerial panorama parallax is clamped and never wraps to unrelated artwork",
   assert.equal(backgroundPanoramaTravel({ camera: { worldX: 900 } }, true), 0);
 });
 
-test("aerial panorama remains on the stable condition shelf for every jump height", () => {
+test("aerial panorama follows camera worldY continuously without using altitude shelves", () => {
   const coast = backgroundPanoramaCropY({
     player: { aerialAltitude: 0 },
     camera: { worldY: 0 },
@@ -382,12 +385,12 @@ test("aerial panorama remains on the stable condition shelf for every jump heigh
   });
 
   assert.equal(coast, 424);
-  assert.deepEqual([high, descending, extreme], [coast, coast, coast]);
+  assert.deepEqual([high, descending, extreme], [400, 344, 292]);
   assert.equal(backgroundPanoramaCropY({ conditionId: "twilightGlass", player: { aerialAltitude: 1 } }), coast);
-  assert.equal(backgroundPanoramaCropY({ conditionId: "stormbreak", camera: { worldY: -500 } }), coast);
+  assert.equal(backgroundPanoramaCropY({ conditionId: "stormbreak", camera: { worldY: -500 } }), 0);
 });
 
-test("aerial presentation stays on the coast with no cloud blend", () => {
+test("aerial presentation has no independent cloud blend controller", () => {
   let state = {
     altitude: 0,
     maximumFrameDelta: 0,
@@ -435,9 +438,10 @@ test("the full panorama is drawn once and covers both bottom corners and the fin
   assert.ok(destinationY <= 0 && destinationY + height >= 216, "last canvas row and both bottom corners are covered");
 
   calls.length = 0;
-  assert.equal(renderer.drawBackgroundAsset({ camera: { worldX: -200 } }), true);
+  assert.equal(renderer.drawBackgroundAsset({ camera: { worldX: -200, worldY: -80 } }), true);
   assert.equal(calls.length, 1, "negative travel cannot wrap into a second panorama fragment");
   assert.equal(calls[0][1], 0);
+  assert.equal(calls[0][2], 344, "vertical camera selects one continuous authored crop");
 });
 
 test("physics, scoring, spawning, and collision never read presentation-only framing", () => {
@@ -447,8 +451,10 @@ test("physics, scoring, spawning, and collision never read presentation-only fra
   }
   assert.doesNotMatch(riderScreenProjection.toString(), /worldY|riderFrameSignal|cameraOffset|allowance/i,
     "rider projection cannot regain delayed camera state");
-  assert.doesNotMatch(backgroundPanoramaCropY.toString(), /aerialAltitude|worldY|camera\?\./,
-    "backdrop selection cannot regain an aerial or camera input");
+  assert.doesNotMatch(backgroundPanoramaCropY.toString(), /aerialAltitude/,
+    "backdrop crop must never use a second altitude signal");
+  assert.match(backgroundPanoramaCropY.toString(), /worldY/,
+    "backdrop crop follows the canonical presentation camera");
 });
 
 test("asset-backed coastline is never redrawn in the world camera", () => {

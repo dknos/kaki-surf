@@ -112,8 +112,8 @@ A riding Tube Tuck enters when the local zone is `critical` or risk is at least 
 | `simpleAutoLevelStart` | 18 | Downward velocity at which Simple auto-level starts |
 | `simpleTrickBuffer` | 0.34 s | Context Trick request lifetime |
 | `simpleGrabHold` | 0.115 s | Hold threshold that selects a grab |
-| `perfectLandingCarry` | 3.2 s | Speed and rebound window after a perfect landing |
-| `cleanLandingCarry` | 1.6 s | Reduced speed and rebound window after a clean landing |
+| `perfectLandingCarry` | 4.5 s | Speed and rebound window after a perfect landing |
+| `cleanLandingCarry` | 2.2 s | Reduced speed and rebound window after a clean landing |
 | `wobbleLandingCarry` | 0.18 s | Reduced carry after a wobble |
 | `wipeoutThreshold` | 1.18 rad | Hard cap for the recovery band |
 

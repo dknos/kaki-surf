@@ -82,9 +82,9 @@ The old narrow seam is no longer required to unlock the board's maximum speed. T
 
 Launch height comes from current speed, uphill approach, Action charge, pocket position, board launch identity, and bonuses such as Moon Pop. A basic lip pop retains a useful floor. The highest launch is an earned rebound chain: match a perfect landing angle, carry its speed into a steep scoop, hold the full 0.5-second preload, and engage Turbo at the lip. Clean landings retain a smaller rebound; an expired carry, flat approach, partial preload, or missing Turbo receives no rebound multiplier. Launch velocity is capped at 370 logical pixels per second so the supported maximum returns to the wave within a playable flight.
 
-Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample. Large aerials never pan the surf world. The selected condition panorama is drawn once on its fixed coastal shelf for the entire run: no cloud overlay, altitude crop, shelf replacement, or second background pass is permitted. The horizon, wave, water, craft, wildlife, and HUD stay planted while the full-size rider follows the stateless high-air projection.
+Horizontal takeoff velocity carries signed travel and board motion into the air instead of being replaced by the last input sample. Large aerials use one coherent vertical world camera: rider, wave, water, craft, and wildlife share the same stage transform while the selected 1536 x 640 panorama counter-crops by the exact opposite amount. That fixed ocean anchor prevents a split horizon or pasted cloud shelf. The panorama is still drawn once, the rider remains full size, and the HUD remains screen-fixed.
 
-Perfect, clean, and wobble landings preserve progressively less speed. A perfect landing carries rebound energy for 3.2 seconds and a clean landing for 1.6 seconds, giving enough time to bottom-turn and scoop without making the next launch automatic.
+Perfect, clean, and wobble landings preserve progressively less speed. A perfect landing carries rebound energy for 4.5 seconds and a clean landing for 2.2 seconds, giving enough time to bottom-turn, settle the camera, preload, and scoop without making the next launch automatic.
 
 ## Aerial tricks
 
