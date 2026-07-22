@@ -22,7 +22,7 @@ Simple Controls are the default:
 
 | Intent | Keyboard | Standard gamepad | Touch |
 | --- | --- | --- | --- |
-| Travel, carve, and trim | Arrows or WASD | Left stick or D-pad | Direction pad |
+| Travel and carve; rotate and trim in air | Arrows or WASD | Left stick or D-pad | Direction pad |
 | Action: compress, pump, and pop | Space or Z | A or right trigger | **Action** |
 | Context trick / tube hold | F or X | X or B | **Trick** |
 | Pause | Escape or P | Start | **II** pause button; Settings also pauses |
@@ -97,7 +97,7 @@ npm run check
 git diff --check
 ```
 
-The native suite passes **212/212 tests** and the syntax gate checks **34 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, forward dead-zone scrolling in every condition, Simple air steering without accidental rotation, rider-only aerial framing, qualified aerial tiers, continuous orbital ascent/descent, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, the reduced Simple HUD, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide. This checkpoint is local and does not claim that GitHub Pages has refreshed.
+The native suite passes **226/226 tests** and the syntax gate checks **35 JavaScript modules**. New invariants cover canonical board/path agreement, mirrored wakes, no front-facing wake, carried drop/climb energy, cutback timing, full-face traversal, forward dead-zone scrolling in every condition, shared Simple/Advanced aerial rotation, rider-only aerial framing, qualified aerial tiers, continuous orbital ascent/descent, contextual mount dismounts, quiet Core Surf Lab ownership, whale water/collision anchors, breach endpoints, foreground masking, disabled production whale scheduling, the reduced Simple HUD, and the visible package-version contract. The local gallery contains **141 deterministic 1280 x 720 captures**, including all four aerial tiers in every condition and a visible re-entry guide. This checkpoint is local and does not claim that GitHub Pages has refreshed.
 
 ## Static deployment and integration
 

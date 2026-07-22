@@ -1254,12 +1254,10 @@ export class SurfSimulation {
     player.aerialReentryFired = false;
     player.aerialWingedLaunch = wingedLaunch;
     player.rotationAccum = 0;
-    // In Simple Controls the directional axis steers the line in the air; it
-    // must not also spin the board. Deliberate body rotation remains available
-    // in Advanced Controls, while Simple's single Trick action owns its pose.
-    player.angularVelocity = this.controlMode === "advanced"
-      ? input.x * (wingedLaunch ? TUNING.wingedInitialSpin : 1.6)
-      : 0;
+    // Horizontal air input owns both the flight line and body rotation in both
+    // control modes. Simple keeps the same core spin axis as Advanced; only the
+    // direct Q/E/F/T trick grammar is mode-specific.
+    player.angularVelocity = input.x * (wingedLaunch ? TUNING.wingedInitialSpin : 1.6);
     player.takeoffDirection = player.travelDirection;
     player.landingDirection = player.travelDirection;
     player.bodyAngle = player.boardAngle;
@@ -1344,15 +1342,11 @@ export class SurfSimulation {
     const apex = Math.abs(player.airVY) < 14;
     const gravityScale = apex ? 0.42 : 1;
 
-    if (this.controlMode === "advanced") {
-      player.angularVelocity += input.x
-        * this.tuning.rotationAcceleration
-        * this.board.rotation
-        * (player.aerialWingedLaunch ? TUNING.wingedAirRotationScale : 1)
-        * dt;
-    } else {
-      player.angularVelocity = damp(player.angularVelocity, 0, 12, dt);
-    }
+    player.angularVelocity += input.x
+      * this.tuning.rotationAcceleration
+      * this.board.rotation
+      * (player.aerialWingedLaunch ? TUNING.wingedAirRotationScale : 1)
+      * dt;
     player.angularVelocity -= player.angularVelocity * this.tuning.angularDrag * dt;
     player.bodyAngle += player.angularVelocity * dt;
     player.rotationAccum += player.angularVelocity * dt;

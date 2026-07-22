@@ -372,7 +372,7 @@ test("every production condition scrolls forward before the right edge can stop 
   }
 });
 
-test("Simple right steering moves through an air without rotating the board upright", () => {
+test("Simple and Advanced directional input both steer and rotate in the air", () => {
   const launchAndHoldRight = (controlMode) => {
     const simulation = beginRiding(BOARDS.foamPuff, { controlMode });
     Object.assign(simulation.player, {
@@ -395,7 +395,8 @@ test("Simple right steering moves through an air without rotating the board upri
   const simple = launchAndHoldRight("simple");
   const advanced = launchAndHoldRight("advanced");
   assert.ok(simple.player.airX > simple.launchX + 6, "Simple steering still moves right in the air");
-  assert.ok(Math.abs(simple.player.boardAngle) < Math.PI / 6, "Simple steering does not double as a spin axis");
+  assert.ok(Math.abs(simple.player.boardAngle) > Math.PI / 3, "Simple directional input rotates the board");
+  assert.ok(Math.abs(simple.player.rotationAccum) > Math.PI / 3, "Simple rotation is tracked for scoring");
   assert.ok(Math.abs(advanced.player.boardAngle) > Math.PI / 3, "Advanced directional rotation remains available");
 });
 
@@ -1527,7 +1528,10 @@ test("long seeded randomized play remains finite, bounded, and restartable", () 
     assert.ok(simulation.player.waveMomentum >= 0 && simulation.player.waveMomentum <= 1);
     assert.ok(Math.abs(simulation.player.lateralVelocity) <= TUNING.sideScrollMaxSpeed);
     assert.ok(simulation.player.speed >= 0);
-    assert.ok(simulation.player.speed <= TUNING.maxSpeed * simulation.board.maxSpeed + 2);
+    assert.ok(
+      simulation.player.speed <= simulation.currentSpeedCapWithLandingCarry() + 0.001,
+      `speed ${simulation.player.speed} exceeded active cap ${simulation.currentSpeedCapWithLandingCarry()}`,
+    );
     assert.ok(simulation.timeRemaining >= 0 && simulation.timeRemaining <= TUNING.runDuration);
     assert.ok(simulation.wipeouts >= 0 && simulation.wipeouts <= TUNING.maxWipeouts);
     assert.ok(simulation.score.total >= 0);

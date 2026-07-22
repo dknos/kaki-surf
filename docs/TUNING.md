@@ -136,7 +136,7 @@ landingTolerance * board.landing * assistScale * (1 - trickRisk * 0.18)
 
 `assistScale` is 1.4 with Landing Assist and 1 otherwise. The recovery limit is the smaller of `wipeoutThreshold` and 1.7 times the resolved clean tolerance. Perfect ignores board and trick-risk modifiers. A landing more than 2.25 radians out of line receives the `BOARD FIRST!` wipeout language after the contact window.
 
-Simple mode uses horizontal input for air steering without also accumulating body rotation. It begins board-specific auto-level after downward velocity exceeds 18 and chooses the nearer of the surface tangent and that tangent plus π, allowing a real opposite-facing landing without guaranteeing it. Advanced mode retains directional body rotation. Landing direction commits to signed travel on contact. Perfect, clean, and wobble speed preservation factors are 1.035, 0.94, and 0.74, followed by their short carry windows.
+Both control modes use horizontal input for air steering and body rotation, while vertical input trims the board. Simple mode begins board-specific auto-level after downward velocity exceeds 18 and chooses the nearer of the surface tangent and that tangent plus π, allowing a real opposite-facing landing without guaranteeing it. Landing direction commits to signed travel on contact. Perfect, clean, and wobble speed preservation factors are 1.035, 0.94, and 0.74, followed by their short carry windows.
 
 ## World envelope
 
