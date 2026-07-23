@@ -90,7 +90,6 @@ export function resolveSoderSnekFrame(player = {}, { reducedMotion = false } = {
   if (LANDING_FRAMES[presentation]) return LANDING_FRAMES[presentation];
   if (TURBO_FRAMES[presentation]) return TURBO_FRAMES[presentation];
   if (player.animalMount === "dolphin") return "dolphinMount";
-  if (player.soderReaction === "shark") return "sharkStartled";
   if (TRICK_PHASE_FRAMES[presentation]) {
     return resolveTrickFrame(
       presentation,
@@ -124,6 +123,7 @@ export function resolveSoderSnekFrame(player = {}, { reducedMotion = false } = {
     case "complete":
       return player.resultWon === false ? "disappointed" : "victory";
     default:
+      if (player.soderReaction === "shark") return "sharkStartled";
       if ((Number(player.turboCookingTimer) || 0) > 0) return "turboCooking";
       if (player.turboActive) {
         if (player.turboTier === "redline") return "turboRedline";

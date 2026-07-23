@@ -1707,6 +1707,12 @@ export class KakiSurfGame {
         }
         this.renderer.onEvent({ type: "whaleMounted", payload: { kind: "whale" } }, this.simulation);
         break;
+      case "sharkApproach":
+        this.renderer.onEvent({
+          type: "wildlifePhase",
+          payload: { kind: "shark", phase: "telegraph" },
+        }, this.simulation);
+        break;
       case "sharkNearMiss":
         makeAirborne("tailGrab", "SHARK THREAD", Math.PI);
         player.airY = 78;

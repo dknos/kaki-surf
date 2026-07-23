@@ -325,14 +325,17 @@ test("condition traffic permissions encode the curated passive coast bands", () 
     goldenCoast: {
       far: ["sailboat", "cargoShip", "fishingBoat", "gullFlock", "cormorantFlock"],
       mid: ["fishingBoat", "pelican"],
+      wildlifeWeights: { dolphin: 0.72, shark: 0.28, whale: 0 },
     },
     twilightGlass: {
       far: ["fishingBoat", "sailboat", "cormorantFlock", "propPlane"],
       mid: [],
+      wildlifeWeights: { dolphin: 0.68, shark: 0.32, whale: 0 },
     },
     stormbreak: {
       far: ["cargoShip", "cormorantFlock"],
       mid: ["tugboat", "rescueCraft", "helicopter"],
+      wildlifeWeights: { dolphin: 0.48, shark: 0.52, whale: 0 },
     },
   };
   for (const [condition, layers] of Object.entries(expected)) {
@@ -343,7 +346,7 @@ test("condition traffic permissions encode the curated passive coast bands", () 
     assert.equal(profile.specialEvents, false);
     assert.equal(profile.carrierEnabled, false);
     assert.equal(profile.interactiveWildlife, true);
-    assert.deepEqual(profile.wildlifeWeights, { dolphin: 1, shark: 0, whale: 0 });
+    assert.deepEqual(profile.wildlifeWeights, layers.wildlifeWeights);
     for (const layer of WORLD_LAYER_ORDER) {
       for (const kind of profile.traffic[layer]) {
         assert.equal(trafficAllowedByProfile(condition, kind, layer), true);
@@ -400,11 +403,11 @@ test("the passive dolphin breach uses one continuous water anchor before interac
   )) < 1e-9);
 });
 
-test("production wildlife restores dolphins only and never overlaps encounters", () => {
+test("production wildlife restores dolphins and sharks without whales or overlap", () => {
   for (const condition of ["goldenCoast", "twilightGlass", "stormbreak"]) {
     const world = new WorldSimulation({ seed: 0xd011000 + condition.length, condition });
     const seen = new Set();
-    for (let step = 0; step < 120 * 120; step += 1) {
+    for (let step = 0; step < 240 * 120; step += 1) {
       world.update(STEP, context({ player: { x: 310, previousX: 310, y: 160, previousY: 160 } }));
       world.consumeEvents((event) => {
         if (event.type === "wildlifePhase") seen.add(event.kind);
@@ -412,8 +415,42 @@ test("production wildlife restores dolphins only and never overlaps encounters",
       world.consumeInteractions(() => {});
       assert.ok(world.wildlife.filter((entity) => entity.active).length <= 1);
     }
-    assert.deepEqual([...seen], ["dolphin"], `${condition} production species`);
+    assert.equal(seen.has("dolphin"), true, `${condition} schedules dolphins`);
+    assert.equal(seen.has("shark"), true, `${condition} schedules sharks`);
+    assert.equal(seen.has("whale"), false, `${condition} keeps whales disabled`);
   }
+});
+
+test("dolphins and sharks cannot overlap one interactive encounter", () => {
+  const dolphinFirst = new WorldSimulation({ seed: 0xd01f1, condition: "goldenCoast" });
+  dolphinFirst.update(STEP, context());
+  assert.ok(dolphinFirst.forceWildlife("dolphin", {
+    screenX: 120,
+    y: 128,
+    direction: 1,
+  }));
+  assert.equal(dolphinFirst.requestWildlife("shark", {
+    screenX: 70,
+    y: 132,
+    direction: 1,
+  }), null);
+
+  const sharkFirst = new WorldSimulation({ seed: 0x5a4f1, condition: "stormbreak" });
+  const fairContext = context({
+    player: { x: 310, previousX: 310, y: 112, previousY: 112 },
+  });
+  sharkFirst.update(STEP, fairContext);
+  assert.ok(sharkFirst.forceWildlife("shark", {
+    screenX: 52,
+    y: 140,
+    speed: 52,
+    direction: 1,
+  }));
+  assert.equal(sharkFirst.requestWildlife("dolphin", {
+    screenX: 80,
+    y: 128,
+    direction: 1,
+  }), null);
 });
 
 test("ambient watercraft stay capped at two per depth region and birds remain above water", () => {

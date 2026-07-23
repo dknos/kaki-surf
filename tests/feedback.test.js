@@ -352,6 +352,46 @@ test("Kaki, board, and rider effects share the same stage-camera transform", () 
     "airborne Kaki is composited after the fixed HUD instead of disappearing behind it");
 });
 
+test("the shark startle is renderer-owned Soder presentation and expires without mutating the player", () => {
+  const context = { imageSmoothingEnabled: true };
+  const renderer = new KakiRenderer({
+    getContext() {
+      return context;
+    },
+  }, {
+    highContrast: false,
+    reducedMotion: false,
+    reducedFlash: false,
+    screenShake: 0,
+  });
+  const player = {
+    characterId: "soderSnek",
+    state: "riding",
+    stateTime: 1,
+    x: 212,
+    face: 0.4,
+    animalMount: "",
+  };
+  const before = structuredClone(player);
+  const simulation = {
+    player,
+    board: BOARDS.foamPuff,
+    wave: { ridingY: () => 104 },
+  };
+
+  renderer.onEvent({
+    type: "wildlifePhase",
+    payload: { kind: "shark", phase: "telegraph" },
+  }, simulation);
+  const presented = renderer.presentationPlayer(player);
+  assert.equal(presented.soderReaction, "shark");
+  assert.deepEqual(player, before, "renderer reaction cannot write gameplay state");
+
+  renderer.soderSharkReactionTimer = 0;
+  assert.equal(renderer.presentationPlayer(player).soderReaction, undefined);
+  assert.equal(renderer.soderSharkReactionTimer, 0);
+});
+
 test("aerial panorama parallax is clamped and never wraps to unrelated artwork", () => {
   const center = backgroundParallaxPhase({ cameraWorldX: 0 });
   const forward = backgroundParallaxPhase({ cameraWorldX: 420 });

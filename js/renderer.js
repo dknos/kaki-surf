@@ -153,6 +153,7 @@ export class KakiRenderer {
     this.time = 0;
     this.pumpRelease = 0;
     this.turboSparkClock = 0;
+    this.soderSharkReactionTimer = 0;
     this.lastLandingQuality = "clean";
     this.riderAnimation = createRiderAnimationState();
     this.turboPresentation = createTurboPresentationState();
@@ -186,6 +187,7 @@ export class KakiRenderer {
     this.sprayClock = 0;
     this.pumpRelease = 0;
     this.turboSparkClock = 0;
+    this.soderSharkReactionTimer = 0;
     this.lastLandingQuality = "clean";
     resetRiderAnimationState(this.riderAnimation);
     resetTurboPresentationState(this.turboPresentation);
@@ -200,6 +202,17 @@ export class KakiRenderer {
     const payload = event.payload ?? {};
     handleTurboPresentationEvent(this.turboPresentation, event, simulation);
     const ridingY = simulation.wave.ridingY(player.x, player.face);
+    if (player.characterId === "soderSnek"
+      && event.type === "wildlifePhase"
+      && payload.kind === "shark"
+      && (payload.phase === "telegraph" || payload.phase === "crossing")) {
+      this.soderSharkReactionTimer = Math.max(
+        this.soderSharkReactionTimer,
+        payload.phase === "crossing" ? 0.68 : 0.48,
+      );
+    } else if (player.characterId === "soderSnek" && event.type === "sharkCollision") {
+      this.soderSharkReactionTimer = Math.max(this.soderSharkReactionTimer, 0.82);
+    }
     if ([
       "lip",
       "launch",
@@ -432,6 +445,7 @@ export class KakiRenderer {
     this.impact = Math.max(0, this.impact - dt * 3.8);
     this.pumpRelease = Math.max(0, this.pumpRelease - dt);
     this.shake = Math.max(0, this.shake - dt * 7.5);
+    this.soderSharkReactionTimer = Math.max(0, this.soderSharkReactionTimer - dt);
 
     const player = simulation.player;
     this.currentPlayer = player;
@@ -1102,10 +1116,18 @@ export class KakiRenderer {
     const riderAnimation = resolveRiderPresentationPose(this.riderAnimation, player, {
       reducedMotion: this.settings.reducedMotion,
     });
-    if (this.pumpRelease <= 0 && player.state !== "landing" && !riderAnimation) return player;
+    const soderSharkReaction = player.characterId === "soderSnek"
+      && this.soderSharkReactionTimer > 0
+      && player.state === "riding"
+      && !player.animalMount;
+    if (this.pumpRelease <= 0
+      && player.state !== "landing"
+      && !riderAnimation
+      && !soderSharkReaction) return player;
     return {
       ...player,
       justPumped: this.pumpRelease > 0,
+      soderReaction: soderSharkReaction ? "shark" : "",
       lastLandingQuality: this.lastLandingQuality,
       presentationPoseId: riderAnimation?.id,
       presentationPose: riderAnimation?.pose,

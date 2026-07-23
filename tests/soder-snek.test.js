@@ -71,12 +71,40 @@ test("Soder supports every canonical rider state and result family", () => {
     [{ state: "riding", maneuver: { id: "cutback" } }, ["coilCutback"]],
     [{ state: "riding", maneuver: { id: "tubeTuck" } }, ["serpentTuck"]],
     [{ state: "riding", animalMount: "dolphin" }, ["dolphinMount"]],
+    [{ state: "riding", soderReaction: "shark" }, ["sharkStartled"]],
   ];
   for (const [player, expected] of cases) {
     const frame = resolveSoderSnekFrame(player);
     assert.ok(expected.includes(frame), `${JSON.stringify(player)} -> ${frame}`);
     assert.ok(SODER_SNEK_FRAME_NAMES.includes(frame));
   }
+});
+
+test("Soder shark reaction never replaces a mount, trick, air, or wipeout silhouette", () => {
+  assert.equal(resolveSoderSnekFrame({
+    state: "riding",
+    animalMount: "dolphin",
+    soderReaction: "shark",
+  }), "dolphinMount");
+  assert.equal(resolveSoderSnekFrame({
+    state: "riding",
+    presentationPoseId: "frontRailGrab",
+    presentationPhase: "hold",
+    presentationProgress: 0.5,
+    soderReaction: "shark",
+  }), "tongueTapHold");
+  assert.equal(resolveSoderSnekFrame({
+    state: "airborne",
+    airVY: -80,
+    stateTime: 0.3,
+    soderReaction: "shark",
+  }), "risingStretch");
+  assert.notEqual(resolveSoderSnekFrame({
+    state: "wipeout",
+    wipeoutCause: "shark",
+    stateTime: 0.3,
+    soderReaction: "shark",
+  }), "sharkStartled");
 });
 
 test("Soder landing variants, Turbo poses, and switch preparation select bespoke frames", () => {
