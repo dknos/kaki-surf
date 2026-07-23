@@ -93,6 +93,8 @@ function pose(overrides = {}) {
     rightPaw: [7, -13],
     legSpread: 5,
     squash: 0,
+    tailX: -11,
+    tailY: -12,
     foldedEar: false,
     expression: "calm",
     loose: false,
@@ -241,8 +243,8 @@ function drawLogBoard(ctx, board, p, flex) {
 }
 
 export function drawKittySprite(ctx, x, y, angle, player, palette, options = {}) {
-  const poseId = resolveKakiPose(player);
-  const poseData = POSES[poseId] ?? POSES.neutralRide;
+  const poseId = player.presentationPoseId ?? resolveKakiPose(player);
+  const poseData = player.presentationPose ?? POSES[poseId] ?? POSES.neutralRide;
   const wobble = poseId === "wobble" ? Math.round(Math.sin((player.stateTime ?? 0) * 30) * 3) : 0;
   const crouch = poseData.crouch + Math.round(clamp(player.compression ?? 0, 0, 1) * 2);
   ctx.save();
@@ -257,9 +259,9 @@ export function drawKittySprite(ctx, x, y, angle, player, palette, options = {})
 
   // Tail and independent legs keep the plush silhouette readable at speed.
   ctx.fillStyle = palette.ink;
-  ctx.fillRect(-11 - Math.sign(poseData.lean), -12 + crouch, 7, 5);
+  ctx.fillRect(poseData.tailX - Math.sign(poseData.lean), poseData.tailY + crouch, 7, 5);
   ctx.fillStyle = palette.plush;
-  ctx.fillRect(-10 - Math.sign(poseData.lean), -11 + crouch, 5, 3);
+  ctx.fillRect(poseData.tailX + 1 - Math.sign(poseData.lean), poseData.tailY + 1 + crouch, 5, 3);
   const legY = -6 + Math.round(crouch * 0.45);
   ctx.fillStyle = palette.ink;
   ctx.fillRect(-poseData.legSpread - 3, legY, 5, Math.max(3, 7 - poseData.squash));

@@ -8,6 +8,14 @@ import { cameraLayerOffset } from "./camera.js";
 import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
 import { persistentHudContract } from "./hud-contract.js";
 import { drawPixelText } from "./pixel-font.js";
+import {
+  beginLandingPresentation,
+  cancelLandingPresentation,
+  createRiderAnimationState,
+  resetRiderAnimationState,
+  resolveRiderPresentationPose,
+  updateRiderAnimation,
+} from "./rider-animation.js";
 import { drawBoardSprite, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
 import {
   advanceWavePresentationClocks,
@@ -133,6 +141,7 @@ export class KakiRenderer {
     this.pumpRelease = 0;
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
+    this.riderAnimation = createRiderAnimationState();
     this.wavePresentationClocks = createWavePresentationClocks();
     this.cameraDebug = typeof globalThis.location?.search === "string"
       && new URLSearchParams(globalThis.location.search).has("debugCamera");
@@ -164,6 +173,7 @@ export class KakiRenderer {
     this.pumpRelease = 0;
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
+    resetRiderAnimationState(this.riderAnimation);
     this.currentBoard = simulation?.board ?? null;
     this.wavePresentationClocks = createWavePresentationClocks();
   }
@@ -174,6 +184,20 @@ export class KakiRenderer {
     this.currentBoard = simulation.board;
     const payload = event.payload ?? {};
     const ridingY = simulation.wave.ridingY(player.x, player.face);
+    if ([
+      "lip",
+      "launch",
+      "wipeout",
+      "maneuver",
+      "maneuverStart",
+      "snap",
+      "cutback",
+      "floater",
+      "tubeTuck",
+      "dolphinMounted",
+      "whaleMounted",
+      "complete",
+    ].includes(event.type)) cancelLandingPresentation(this.riderAnimation);
     switch (event.type) {
       case "callout":
         this.pushCallout(payload.text ?? "", payload.subtext ?? "", payload.tone, {
@@ -276,6 +300,14 @@ export class KakiRenderer {
         break;
       case "land": {
         this.lastLandingQuality = payload.quality ?? "clean";
+        beginLandingPresentation(this.riderAnimation, {
+          seed: simulation.seed,
+          quality: payload.quality,
+          trickSignature: payload.signature ?? payload.trick ?? "",
+          boardId: simulation.board?.id,
+          direction: payload.landingDirection ?? player.travelDirection,
+          majorTrick: (Number(payload.banked) || 0) >= 500,
+        });
         const strength = payload.quality === "perfect" ? 2.3 : payload.quality === "wobble" || payload.quality === "sketchy" ? 1.3 : 1.8;
         this.spawnContactSpray(player, 22, strength);
         this.shake = Math.max(this.shake, strength);
@@ -372,6 +404,7 @@ export class KakiRenderer {
 
     const player = simulation.player;
     this.currentPlayer = player;
+    updateRiderAnimation(this.riderAnimation, dt, player);
     this.aerialBackdrop = advanceAerialBackdropState(this.aerialBackdrop, player, dt);
     advanceWavePresentationClocks(
       this.wavePresentationClocks,
@@ -1000,11 +1033,16 @@ export class KakiRenderer {
   }
 
   presentationPlayer(player) {
-    if (this.pumpRelease <= 0 && player.state !== "landing") return player;
+    const riderAnimation = resolveRiderPresentationPose(this.riderAnimation, player, {
+      reducedMotion: this.settings.reducedMotion,
+    });
+    if (this.pumpRelease <= 0 && player.state !== "landing" && !riderAnimation) return player;
     return {
       ...player,
       justPumped: this.pumpRelease > 0,
       lastLandingQuality: this.lastLandingQuality,
+      presentationPoseId: riderAnimation?.id,
+      presentationPose: riderAnimation?.pose,
     };
   }
 
