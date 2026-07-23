@@ -28,6 +28,7 @@ import { AerialTrickSession, normalizeTrickInput } from "./tricks.js";
 import { GameplayWave } from "./wave.js";
 import { WorldSimulation } from "./world.js";
 import { createCameraState, updateCamera } from "./camera.js";
+import { normalizeCharacterId } from "./character-catalog.js";
 
 const EMPTY_INPUT = Object.freeze({
   x: 0,
@@ -159,6 +160,7 @@ export class SurfSimulation {
     tutorialEnabled = false,
     mode = DEFAULT_RUN_MODE_ID,
     cameraSettings = {},
+    character = "kaki",
   } = {}) {
     this.seed = seed >>> 0;
     this.tuning = tuning;
@@ -183,6 +185,7 @@ export class SurfSimulation {
     this.mode = resolveRunMode(mode);
     this.modeId = this.mode.id;
     this.controlMode = normalizeControlMode(controlMode);
+    this.characterId = normalizeCharacterId(character);
     this.worldTravel = 0;
     this.camera = createCameraState(cameraSettings);
     Object.defineProperty(this, "cameraWorldX", {
@@ -210,6 +213,7 @@ export class SurfSimulation {
     seed = this.seed,
     worldQa = null,
     coreSurfLab = false,
+    character = this.characterId,
   } = {}) {
     this.seed = Number.isFinite(seed) ? seed >>> 0 : this.seed;
     this.board = typeof board === "string" ? BOARDS[board] ?? BOARDS.foamPuff : board;
@@ -223,6 +227,7 @@ export class SurfSimulation {
     this.coreSurfLab = Boolean(coreSurfLab);
     this.coreSurfLabTelemetry = true;
     this.controlMode = normalizeControlMode(controlMode);
+    this.characterId = normalizeCharacterId(character);
     this.assists = {
       steering: Boolean(assists.steering),
       landing: Boolean(assists.landing),
@@ -268,6 +273,7 @@ export class SurfSimulation {
       this.tuning.speed,
       this.tuning.turboStartCharge,
     );
+    this.player.characterId = this.characterId;
     if (this.wave.profileId === "heroBarrel") {
       const entryFace = this.wave.powerFaceAt(this.player.x);
       this.player.face = entryFace;
@@ -2774,6 +2780,7 @@ function resetCarveArcState(player) {
 
 function createPlayer() {
   const player = {
+    characterId: "kaki",
     state: "entry",
     stateTime: 0,
     worldX: 212,

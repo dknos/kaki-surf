@@ -10,6 +10,11 @@ import {
   RUN_MODES,
   TUNING,
 } from "./config.js";
+import {
+  CHARACTER_CATALOG,
+  characterDefinition,
+  normalizeCharacterId,
+} from "./character-catalog.js";
 import { SurfAudio } from "./audio.js";
 import { PoliteAnnouncer } from "./announcer.js";
 import { InputManager } from "./input.js";
@@ -180,11 +185,14 @@ export class KakiSurfGame {
     });
     this.input.setControlMode?.(this.settings.controlMode);
     this.audio = externalAudio ?? new SurfAudio(this.settings);
+    this.selectedCharacter = normalizeCharacterId(this.save.selectedCharacter);
     this.selectedBoard = BOARDS[this.save.selectedBoard] ? this.save.selectedBoard : "foamPuff";
     this.selectedCondition = CONDITIONS[this.save.selectedCondition] ? this.save.selectedCondition : "goldenCoast";
     this.selectedMode = RUN_MODES[this.save.selectedMode] ? this.save.selectedMode : DEFAULT_RUN_MODE_ID;
     this.host.dataset.condition = this.selectedCondition;
+    this.host.dataset.character = this.selectedCharacter;
     this.bindUI();
+    this.buildCharacterCards();
     this.buildBoardCards();
     this.buildModeCards();
     this.buildConditionCards();
@@ -195,8 +203,15 @@ export class KakiSurfGame {
     this.audio.setLifecycle?.("menu");
   }
 
-  start({ immediate = false, board = null, condition = null, mode = null } = {}) {
+  start({
+    immediate = false,
+    character = null,
+    board = null,
+    condition = null,
+    mode = null,
+  } = {}) {
     if (this.destroyed) throw new Error("Cannot start a destroyed Kaki Surf instance.");
+    if (character) this.selectCharacter(character);
     if (board && BOARDS[board]) this.selectBoard(board);
     if (condition && CONDITIONS[condition]) this.selectCondition(condition);
     if (mode && RUN_MODES[mode]) this.selectMode(mode);
@@ -222,6 +237,7 @@ export class KakiSurfGame {
     });
     const runSequence = ++this.runSequence;
     this.announcer.clear();
+    this.save.selectedCharacter = this.selectedCharacter;
     this.save.selectedBoard = this.selectedBoard;
     this.save.selectedCondition = this.selectedCondition;
     this.save.selectedMode = this.selectedMode;
@@ -229,6 +245,7 @@ export class KakiSurfGame {
     this.input.clear?.();
     this.audio.resetRun?.();
     this.simulation.reset({
+      character: this.selectedCharacter,
       board: this.selectedBoard,
       condition: this.selectedCondition,
       mode: this.selectedMode,
@@ -261,7 +278,7 @@ export class KakiSurfGame {
       this.announce("Turn your phone sideways to surf.", { urgent: true });
       return;
     }
-    this.announce(`${RUN_MODES[this.selectedMode].name} started on ${BOARDS[this.selectedBoard].name} at ${CONDITIONS[this.selectedCondition].name}.`);
+    this.announce(`${characterDefinition(this.selectedCharacter).displayName}, ${RUN_MODES[this.selectedMode].name}, ${BOARDS[this.selectedBoard].name}, ${CONDITIONS[this.selectedCondition].name}.`);
   }
 
   pause(reason = "manual") {
@@ -308,6 +325,7 @@ export class KakiSurfGame {
     this.input.clear?.();
     this.state = "menu";
     this.simulation.reset({
+      character: this.selectedCharacter,
       board: this.selectedBoard,
       condition: this.selectedCondition,
       mode: this.selectedMode,
@@ -339,6 +357,7 @@ export class KakiSurfGame {
       aerialAltitude: this.simulation.player.aerialAltitude,
       aerialZone: this.simulation.player.aerialZone,
       wipeouts: this.simulation.wipeouts,
+      character: this.selectedCharacter,
       board: this.selectedBoard,
       condition: this.selectedCondition,
       mode: this.selectedMode,
@@ -560,6 +579,7 @@ export class KakiSurfGame {
     this.input.clear?.();
     const enriched = {
       ...result,
+      character: this.selectedCharacter,
       board: this.selectedBoard,
       condition: this.selectedCondition,
       mode: this.selectedMode,
@@ -740,6 +760,32 @@ export class KakiSurfGame {
     }, { signal });
   }
 
+  buildCharacterCards() {
+    this.elements.characterGrid.innerHTML = Object.values(CHARACTER_CATALOG).map((character) => `
+      <button class="character-card character-card--${character.id}${character.id === this.selectedCharacter ? " is-selected" : ""}" type="button" data-character="${character.id}" aria-pressed="${character.id === this.selectedCharacter}" aria-label="${character.menuDescription}">
+        <span class="character-portrait" aria-hidden="true"><i></i><b></b><em></em></span>
+        <span><strong>${character.displayName}</strong><small>${character.menuDescription.replace(`${character.displayName} — `, "")}</small></span>
+      </button>
+    `).join("");
+    this.elements.characterGrid.querySelectorAll("[data-character]").forEach((button) => {
+      button.addEventListener("click", () => this.selectCharacter(button.dataset.character), { signal: this.abort.signal });
+    });
+  }
+
+  selectCharacter(characterId) {
+    const normalized = normalizeCharacterId(characterId);
+    this.selectedCharacter = normalized;
+    this.host.dataset.character = normalized;
+    this.save.selectedCharacter = normalized;
+    this.elements.characterGrid.querySelectorAll("[data-character]").forEach((button) => {
+      const selected = button.dataset.character === normalized;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    this.elements.selectedCharacterName.textContent = characterDefinition(normalized).displayName;
+    writeSave(this.save, this.storage);
+  }
+
   buildBoardCards() {
     const stats = ["speed", "carve", "pump", "pop", "spin", "landing"];
     this.elements.boardGrid.innerHTML = Object.values(BOARDS).map((board) => `
@@ -891,6 +937,7 @@ export class KakiSurfGame {
       const output = this.host.querySelector(`[data-setting-output="${key}"]`);
       if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     }
+    this.selectCharacter(this.selectedCharacter);
     this.selectBoard(this.selectedBoard);
     this.selectMode(this.selectedMode);
     this.selectCondition(this.selectedCondition);
@@ -926,6 +973,7 @@ export class KakiSurfGame {
     this.elements.bestLabel.textContent = `${mode.shortName} BEST`;
     this.elements.bestScore.textContent = record.bestScore.toLocaleString();
     this.elements.runCount.textContent = String(this.save.totalRuns);
+    this.elements.selectedCharacterName.textContent = characterDefinition(this.selectedCharacter).displayName;
     this.elements.selectedBoardName.textContent = BOARDS[this.selectedBoard].name;
     this.elements.selectedConditionName.textContent = CONDITIONS[this.selectedCondition].shortName;
   }
@@ -1762,6 +1810,7 @@ function collectElements(host) {
     fullscreenButton: host.querySelector("[data-action=fullscreen]"),
     pauseButton: host.querySelector("[data-action=pause-run]"),
     exitButton: host.querySelector("[data-action=exit]"),
+    characterGrid: host.querySelector(".character-grid"),
     boardGrid: host.querySelector(".board-grid"),
     modeGrid: host.querySelector(".mode-grid"),
     conditionGrid: host.querySelector(".condition-grid"),
@@ -1770,6 +1819,7 @@ function collectElements(host) {
     bestLabel: host.querySelector("[data-stat=best-label]"),
     bestScore: host.querySelector("[data-stat=best]"),
     runCount: host.querySelector("[data-stat=runs]"),
+    selectedCharacterName: host.querySelector("[data-stat=character]"),
     selectedBoardName: host.querySelector("[data-stat=board]"),
     selectedConditionName: host.querySelector("[data-stat=condition]"),
     resultRank: host.querySelector("[data-result=rank]"),
@@ -1822,6 +1872,10 @@ function gameMarkup() {
             <button class="primary-button" type="button" data-action="start"><span data-start="label">CHASE THE HORIZON</span><small data-start="hint">3 PAWS / NO CLOCK</small></button>
             <button class="secondary-button" type="button" data-action="settings">ACCESS + AUDIO</button>
           </div>
+          <div class="character-select">
+            <p><b>RIDER</b> Choose your surfer. Style changes; physics never do.</p>
+            <div class="character-grid" role="group" aria-label="Choose a playable character"></div>
+          </div>
           <div class="board-grid" aria-label="Choose a board"></div>
           <div class="condition-select">
             <p><b>SESSION</b> Choose the light. The wave stays fair.</p>
@@ -1829,6 +1883,7 @@ function gameMarkup() {
           </div>
           <dl class="menu-stats">
             <div><dt data-stat="best-label">ENDLESS BEST</dt><dd data-stat="best">0</dd></div>
+            <div><dt>RIDER</dt><dd data-stat="character">KAKI</dd></div>
             <div><dt>BOARD</dt><dd data-stat="board">FOAM PUFF</dd></div>
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>

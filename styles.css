@@ -981,11 +981,13 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .mode-select,
+.character-select,
 .condition-select {
   width: min(760px, 90vw);
 }
 
 .mode-select > p,
+.character-select > p,
 .condition-select > p {
   margin: 0 0 5px;
   color: var(--foam-shadow);
@@ -995,6 +997,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .mode-select > p b,
+.character-select > p b,
 .condition-select > p b {
   color: var(--gold);
 }
@@ -1003,6 +1006,135 @@ input[type="range"]::-moz-range-thumb {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 7px;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.character-card {
+  position: relative;
+  min-height: 54px;
+  padding: 8px 10px 8px 58px;
+  border: 2px solid var(--ink);
+  color: var(--foam);
+  background: rgb(16 28 52 / 92%);
+  box-shadow: inset 0 0 0 1px #315574, 3px 3px 0 var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.character-card.is-selected {
+  border-color: var(--gold);
+  background: #244f6d;
+  box-shadow: inset 0 0 0 1px var(--foam), 3px 3px 0 var(--ink);
+}
+
+.character-card strong,
+.character-card small {
+  display: block;
+}
+
+.character-card strong {
+  color: var(--foam);
+  font-size: 10px;
+}
+
+.character-card small {
+  margin-top: 3px;
+  color: var(--foam-shadow);
+  font-size: 7px;
+  line-height: 1.2;
+}
+
+.character-portrait {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--ink);
+  background: var(--gold);
+  image-rendering: pixelated;
+}
+
+.character-portrait::before,
+.character-portrait::after,
+.character-portrait i,
+.character-portrait b,
+.character-portrait em {
+  content: "";
+  position: absolute;
+  display: block;
+}
+
+.character-card--kaki .character-portrait::before {
+  left: 8px;
+  top: 8px;
+  width: 22px;
+  height: 22px;
+  background: var(--foam);
+  box-shadow: -3px -5px 0 var(--ink), 3px -5px 0 var(--ink);
+}
+
+.character-card--kaki .character-portrait::after {
+  left: 11px;
+  top: 19px;
+  width: 3px;
+  height: 2px;
+  background: var(--ink);
+  box-shadow: 13px 0 0 var(--ink), 6px 5px 0 1px var(--coral);
+}
+
+.character-card--soderSnek .character-portrait {
+  background: #2c5f45;
+}
+
+.character-card--soderSnek .character-portrait::before {
+  left: 4px;
+  top: 4px;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  background: #63a93d;
+  box-shadow: inset 0 -5px #477d34;
+}
+
+.character-card--soderSnek .character-portrait::after {
+  left: 10px;
+  top: 12px;
+  width: 18px;
+  height: 17px;
+  background: #f6e9d8;
+  box-shadow: 5px -6px 0 -3px #82cde0;
+}
+
+.character-card--soderSnek .character-portrait i {
+  left: 7px;
+  top: 7px;
+  width: 3px;
+  height: 7px;
+  background: var(--ink);
+  box-shadow: 21px 0 0 var(--ink);
+}
+
+.character-card--soderSnek .character-portrait b {
+  left: 4px;
+  top: 20px;
+  width: 4px;
+  height: 4px;
+  background: #b46d9d;
+  box-shadow: 26px 0 0 #b46d9d;
+}
+
+.character-card--soderSnek .character-portrait em {
+  left: 18px;
+  top: 6px;
+  width: 5px;
+  height: 13px;
+  background: #df759d;
 }
 
 .mode-card {
@@ -1114,7 +1246,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .menu-stats {
-  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  width: min(760px, 92vw);
+  grid-template-columns: repeat(5, minmax(82px, 1fr));
 }
 
 .condition-label {
@@ -1206,6 +1339,7 @@ input[type="range"]::-moz-range-thumb {
   }
 
   .mode-select,
+  .character-select,
   .condition-select {
     align-self: center;
     width: min(430px, 92vw);
@@ -1237,12 +1371,11 @@ input[type="range"]::-moz-range-thumb {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .menu-stats div:nth-child(3) {
+  .menu-stats div:nth-child(odd) {
     border-left: 0;
-    border-top: 2px solid #538aa0;
   }
 
-  .menu-stats div:nth-child(4) {
+  .menu-stats div:nth-child(n + 3) {
     border-top: 2px solid #538aa0;
   }
 
@@ -1275,7 +1408,11 @@ input[type="range"]::-moz-range-thumb {
   .board-specialty { display: none; }
   .condition-select > p,
   .mode-select > p,
+  .character-select > p,
   .condition-card small { display: none; }
+  .character-card small { display: none; }
+  .character-card { min-height: 42px; padding-block: 7px; }
+  .character-portrait { top: 3px; width: 34px; height: 34px; }
   .mode-card { min-height: 38px; padding-block: 7px; }
   .mode-card small { display: none; }
   .condition-card { min-height: 38px; padding-top: 11px; }

@@ -6,6 +6,7 @@ import {
   RUN_MODES,
   SAVE_KEY,
 } from "./config.js";
+import { normalizeCharacterId } from "./character-catalog.js";
 
 const VOLUME_SETTINGS = Object.freeze(["music", "effects", "waveAudio", "screenShake"]);
 const BOOLEAN_SETTINGS = Object.freeze([
@@ -26,6 +27,7 @@ export function createDefaultSave() {
     bestScore: 0,
     bestFlow: 0,
     totalRuns: 0,
+    selectedCharacter: "kaki",
     selectedBoard: "foamPuff",
     selectedCondition: FRESH_DEFAULT_CONDITION,
     selectedMode: DEFAULT_RUN_MODE_ID,
@@ -77,6 +79,7 @@ export function loadSave(storage = undefined) {
       bestScore: Math.max(legacyBestScore, ...Object.values(records).map((record) => record.bestScore)),
       bestFlow: Math.max(legacyBestFlow, ...Object.values(records).map((record) => record.bestFlow)),
       totalRuns: Math.floor(finiteNonNegative(saved.totalRuns, fallback.totalRuns)),
+      selectedCharacter: normalizeCharacterId(saved.selectedCharacter),
       selectedBoard: Object.hasOwn(BOARDS, saved.selectedBoard) ? saved.selectedBoard : fallback.selectedBoard,
       // Existing v1 profiles that predate condition selection keep their familiar
       // Golden Coast session; only genuinely fresh profiles open on the hero barrel.
@@ -151,6 +154,7 @@ export function recordRun(save, result) {
     score,
     flow,
     rank: result.rank.grade,
+    character: normalizeCharacterId(result.character ?? save.selectedCharacter),
     board: result.board,
     condition: result.condition ?? save.selectedCondition,
     mode,
@@ -169,6 +173,7 @@ export function getRunRecord(save, modeId = save?.selectedMode) {
 function sanitizeLastRun(lastRun) {
   if (!lastRun || typeof lastRun !== "object") return null;
   const rank = typeof lastRun.rank === "string" && /^[SABCD]$/.test(lastRun.rank) ? lastRun.rank : "D";
+  const character = normalizeCharacterId(lastRun.character);
   const board = Object.hasOwn(BOARDS, lastRun.board) ? lastRun.board : "foamPuff";
   const condition = Object.hasOwn(CONDITIONS, lastRun.condition) ? lastRun.condition : LEGACY_DEFAULT_CONDITION;
   const mode = Object.hasOwn(RUN_MODES, lastRun.mode)
@@ -181,6 +186,7 @@ function sanitizeLastRun(lastRun) {
     score: Math.round(finiteNonNegative(lastRun.score, 0)),
     flow: Math.round(finiteRange(lastRun.flow, 0, 0, 100)),
     rank,
+    character,
     board,
     condition,
     mode,

@@ -10,6 +10,7 @@ test("fresh profiles keep the backward-compatible v1 shape and current defaults"
   assert.equal(save.version, 1);
   assert.equal(SAVE_KEY, "kaki-surf-meta-v1");
   assert.deepEqual(save.unlockedBoards, Object.keys(BOARDS));
+  assert.equal(save.selectedCharacter, "kaki");
   assert.equal(save.selectedBoard, "foamPuff");
   assert.equal(save.selectedCondition, "twilightGlass", "fresh players see the MVP hero barrel first");
   assert.equal(save.selectedMode, "endless");
@@ -55,6 +56,7 @@ test("legacy v1 payloads retain progress and settings while migrating missing co
 
   assert.equal(save.version, 1);
   assert.equal(save.bestScore, legacy.bestScore);
+  assert.equal(save.selectedCharacter, "kaki");
   assert.equal(save.selectedBoard, legacy.selectedBoard);
   assert.deepEqual(save.unlockedBoards, legacy.unlockedBoards);
   assert.equal(save.selectedCondition, "goldenCoast");
@@ -135,6 +137,7 @@ test("semantically corrupt v1 fields are normalized without discarding valid pro
   assert.equal(save.bestScore, 0);
   assert.equal(save.bestFlow, 100);
   assert.equal(save.totalRuns, 0);
+  assert.equal(save.selectedCharacter, "kaki");
   assert.equal(save.selectedBoard, "foamPuff");
   assert.equal(save.selectedCondition, "goldenCoast");
   assert.deepEqual(save.unlockedBoards, ["foamPuff"]);
@@ -149,6 +152,7 @@ test("semantically corrupt v1 fields are normalized without discarding valid pro
     score: 0,
     flow: 0,
     rank: "D",
+    character: "kaki",
     board: "foamPuff",
     condition: "goldenCoast",
     mode: "scoreAttack",
@@ -184,13 +188,14 @@ test("recordRun only raises bests and records board and condition metadata", () 
       score: 751,
       flow: 40,
       rank: "A",
-    board: "moonLog",
-    condition: "stormbreak",
-    mode: "endless",
-    distance: 0,
-    set: 1,
-    duration: 0,
-    at: undefined,
+      character: "kaki",
+      board: "moonLog",
+      condition: "stormbreak",
+      mode: "endless",
+      distance: 0,
+      set: 1,
+      duration: 0,
+      at: undefined,
     },
   );
   assert.ok(Number.isFinite(Date.parse(save.lastRun.at)), "lastRun.at should be an ISO timestamp");
