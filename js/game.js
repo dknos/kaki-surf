@@ -1789,6 +1789,18 @@ export class KakiSurfGame {
       player.boardAngle = qaMotion.spriteAngle;
       player.bodyAngle = qaMotion.spriteAngle;
     }
+    if (player.animalMount) {
+      const mountY = this.simulation.wave.ridingY(player.worldX, player.face) + 5;
+      this.simulation.world.forEachWildlife((entity) => {
+        if (!entity.active || entity.phase !== "mounted" || entity.kind !== player.animalMount) return;
+        entity.worldX = player.worldX;
+        entity.previousWorldX = player.worldX;
+        entity.y = mountY;
+        entity.previousY = mountY;
+        entity.collisionY = mountY;
+        entity.previousCollisionY = mountY;
+      });
+    }
     primeQaWake(this.simulation, scene === "reversal" ? 0.9 : 0);
   }
 

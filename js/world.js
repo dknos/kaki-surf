@@ -1485,10 +1485,13 @@ export class WorldSimulation {
     entity.nearCandidate = false;
     entity.collidable = phase === "catchable" || phase === "crossing" || phase === "ramp";
     entity.phaseDuration = finite(definition.phases[phase], 1);
-    entity.waterAnchorY = screenY;
-    entity.previousWaterAnchorY = screenY;
-    entity.collisionY = screenY;
-    entity.previousCollisionY = screenY;
+    const initialDolphinOffset = kind === "dolphin" && phase !== "mounted"
+      ? dolphinBreachOffsetY(phase, entity.phaseTime, definition.phases)
+      : 0;
+    entity.waterAnchorY = screenY - initialDolphinOffset;
+    entity.previousWaterAnchorY = entity.waterAnchorY;
+    entity.collisionY = entity.y;
+    entity.previousCollisionY = entity.y;
     if (kind === "whale") this.syncWhaleMetadata(entity);
     entity.cooldownUntil = Math.max(entity.cooldownUntil, this.elapsed + definition.cooldown);
     this.lastInteractiveSpawn = this.elapsed;
@@ -1533,7 +1536,17 @@ export class WorldSimulation {
 
       if (entity.kind === "whale") this.syncWhaleMetadata(entity);
 
-      if (entity.kind === "dolphin") this.updateDolphin(entity, definition);
+      if (entity.kind === "dolphin") {
+        if (entity.phase !== "mounted") {
+          entity.y = entity.waterAnchorY + dolphinBreachOffsetY(
+            entity.phase,
+            entity.phaseTime,
+            definition.phases,
+          );
+          entity.collisionY = entity.y;
+        }
+        this.updateDolphin(entity, definition);
+      }
       else if (entity.kind === "shark") this.updateShark(entity, definition);
       else this.updateWhale(entity, definition);
     }
@@ -1915,6 +1928,18 @@ export class WorldSimulation {
     writeSignalRecord(this.interactions[this.interactionCount], type, this.elapsed, source, details);
     this.interactionCount += 1;
   }
+}
+
+export function dolphinBreachOffsetY(phase, phaseTime, phases = WILDLIFE_CATALOG.dolphin.phases) {
+  const duration = Math.max(1e-6, finite(phases?.[phase], 1));
+  const progress = clamp(finite(phaseTime) / duration, 0, 1);
+  if (phase === "telegraph") return 4 * (1 - progress);
+  if (phase === "approach") return -22 * Math.sin(progress * Math.PI * 0.5);
+  if (phase === "catchable") return -22 - 12 * Math.sin(progress * Math.PI);
+  if (phase === "dismount" || phase === "depart") {
+    return -22 * Math.cos(progress * Math.PI * 0.5);
+  }
+  return 0;
 }
 
 /**

@@ -196,14 +196,14 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
     farSkyTraffic: true,
     midSkyTraffic: true,
     nearSkyTraffic: false,
-    interactiveWildlife: false,
+    interactiveWildlife: true,
     specialEvents: false,
     traffic: Object.freeze({
       far: Object.freeze(["sailboat", "cargoShip", "fishingBoat", "gullFlock", "cormorantFlock"]),
       mid: Object.freeze(["fishingBoat", "pelican"]),
       near: Object.freeze([]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0, shark: 0, whale: 0 }),
+    wildlifeWeights: Object.freeze({ dolphin: 1, shark: 0, whale: 0 }),
   }),
   twilightGlass: Object.freeze({
     id: "twilightGlass",
@@ -217,14 +217,14 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
     farSkyTraffic: true,
     midSkyTraffic: false,
     nearSkyTraffic: false,
-    interactiveWildlife: false,
+    interactiveWildlife: true,
     specialEvents: false,
     traffic: Object.freeze({
       far: Object.freeze(["fishingBoat", "sailboat", "cormorantFlock", "propPlane"]),
       mid: Object.freeze([]),
       near: Object.freeze([]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0, shark: 0, whale: 0 }),
+    wildlifeWeights: Object.freeze({ dolphin: 1, shark: 0, whale: 0 }),
   }),
   stormbreak: Object.freeze({
     id: "stormbreak",
@@ -238,14 +238,14 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
     farSkyTraffic: true,
     midSkyTraffic: true,
     nearSkyTraffic: false,
-    interactiveWildlife: false,
+    interactiveWildlife: true,
     specialEvents: false,
     traffic: Object.freeze({
       far: Object.freeze(["cargoShip", "cormorantFlock"]),
       mid: Object.freeze(["tugboat", "rescueCraft", "helicopter"]),
       near: Object.freeze([]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0, shark: 0, whale: 0 }),
+    wildlifeWeights: Object.freeze({ dolphin: 1, shark: 0, whale: 0 }),
   }),
 });
 

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   POWERUP_CATALOG,
   TRAFFIC_CATALOG,
+  WILDLIFE_CATALOG,
   WORLD_LAYER_CONFIG,
   WORLD_LAYER_ORDER,
   WORLD_LIMITS,
@@ -27,7 +28,7 @@ import {
   watercraftClearsBreaker,
   wildlifeClearsWaterline,
 } from "../js/world-visuals.js";
-import { stableTrafficWorldDelta, WorldSimulation } from "../js/world.js";
+import { dolphinBreachOffsetY, stableTrafficWorldDelta, WorldSimulation } from "../js/world.js";
 
 const STEP = 1 / 120;
 
@@ -314,7 +315,8 @@ test("Twilight schedules only its explicit far scenic traffic and no special eve
   assert.equal(world.courier.active, false);
   assert.equal(world.race.active, false);
   assert.equal(world.aircraftDrop.active, false);
-  assert.equal(events.some((event) => ["courierPhase", "racePhase", "aircraftDropPhase", "carrierPhase", "wildlifePhase"].includes(event.type)), false);
+  assert.equal(events.some((event) => ["courierPhase", "racePhase", "aircraftDropPhase", "carrierPhase"].includes(event.type)), false);
+  assert.equal(events.some((event) => event.type === "wildlifePhase" && event.kind !== "dolphin"), false);
   assert.equal(interactions.some((event) => ["speedboatRaceWon", "fleetAirshowCompleted"].includes(event.type)), false);
 });
 
@@ -340,8 +342,8 @@ test("condition traffic permissions encode the curated passive coast bands", () 
     assert.deepEqual(profile.traffic.near, []);
     assert.equal(profile.specialEvents, false);
     assert.equal(profile.carrierEnabled, false);
-    assert.equal(profile.interactiveWildlife, false);
-    assert.deepEqual(profile.wildlifeWeights, { dolphin: 0, shark: 0, whale: 0 });
+    assert.equal(profile.interactiveWildlife, true);
+    assert.deepEqual(profile.wildlifeWeights, { dolphin: 1, shark: 0, whale: 0 });
     for (const layer of WORLD_LAYER_ORDER) {
       for (const kind of profile.traffic[layer]) {
         assert.equal(trafficAllowedByProfile(condition, kind, layer), true);
@@ -353,6 +355,65 @@ test("condition traffic permissions encode the curated passive coast bands", () 
   assert.equal(trafficVisibilityPermission("twilightGlass", "mid", "water"), false);
   assert.equal(trafficVisibilityPermission("twilightGlass", "far", "sky"), true);
   assert.equal(trafficVisibilityPermission("twilightGlass", "near", "sky"), false);
+});
+
+test("the passive dolphin breach uses one continuous water anchor before interaction", () => {
+  const world = new WorldSimulation({ seed: 0xd011f1, condition: "goldenCoast" });
+  const distantPlayer = context({ player: { x: 330, previousX: 330, y: 168, previousY: 168 } });
+  world.update(STEP, distantPlayer);
+  const dolphin = world.forceWildlife("dolphin", {
+    phase: "telegraph",
+    screenX: 40,
+    y: 128,
+    speed: 0,
+    direction: 1,
+  });
+  const anchor = dolphin.waterAnchorY;
+  const samples = [];
+  const phases = new Set();
+  const interactions = [];
+  for (let step = 0; step < 7 * 120 && dolphin.active; step += 1) {
+    world.update(STEP, distantPlayer);
+    if (!dolphin.active) break;
+    phases.add(dolphin.phase);
+    samples.push({ y: dolphin.y, anchor: dolphin.waterAnchorY });
+    world.consumeEvents(() => {});
+    world.consumeInteractions((event) => interactions.push(event));
+  }
+  assert.deepEqual([...phases], ["telegraph", "approach", "catchable", "depart"]);
+  assert.ok(samples.every((sample) => sample.anchor === anchor), "water anchor never migrates");
+  assert.ok(Math.min(...samples.map((sample) => sample.y)) <= anchor - 33.5, "breach visibly clears the water");
+  const largestStep = Math.max(...samples.slice(1).map((sample, index) => (
+    Math.abs(sample.y - samples[index].y)
+  )));
+  assert.ok(largestStep < 1, `breach continuity jumped ${largestStep}px in one fixed step`);
+  assert.equal(interactions.length, 0, "the noninteractive validation pass never mounts");
+
+  assert.equal(dolphinBreachOffsetY("telegraph", 0), 4);
+  assert.ok(Math.abs(dolphinBreachOffsetY(
+    "approach",
+    WILDLIFE_CATALOG.dolphin.phases.approach,
+  ) + 22) < 1e-9);
+  assert.ok(Math.abs(dolphinBreachOffsetY(
+    "depart",
+    WILDLIFE_CATALOG.dolphin.phases.depart,
+  )) < 1e-9);
+});
+
+test("production wildlife restores dolphins only and never overlaps encounters", () => {
+  for (const condition of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+    const world = new WorldSimulation({ seed: 0xd011000 + condition.length, condition });
+    const seen = new Set();
+    for (let step = 0; step < 120 * 120; step += 1) {
+      world.update(STEP, context({ player: { x: 310, previousX: 310, y: 160, previousY: 160 } }));
+      world.consumeEvents((event) => {
+        if (event.type === "wildlifePhase") seen.add(event.kind);
+      });
+      world.consumeInteractions(() => {});
+      assert.ok(world.wildlife.filter((entity) => entity.active).length <= 1);
+    }
+    assert.deepEqual([...seen], ["dolphin"], `${condition} production species`);
+  }
 });
 
 test("ambient watercraft stay capped at two per depth region and birds remain above water", () => {
@@ -498,6 +559,33 @@ test("mounted animal direction follows the rider's stable world direction", () =
   assert.equal(whale.direction, -1);
   world.update(STEP, context({ direction: 1 }));
   assert.equal(whale.direction, 1);
+});
+
+test("a mounted dolphin shares the rider transform instead of following its old breach path", () => {
+  const world = new WorldSimulation({ seed: 0xd011f1, condition: "goldenCoast" });
+  const dolphin = world.forceWildlife("dolphin", {
+    phase: "mounted",
+    screenX: 120,
+    y: 146,
+    speed: 0,
+    direction: -1,
+  });
+  const rider = context({
+    direction: 1,
+    player: {
+      x: 238,
+      previousX: 235,
+      y: 103,
+      previousY: 104,
+      state: "riding",
+    },
+  });
+
+  world.update(STEP, rider);
+
+  assert.equal(dolphin.worldX, rider.player.x);
+  assert.equal(dolphin.y, rider.player.y + 5);
+  assert.equal(dolphin.direction, rider.direction);
 });
 
 test("Mango Rush, Moon Pop, and Star Foam collect, modify, consume, expire, and reset independently", () => {
