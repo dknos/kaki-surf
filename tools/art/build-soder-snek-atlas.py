@@ -51,8 +51,11 @@ def spec(**overrides):
         "tail": "trail",
         "tongue": "down",
         "expression": "happy",
-        "paw_left": (-8, -8),
-        "paw_right": (7, -7),
+        # Keep the everyday mittens below the oversized hood so the sleeves
+        # read as arms instead of two detached white pixels.
+        "paw_left": (-11, -2),
+        "paw_right": (10, -2),
+        "leg_spread": 7,
         "coil": 0,
         "hood_flat": 0,
         "body_open": 0,
@@ -233,6 +236,61 @@ def draw_paw(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
     draw.point((x + 1, y - 1), fill=PALETTE["face_shadow"])
 
 
+def draw_arm(
+    draw: ImageDraw.ImageDraw,
+    shoulder: tuple[int, int],
+    mitten: tuple[int, int],
+) -> None:
+    """Draw a readable sleeved arm over the hood/body overlap."""
+    shoulder_x, shoulder_y = shoulder
+    mitten_x, mitten_y = mitten
+    side = -1 if mitten_x < shoulder_x else 1
+    elbow = (
+        round((shoulder_x + mitten_x) * 0.5) + side * 2,
+        round((shoulder_y + mitten_y) * 0.5) + 2,
+    )
+    points = (shoulder, elbow, mitten)
+    draw.line(points, fill=PALETTE["ink"], width=7, joint="curve")
+    draw.line(points, fill=PALETTE["green_dark"], width=5, joint="curve")
+    draw.line(points, fill=PALETTE["green"], width=3, joint="curve")
+    draw_paw(draw, mitten_x, mitten_y)
+
+
+def draw_leg(
+    draw: ImageDraw.ImageDraw,
+    hip: tuple[int, int],
+    foot: tuple[int, int],
+) -> None:
+    """Draw one short chibi leg and a flat board-contact foot."""
+    hip_x, hip_y = hip
+    foot_x, foot_y = foot
+    side = -1 if foot_x < hip_x else 1
+    knee = (
+        round((hip_x + foot_x) * 0.5) + side,
+        max(hip_y + 3, foot_y - 5),
+    )
+    points = (hip, knee, foot)
+    draw.line(points, fill=PALETTE["ink"], width=8, joint="curve")
+    draw.line(points, fill=PALETTE["green_dark"], width=6, joint="curve")
+    draw.line(points, fill=PALETTE["green"], width=3, joint="curve")
+
+
+def draw_foot(draw: ImageDraw.ImageDraw, foot: tuple[int, int], side: int) -> None:
+    foot_x, foot_y = foot
+    toe_x = foot_x + side * 3
+    draw.rounded_rectangle(
+        (
+            min(foot_x - 2, toe_x - 2),
+            foot_y - 2,
+            max(foot_x + 2, toe_x + 2),
+            foot_y + 2,
+        ),
+        radius=2,
+        fill=PALETTE["ink"],
+    )
+    draw.line((foot_x - side, foot_y, toe_x, foot_y), fill=PALETTE["green_light"], width=2)
+
+
 def draw_frame(specification: dict) -> Image.Image:
     image = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
@@ -246,6 +304,18 @@ def draw_frame(specification: dict) -> Image.Image:
     head_y = max(2, 5 + crouch - stretch)
 
     draw_tail(draw, specification["tail"], body_x, body_y)
+
+    # Legs sit behind the torso but remain visible on either side of the belly.
+    # Their feet share a stable authored board-contact row; crouch and stretch
+    # alter the bends without changing the gameplay board transform.
+    leg_spread = int(specification["leg_spread"]) + (2 if coil else 0)
+    if specification["body_open"]:
+        leg_spread += 3
+    foot_y = max(body_y + 11, min(59, 56 + crouch // 3 - stretch // 2))
+    left_foot = (max(5, body_x - leg_spread), foot_y)
+    right_foot = (min(58, body_x + leg_spread), foot_y - (1 if specification["switch"] else 0))
+    draw_leg(draw, (body_x - 5, body_y + 7), left_foot)
+    draw_leg(draw, (body_x + 5, body_y + 7), right_foot)
 
     if coil:
         body_box = (body_x - 12 - coil, body_y - 2, body_x + 11, min(57, body_y + 19 - stretch))
@@ -262,15 +332,6 @@ def draw_frame(specification: dict) -> Image.Image:
     if specification["body_open"]:
         draw.line((body_x - 6, body_y + 2, body_x - 11, body_y + 10), fill=PALETTE["green"], width=4)
         draw.line((body_x + 6, body_y + 2, body_x + 12, body_y + 9), fill=PALETTE["green"], width=4)
-
-    paw_left = specification["paw_left"]
-    paw_right = specification["paw_right"]
-    draw.line((body_x - 5, body_y, body_x + paw_left[0], body_y + paw_left[1]), fill=PALETTE["ink"], width=5)
-    draw.line((body_x + 5, body_y, body_x + paw_right[0], body_y + paw_right[1]), fill=PALETTE["ink"], width=5)
-    draw.line((body_x - 5, body_y, body_x + paw_left[0], body_y + paw_left[1]), fill=PALETTE["green"], width=3)
-    draw.line((body_x + 5, body_y, body_x + paw_right[0], body_y + paw_right[1]), fill=PALETTE["green"], width=3)
-    draw_paw(draw, body_x + paw_left[0], body_y + paw_left[1])
-    draw_paw(draw, body_x + paw_right[0], body_y + paw_right[1])
 
     hood_height = 27 - int(specification["hood_flat"]) * 2
     draw.rounded_rectangle(
@@ -319,6 +380,21 @@ def draw_frame(specification: dict) -> Image.Image:
     draw_face(draw, head_x, head_y, specification["expression"])
     draw_tongue(draw, head_x, head_y, specification["tongue"])
 
+    # Paint the sleeves last. Previously the oversized hood covered almost the
+    # entire arm stroke, leaving Soder's white mittens looking detached.
+    paw_left = specification["paw_left"]
+    paw_right = specification["paw_right"]
+    draw_arm(
+        draw,
+        (body_x - 6, body_y - 1),
+        (body_x + paw_left[0], body_y + paw_left[1]),
+    )
+    draw_arm(
+        draw,
+        (body_x + 6, body_y - 1),
+        (body_x + paw_right[0], body_y + paw_right[1]),
+    )
+
     if specification["switch"]:
         draw.rectangle((body_x - 11, min(57, body_y + 16), body_x - 7, min(59, body_y + 18)), fill=PALETTE["white"])
     if specification["accent"] in {"spark", "contact", "snap"}:
@@ -329,10 +405,70 @@ def draw_frame(specification: dict) -> Image.Image:
     if specification["accent"] == "impact":
         draw.line((body_x - 13, 57, body_x + 13, 57), fill=PALETTE["spark"], width=2)
 
+    # Paint the board-contact feet after torso, switch, and landing accents so
+    # deep coils and impact glints cannot erase the leg silhouette.
+    draw_foot(draw, left_foot, -1)
+    draw_foot(draw, right_foot, 1)
+
     return image
 
 
-def validate_cell(name: str, cell: Image.Image) -> None:
+def validate_limb_landmarks(name: str, cell: Image.Image, specification: dict) -> None:
+    crouch = int(specification["crouch"])
+    stretch = int(specification["stretch"])
+    lean = int(specification["lean"])
+    coil = int(specification["coil"])
+    body_x = 33 + lean // 2
+    body_y = 35 + crouch // 2 - stretch // 2
+    green_colors = {
+        PALETTE["green_dark"],
+        PALETTE["green"],
+        PALETTE["green_light"],
+    }
+
+    def has_green_near(x: int, y: int, radius: int = 1) -> bool:
+        return any(
+            cell.getpixel((sample_x, sample_y)) in green_colors
+            for sample_x in range(max(1, x - radius), min(CELL - 1, x + radius + 1))
+            for sample_y in range(max(1, y - radius), min(CELL - 1, y + radius + 1))
+        )
+
+    for side_name, paw in (
+        ("left", specification["paw_left"]),
+        ("right", specification["paw_right"]),
+    ):
+        mitten = (body_x + paw[0], body_y + paw[1])
+        if cell.getpixel(mitten) != PALETTE["white"]:
+            raise SystemExit(f"{name}: {side_name} mitten landmark is missing")
+        shoulder_x = body_x + (-6 if side_name == "left" else 6)
+        shoulder_y = body_y - 1
+        side = -1 if mitten[0] < shoulder_x else 1
+        elbow = (
+            round((shoulder_x + mitten[0]) * 0.5) + side * 2,
+            round((shoulder_y + mitten[1]) * 0.5) + 2,
+        )
+        sleeve_probe = (
+            round((shoulder_x + elbow[0]) * 0.5),
+            round((shoulder_y + elbow[1]) * 0.5),
+        )
+        if not has_green_near(*sleeve_probe):
+            raise SystemExit(f"{name}: {side_name} sleeve landmark is missing")
+
+    leg_spread = int(specification["leg_spread"]) + (2 if coil else 0)
+    if specification["body_open"]:
+        leg_spread += 3
+    foot_y = max(body_y + 11, min(59, 56 + crouch // 3 - stretch // 2))
+    for side_name, side, foot_x in (
+        ("left", -1, max(5, body_x - leg_spread)),
+        ("right", 1, min(58, body_x + leg_spread)),
+    ):
+        toe_x = foot_x + side * 3
+        toe_y = foot_y - (1 if side_name == "right" and specification["switch"] else 0)
+        if not has_green_near(toe_x, toe_y):
+            raise SystemExit(f"{name}: {side_name} board-contact foot landmark is missing")
+
+
+def validate_cell(name: str, cell: Image.Image, specification: dict) -> None:
     pixels = list(cell.getdata())
     alphas = {pixel[3] for pixel in pixels}
     if not alphas.issubset({0, 255}):
@@ -346,6 +482,7 @@ def validate_cell(name: str, cell: Image.Image) -> None:
     for y in range(CELL):
         if cell.getpixel((0, y))[3] or cell.getpixel((CELL - 1, y))[3]:
             raise SystemExit(f"{name}: touches a vertical cell edge")
+    validate_limb_landmarks(name, cell, specification)
 
 
 def build_atlas() -> Image.Image:
@@ -353,7 +490,7 @@ def build_atlas() -> Image.Image:
     atlas = Image.new("RGBA", (COLUMNS * CELL, rows * CELL), (0, 0, 0, 0))
     for index, (name, specification) in enumerate(FRAME_SPECS):
         frame = draw_frame(specification)
-        validate_cell(name, frame)
+        validate_cell(name, frame, specification)
         atlas.alpha_composite(frame, ((index % COLUMNS) * CELL, (index // COLUMNS) * CELL))
     return atlas
 

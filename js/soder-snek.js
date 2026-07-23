@@ -185,6 +185,17 @@ function drawSoderSnekFallback(ctx, player, palette, frame) {
   ctx.fillRect(-21, -10 + crouch, 22, 8);
   ctx.fillStyle = greenDark;
   ctx.fillRect(-19, -8 + crouch, 20, 4);
+
+  // Stable board-contact legs for the complete code-authored fallback.
+  drawFallbackLimb(ctx, -4, -5 + crouch, -9, -1 + crouch, ink, greenDark, green, 5);
+  drawFallbackLimb(ctx, 4, -5 + crouch, 9, -1 + crouch, ink, greenDark, green, 5);
+  ctx.fillStyle = ink;
+  ctx.fillRect(-13, -3 + crouch, 8, 4);
+  ctx.fillRect(5, -3 + crouch, 8, 4);
+  ctx.fillStyle = green;
+  ctx.fillRect(-12, -2 + crouch, 6, 2);
+  ctx.fillRect(6, -2 + crouch, 6, 2);
+
   ctx.fillStyle = ink;
   ctx.fillRect(-7, -25 + crouch - stretch, 14, 25 + stretch);
   ctx.fillStyle = green;
@@ -233,8 +244,29 @@ function drawSoderSnekFallback(ctx, player, palette, frame) {
   ctx.fillRect(-2, -49 + crouch - stretch, speed ? 15 : 5, 4);
   if (!speed) ctx.fillRect(1, -45 + crouch - stretch, 3, 7);
 
-  drawFallbackPaw(ctx, -10, -19 + crouch, ink);
-  drawFallbackPaw(ctx, 7, -18 + crouch, ink);
+  // Draw sleeves after the hood so the arms cannot disappear behind it.
+  drawFallbackLimb(ctx, -5, -21 + crouch, -11, -17 + crouch, ink, greenDark, green, 4);
+  drawFallbackLimb(ctx, 5, -21 + crouch, 11, -17 + crouch, ink, greenDark, green, 4);
+  drawFallbackPaw(ctx, -14, -20 + crouch, ink);
+  drawFallbackPaw(ctx, 8, -20 + crouch, ink);
+}
+
+function drawFallbackLimb(ctx, startX, startY, endX, endY, ink, shadow, green, width) {
+  const left = Math.min(startX, endX);
+  const top = Math.min(startY, endY);
+  const spanX = Math.abs(endX - startX);
+  const spanY = Math.abs(endY - startY);
+  ctx.fillStyle = ink;
+  ctx.fillRect(left - 1, top - 1, spanX + width, spanY + width);
+  ctx.fillStyle = shadow;
+  ctx.fillRect(left, top, Math.max(2, spanX + width - 2), Math.max(2, spanY + width - 2));
+  ctx.fillStyle = green;
+  ctx.fillRect(
+    left + 1,
+    top + 1,
+    Math.max(1, spanX + width - 4),
+    Math.max(1, spanY + width - 4),
+  );
 }
 
 function drawFallbackPaw(ctx, x, y, ink) {

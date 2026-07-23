@@ -179,7 +179,7 @@ test("Kaki dispatcher remains byte-for-byte equivalent to the original Kaki rend
   assert.equal(dispatched.depth, 0);
 });
 
-test("Soder fallback is recognizable, balanced, bounded, and mirrors only once", () => {
+test("Soder fallback has a complete hood, arm, leg, paw, and tail silhouette and mirrors only once", () => {
   const right = new CommandContext();
   const left = new CommandContext();
   const goofy = new CommandContext();
@@ -202,6 +202,12 @@ test("Soder fallback is recognizable, balanced, bounded, and mirrors only once",
   assert.ok(right.colors.has("#539738"), "green hood/body");
   assert.ok(right.colors.has("#de6997"), "pink tongue");
   assert.ok(right.colors.has("#a6703d"), "segmented tan belly");
+  assert.ok(
+    right.commands.filter(([command, , , width, height]) => (
+      command === "fillRect" && width >= 4 && height >= 4
+    )).length >= 8,
+    "paired sleeved arms, mitten paws, legs, and board-contact feet",
+  );
   assert.deepEqual(right.scales[0], [1, 1]);
   assert.deepEqual(left.scales[0], [-1, 1]);
   assert.deepEqual(goofy.scales[0], [-1, 1]);
