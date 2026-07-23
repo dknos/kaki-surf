@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.3.1";
+export const GAME_VERSION = "2.4.0";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -242,15 +242,22 @@ export const TUNING = {
   reversalCommitSpeed: 7,
   reversalScrub: 22,
   wavePush: 15.5,
-  // Turbo is an earned overdrive: one full tank lasts just under three
-  // seconds, raises the board envelope by 14%, and is refilled only when an
-  // aerial trick is actually banked through a clean or perfect landing.
+  // Turbo is an earned progressive overdrive. The drain rate remains the
+  // shipped just-under-three-second tank; uninterrupted spend now moves
+  // through authored speed envelopes before a qualified full burn carries
+  // its earned momentum briefly after the meter empties.
   turboStartCharge: 1,
   turboDrainPerSecond: 0.36,
   turboAcceleration: 112,
   turboSpeedCapMultiplier: 1.42,
   turboOverdriveBuild: 11,
   turboOverdriveDecay: 2.6,
+  turboFullBurnThreshold: 0.88,
+  turboFullBurnStartLevel: 0.88,
+  turboReleaseGrace: 0.15,
+  turboCookingDuration: 0.75,
+  turboCookingSpeedCapMultiplier: 1.5,
+  turboCookingDragScale: 0.18,
   turboTrickBaseRefill: 0.18,
   turboTrickEntryRefill: 0.12,
   turboSpinHalfTurnRefill: 0.035,
