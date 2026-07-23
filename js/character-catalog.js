@@ -66,3 +66,31 @@ export function characterMoveName(character, canonicalId, fallback = canonicalId
   const definition = characterDefinition(character);
   return definition.moveNameOverrides[canonicalId] ?? fallback;
 }
+
+const PRESENTATION_MOVE_TERMS = Object.freeze([
+  Object.freeze(["KAKI'S COOKING", "turboFullBurn"]),
+  Object.freeze(["FRONTSIDE GRAB", "frontRailGrab"]),
+  Object.freeze(["FRONT RAIL GRAB", "frontRailGrab"]),
+  Object.freeze(["STALEFISH", "tailGrab"]),
+  Object.freeze(["TAIL GRAB", "tailGrab"]),
+  Object.freeze(["BOARD VARIAL", "boardVarial"]),
+  Object.freeze(["KAKI TWIST", "kakiTwist"]),
+  Object.freeze(["TUBE TUCK", "tubeTuck"]),
+  Object.freeze(["FRONTSIDE SNAP", "snap"]),
+  Object.freeze(["DEEP CUTBACK", "cutback"]),
+  Object.freeze(["CUTBACK", "cutback"]),
+  Object.freeze(["SNAP", "snap"]),
+]);
+
+/**
+ * Presentation-only text replacement. Canonical move IDs remain the scoring,
+ * replay, and integration identity for every character.
+ */
+export function characterMoveText(character, text = "") {
+  if (normalizeCharacterId(character) === DEFAULT_CHARACTER_ID) return String(text ?? "");
+  let result = String(text ?? "");
+  for (const [term, canonicalId] of PRESENTATION_MOVE_TERMS) {
+    result = result.replaceAll(term, characterMoveName(character, canonicalId, term));
+  }
+  return result;
+}

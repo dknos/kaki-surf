@@ -54,12 +54,51 @@ const TURBO_FRAMES = Object.freeze({
   turboRelease: "turboRelease",
 });
 
+const TRICK_PHASE_FRAMES = Object.freeze({
+  frontRailGrab: Object.freeze({
+    reach: "tongueTapReach",
+    lock: "tongueTapHold",
+    hold: "tongueTapHold",
+    release: "tongueTapRelease",
+    landingRead: "tongueTapRelease",
+  }),
+  tailGrab: Object.freeze({
+    windup: "tailCoilReach",
+    reach: "tailCoilReach",
+    hold: "tailCoilHold",
+    release: "tailCoilRelease",
+    landingRead: "tailCoilRelease",
+  }),
+  boardVarial: Object.freeze({
+    pop: "shedFlipOpen",
+    separate: "shedFlipSeparate",
+    tuck: "shedFlipSeparate",
+    reconnect: "shedFlipReconnect",
+    landingRead: "shedFlipReconnect",
+  }),
+  kakiTwist: Object.freeze({
+    windup: "soderSpiralWindup",
+    cross: "soderSpiralMaximum",
+    maximum: "soderSpiralMaximum",
+    spot: "soderSpiralSpot",
+    landingRead: "soderSpiralSpot",
+  }),
+});
+
 export function resolveSoderSnekFrame(player = {}, { reducedMotion = false } = {}) {
   const presentation = player.presentationPoseId;
   if (LANDING_FRAMES[presentation]) return LANDING_FRAMES[presentation];
   if (TURBO_FRAMES[presentation]) return TURBO_FRAMES[presentation];
   if (player.animalMount === "dolphin") return "dolphinMount";
   if (player.soderReaction === "shark") return "sharkStartled";
+  if (TRICK_PHASE_FRAMES[presentation]) {
+    return resolveTrickFrame(
+      presentation,
+      player.presentationPhase,
+      player.presentationProgress,
+      reducedMotion,
+    );
+  }
 
   const maneuver = player.maneuver?.id ?? "";
   if (maneuver === "snap") return "snekSnap";
@@ -99,6 +138,10 @@ export function resolveSoderSnekFrame(player = {}, { reducedMotion = false } = {
       if (reducedMotion) return "regularRide";
       return quantizedAnimationFrame(player.stateTime, 10) & 1 ? "neutralRide" : "regularRide";
   }
+}
+
+export function resolveSoderTrickFrame(id, phase, progress = 0, { reducedMotion = false } = {}) {
+  return resolveTrickFrame(id, phase, progress, reducedMotion);
 }
 
 export function quantizedAnimationFrame(time, framesPerSecond = 10) {
@@ -211,6 +254,21 @@ function landingIsRecoverable(preview = {}) {
   const error = Number(preview.error);
   const recovery = Number(preview.bands?.recovery);
   return Number.isFinite(error) && Number.isFinite(recovery) && recovery > 0 && error <= recovery;
+}
+
+function resolveTrickFrame(id, phase, progress, reducedMotion) {
+  const frames = TRICK_PHASE_FRAMES[id];
+  if (!frames) return "floatingApex";
+  if (reducedMotion) {
+    if (progress >= 0.82) return frames.landingRead ?? frames.release ?? frames.reconnect ?? frames.spot;
+    if (progress >= 0.34) return frames.hold ?? frames.maximum ?? frames.separate;
+  }
+  return frames[phase]
+    ?? (progress >= 0.82
+      ? frames.landingRead
+      : progress >= 0.42
+        ? frames.hold ?? frames.maximum ?? frames.separate
+        : frames.reach ?? frames.windup ?? frames.pop);
 }
 
 function snapAngle(angle = 0) {

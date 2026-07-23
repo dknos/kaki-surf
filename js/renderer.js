@@ -1,4 +1,5 @@
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
+import { characterMoveName, characterMoveText } from "./character-catalog.js";
 import {
   AERIAL_PANORAMA,
   aerialBackdropCropShelves,
@@ -214,9 +215,14 @@ export class KakiRenderer {
     ].includes(event.type)) cancelLandingPresentation(this.riderAnimation);
     switch (event.type) {
       case "callout":
-        this.pushCallout(payload.text ?? "", payload.subtext ?? "", payload.tone, {
+        this.pushCallout(
+          characterMoveText(player.characterId, payload.text ?? ""),
+          characterMoveText(player.characterId, payload.subtext ?? ""),
+          payload.tone,
+          {
           channel: payload.channel,
-        });
+          },
+        );
         break;
       case "pump":
         this.spawnContactSpray(player, 6 + Math.round((payload.strength ?? 0.5) * 8), 0.8 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.75);
@@ -235,7 +241,12 @@ export class KakiRenderer {
       case "turboFullBurn":
         this.impact = Math.max(this.impact, 1.1);
         if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.075);
-        this.pushCallout("KAKI'S COOKING", "FULL BURN", "perfect", { channel: "turbo" });
+        this.pushCallout(
+          characterMoveName(player.characterId, "turboFullBurn", "KAKI'S COOKING"),
+          "FULL BURN",
+          "perfect",
+          { channel: "turbo" },
+        );
         break;
       case "powerLineEnter":
         this.spawnSeamGlints(player.x, ridingY, 9);
@@ -1082,6 +1093,9 @@ export class KakiRenderer {
       lastLandingQuality: this.lastLandingQuality,
       presentationPoseId: riderAnimation?.id,
       presentationPose: riderAnimation?.pose,
+      presentationPhase: riderAnimation?.phase,
+      presentationProgress: riderAnimation?.progress,
+      presentationSignatureVariant: riderAnimation?.signatureVariant,
       presentationTurboFlutter: riderAnimation?.flutter ?? 0,
     };
   }
@@ -1479,11 +1493,31 @@ export class KakiRenderer {
 
   spawnTrickMarks(x, y, id = "", count = 6) {
     const key = String(id).toLowerCase();
-    const color = key.includes("tail") ? this.palette.danger : key.includes("varial") ? this.palette.violet : key.includes("twist") || key.includes("signature") ? this.palette.gold : this.palette.crest;
+    const soder = this.currentPlayer?.characterId === "soderSnek";
+    const soderColors = ["#8ed05e", "#d5ae69", "#ed83ad", "#b7e56c"];
+    const color = soder
+      ? soderColors[(key.includes("tail") ? 1 : key.includes("varial") ? 0 : key.includes("twist") || key.includes("signature") ? 3 : 2)]
+      : key.includes("tail") ? this.palette.danger
+        : key.includes("varial") ? this.palette.violet
+          : key.includes("twist") || key.includes("signature") ? this.palette.gold
+            : this.palette.crest;
     const amount = this.settings.reducedMotion ? Math.ceil(count * 0.4) : count;
     for (let index = 0; index < amount; index += 1) {
       const angle = (index / Math.max(1, amount)) * Math.PI * 2;
-      this.spawnParticle(x + Math.cos(angle) * 11, y + Math.sin(angle) * 7, Math.cos(angle) * 10, Math.sin(angle) * 7 - 4, 0.42, color, index % 3 === 0 ? 2 : 1, 8, 0.15, "star", true, "rider");
+      this.spawnParticle(
+        x + Math.cos(angle) * 11,
+        y + Math.sin(angle) * 7,
+        Math.cos(angle) * 10,
+        Math.sin(angle) * 7 - 4,
+        0.42,
+        soder ? soderColors[index % soderColors.length] : color,
+        index % 3 === 0 ? 2 : 1,
+        8,
+        0.15,
+        soder && index % 3 !== 0 ? "scale" : "star",
+        true,
+        "rider",
+      );
     }
   }
 

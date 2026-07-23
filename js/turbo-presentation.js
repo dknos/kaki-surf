@@ -210,7 +210,18 @@ export function turboPresentationSnapshot(state) {
 }
 
 function createEcho() {
-  return { active: false, life: 0, maxLife: 0, worldX: 0, y: 0, bodyAngle: 0, boardAngle: 0, direction: 1, boardId: "foamPuff" };
+  return {
+    active: false,
+    life: 0,
+    maxLife: 0,
+    worldX: 0,
+    y: 0,
+    bodyAngle: 0,
+    boardAngle: 0,
+    direction: 1,
+    boardId: "foamPuff",
+    characterId: "kaki",
+  };
 }
 
 function createDash() {
@@ -331,6 +342,7 @@ function captureEcho(state, simulation, lifetime) {
   echo.boardAngle = Number(player.boardAngle) || 0;
   echo.direction = Math.sign(player.motionDirection ?? player.travelDirection ?? 1) || 1;
   echo.boardId = simulation.board?.id ?? "foamPuff";
+  echo.characterId = player.characterId ?? "kaki";
 }
 
 function captureTrailPoint(state, player) {
@@ -426,10 +438,20 @@ function drawEchoes(ctx, state, simulation, palette) {
     const halfLength = echo.boardId === "moonLog" ? 20 : echo.boardId === "mangoFish" ? 16 : 17;
     ctx.fillRect(-halfLength, 0, halfLength * 2, 2);
     ctx.rotate(echo.bodyAngle - echo.boardAngle);
-    ctx.fillStyle = echo.boardId === "moonLog" ? palette.violet : palette.gold;
-    ctx.fillRect(-6, -17, 12, 10);
-    ctx.fillRect(-9, -31, 18, 13);
-    ctx.fillRect(-12, -29, 4, 7);
+    if (echo.characterId === "soderSnek") {
+      ctx.fillStyle = "#7bc64f";
+      ctx.fillRect(-5, -17, 10, 15);
+      ctx.fillRect(-11, -32, 22, 15);
+      ctx.fillStyle = "#d6aa68";
+      ctx.fillRect(-2, -15, 4, 12);
+      ctx.fillStyle = "#e77da8";
+      ctx.fillRect(6, -29, 8, 3);
+    } else {
+      ctx.fillStyle = echo.boardId === "moonLog" ? palette.violet : palette.gold;
+      ctx.fillRect(-6, -17, 12, 10);
+      ctx.fillRect(-9, -31, 18, 13);
+      ctx.fillRect(-12, -29, 4, 7);
+    }
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -445,7 +467,10 @@ function drawMoveEffects(ctx, state, simulation, palette, settings) {
   const x = Math.round(player.worldX - cameraX);
   const y = Math.round(player.airY);
   const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? 1) || 1;
-  const accent = chainAccent(manifest?.sequence, simulation.board?.id, palette);
+  const soder = player.characterId === "soderSnek";
+  const accent = soder
+    ? soderMoveAccent(id, manifest?.sequence)
+    : chainAccent(manifest?.sequence, simulation.board?.id, palette);
   ctx.globalAlpha = settings.reducedMotion ? 0.62 : 0.78;
   ctx.fillStyle = accent;
 
@@ -462,7 +487,7 @@ function drawMoveEffects(ctx, state, simulation, palette, settings) {
       ctx.translate(x, y + 1);
       ctx.rotate((Number(player.boardAngle) || 0) - direction * index * 0.24 * progress);
       ctx.globalAlpha = 0.18 + index * 0.08;
-      ctx.fillStyle = index === count ? accent : palette.foamShade;
+      ctx.fillStyle = soder ? (index === count ? "#9edc6b" : "#c8e5ab") : index === count ? accent : palette.foamShade;
       ctx.fillRect(-15, -1, 30, 2);
       ctx.restore();
     }
@@ -475,6 +500,7 @@ function drawMoveEffects(ctx, state, simulation, palette, settings) {
       const radius = 7 + (index % 3) * 3;
       const starX = x + Math.round(Math.cos(phase) * radius);
       const starY = y - 13 + Math.round(Math.sin(phase) * radius * 0.55);
+      if (soder) ctx.fillStyle = ["#8ed05e", "#d5ae69", "#ed83ad"][index % 3];
       ctx.fillRect(starX, starY, index % 2 ? 1 : 2, 1);
     }
   }
@@ -489,6 +515,14 @@ function drawMoveEffects(ctx, state, simulation, palette, settings) {
     ctx.fillRect(px - direction * (3 + streaks), py + streaks * 2, direction * (5 + streaks), 1);
   }
   ctx.globalAlpha = 1;
+}
+
+function soderMoveAccent(id, sequence = []) {
+  if (id === "frontRailGrab") return "#ed83ad";
+  if (id === "tailGrab") return "#d5ae69";
+  if (id === "boardVarial") return "#a9dc79";
+  const varied = new Set((sequence ?? []).map((entry) => entry?.id).filter(Boolean)).size;
+  return varied >= 2 ? "#b7e56c" : "#8ed05e";
 }
 
 function drawPeakSeparation(ctx, simulation, palette, settings) {

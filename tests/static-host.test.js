@@ -13,6 +13,15 @@ import { createKakiSurf } from "../js/integration-adapter.js";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX_PATH = path.join(ROOT, "index.html");
 const QA_PATH = path.join(ROOT, "qa.html");
+const SURF_SONG_PATH = path.join(ROOT, "assets", "audio", "kaki-surfin-remix-2-96k.mp3");
+
+test("selected Warm Remix 2 soundtrack is bundled locally and web-compressed", () => {
+  assert.ok(isFile(SURF_SONG_PATH));
+  const size = statSync(SURF_SONG_PATH).size;
+  assert.ok(size > 1_700_000 && size < 2_000_000, `unexpected soundtrack size ${size}`);
+  const header = readFileSync(SURF_SONG_PATH).subarray(0, 3).toString("ascii");
+  assert.equal(header, "ID3");
+});
 
 test("index uses relative stylesheet and module entry URLs that exist", () => {
   const tags = parseHtml(read(INDEX_PATH));

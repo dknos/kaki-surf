@@ -5,6 +5,7 @@ import {
   CHARACTER_CATALOG,
   characterDefinition,
   characterMoveName,
+  characterMoveText,
   normalizeCharacterId,
 } from "../js/character-catalog.js";
 import { BOARDS, CONDITIONS, FIXED_STEP, SAVE_KEY } from "../js/config.js";
@@ -42,6 +43,9 @@ test("character IDs normalize safely and Soder move names remain display-only", 
   assert.equal(characterDefinition(null).id, "kaki");
   assert.equal(characterMoveName("soderSnek", "kakiTwist", "KAKI TWIST"), "SODER SPIRAL");
   assert.equal(characterMoveName("kaki", "kakiTwist", "KAKI TWIST"), "KAKI TWIST");
+  assert.equal(characterMoveText("soderSnek", "PERFECT KAKI TWIST"), "PERFECT SODER SPIRAL");
+  assert.equal(characterMoveText("soderSnek", "FRONTSIDE GRAB + BOARD VARIAL"), "TONGUE TAP + SHED FLIP");
+  assert.equal(characterMoveText("kaki", "KAKI'S COOKING"), "KAKI'S COOKING");
 });
 
 test("existing saves migrate to Kaki, Soder persists, and invalid IDs fall back", () => {

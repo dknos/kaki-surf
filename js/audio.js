@@ -24,6 +24,13 @@ const EMPTY_EVENT_PAYLOAD = Object.freeze({});
 const MUSIC_LOOKAHEAD = 0.16;
 const MUSIC_RESYNC_GAP = 0.22;
 const MAX_BEATS_PER_UPDATE = 4;
+export const SURF_SONG = Object.freeze({
+  id: "kakiSurfinWarmRemix2",
+  title: "Kaki Surfin - Warm Remix 2",
+  source: new URL("../assets/audio/kaki-surfin-remix-2-96k.mp3", import.meta.url).href,
+  duration: 154.827755,
+  bitrate: 96018,
+});
 
 const LIFECYCLE_MIX = Object.freeze({
   menu: Object.freeze({ master: 0.52, music: 0.42, wave: 0.08, effects: 0.72 }),
@@ -89,6 +96,7 @@ export class SurfAudio {
     this.lastFinalSecond = -1;
     this.inPowerLine = false;
     this.turboMix = {};
+    this.soundtrack = createSoundtrackPlayer();
     this.beatReactive = {
       speedTier: 0,
       risk: 0,
@@ -102,10 +110,12 @@ export class SurfAudio {
     if (this.destroyed) return;
     if (!this.context) this.createGraph();
     if (!this.context) return;
-    if (this.context.state === "suspended") await this.context.resume();
     this.started = true;
+    const soundtrackStart = this.syncSoundtrack();
+    if (this.context.state === "suspended") await this.context.resume();
     this.resyncMusicClock();
     this.applyLifecycleMix();
+    await soundtrackStart;
   }
 
   createGraph() {
@@ -289,10 +299,12 @@ export class SurfAudio {
         * (airborne
           ? 0.17 * (1 - smoothAudioStep(0.62, 1, aerialAltitude) * 0.42)
           : 0.22 + Math.min(0.055, combo * 0.012))
+        * (this.soundtrack ? 0.18 : 1)
         * duck,
       now,
       duck < 1 ? 0.025 : 0.08,
     );
+    this.syncSoundtrack(duck);
 
     const speedTier = clamp(Math.floor((speed - 34) / 24), 0, 4);
     if (speedTier > this.lastSpeedTier && speedTier >= 3) this.tone(now, 520 + speedTier * 80, 0.05, "triangle", 0.035, this.effectsGain, 720 + speedTier * 90);
@@ -343,6 +355,7 @@ export class SurfAudio {
       ? EMPTY_EVENT_PAYLOAD
       : event?.payload ?? event ?? EMPTY_EVENT_PAYLOAD;
     const now = this.context.currentTime;
+    const soder = simulation?.player?.characterId === "soderSnek";
     switch (type) {
       case "turboStart":
         this.duck(0.78, 0.16);
@@ -366,6 +379,7 @@ export class SurfAudio {
         this.noiseBurst(now, 0.11, 0.09, "highpass", 420, 4200);
         this.chirp(now, 165, 1320, 0.13, 0.12);
         this.tone(now + 0.045, 990, 0.12, "triangle", 0.065, this.effectsGain, 1485);
+        if (soder) this.tone(now + 0.08, 660, 0.16, "sine", 0.045, this.effectsGain, 1320);
         break;
       case "turboStop":
         if (payload.reason === "empty") {
@@ -385,6 +399,7 @@ export class SurfAudio {
         break;
       case "pump":
         this.tone(now, 132, 0.075, "square", 0.07 + (payload.efficiency ?? payload.strength ?? 0.5) * 0.07, this.effectsGain, 220 + (payload.efficiency ?? payload.strength ?? 0.5) * 160);
+        if (soder) this.tone(now + 0.025, 220, 0.08, "triangle", 0.035, this.effectsGain, 132);
         break;
       case "directionChange":
       case "reversal":
@@ -465,6 +480,7 @@ export class SurfAudio {
       case "signature":
       case "kakiTwist":
         this.playTrick(now, "kakiTwist", true);
+        if (soder) this.tone(now + 0.04, 523, 0.18, "sine", 0.055, this.effectsGain, 1568);
         break;
       case "land":
         this.playLanding(now, payload.quality, payload);
@@ -558,6 +574,7 @@ export class SurfAudio {
         this.duck(0.34, 0.48);
         this.noiseBurst(now, 0.34, 0.26, "lowpass", 980, 260);
         this.tone(now, 160, 0.33, "square", 0.11, this.effectsGain, 52);
+        if (soder) this.tone(now + 0.12, 247, 0.16, "triangle", 0.045, this.effectsGain, 116);
         break;
       case "respawn":
         this.chirp(now, 196, 523, 0.18, 0.075);
@@ -867,6 +884,7 @@ export class SurfAudio {
       now,
       0.018,
     );
+    this.syncSoundtrack(this.duckAmount);
   }
 
   setLifecycle(nextLifecycle) {
@@ -891,6 +909,9 @@ export class SurfAudio {
     this.duckAmount = 1;
     this.beatIndex = 0;
     this.resyncMusicClock();
+    if (this.soundtrack) {
+      try { this.soundtrack.currentTime = 0; } catch {}
+    }
     if (!this.context) return;
     const now = this.context.currentTime;
     setParamTarget(this.boardGain?.gain, 0, now, 0.015);
@@ -902,7 +923,9 @@ export class SurfAudio {
   }
 
   applyLifecycleMix() {
-    if (!this.context || this.destroyed) return;
+    if (this.destroyed) return;
+    this.syncSoundtrack();
+    if (!this.context) return;
     const now = this.context.currentTime;
     const lifecycle = LIFECYCLE_MIX[this.lifecycle] ?? LIFECYCLE_MIX.menu;
     const muted = this.mutedByVisibility || Boolean(this.settings.muted);
@@ -910,7 +933,7 @@ export class SurfAudio {
     const effects = safeLevel(this.settings.effects, 0.78);
     const wave = safeLevel(this.settings.waveAudio, 0.52);
     setParamTarget(this.master?.gain, muted ? 0 : lifecycle.master, now, muted ? 0.018 : 0.055);
-    setParamTarget(this.musicGain?.gain, music * 0.22 * lifecycle.music, now, 0.06);
+    setParamTarget(this.musicGain?.gain, music * 0.22 * lifecycle.music * (this.soundtrack ? 0.18 : 1), now, 0.06);
     setParamTarget(this.effectsGain?.gain, effects * 0.42 * lifecycle.effects, now, 0.045);
     setParamTarget(this.waveGain?.gain, wave * 0.13 * lifecycle.wave, now, 0.09);
     if (this.lifecycle !== "running") {
@@ -930,6 +953,12 @@ export class SurfAudio {
     if (this.destroyed) return;
     this.destroyed = true;
     this.started = false;
+    if (this.soundtrack) {
+      try { this.soundtrack.pause(); } catch {}
+      try { this.soundtrack.removeAttribute?.("src"); } catch {}
+      try { this.soundtrack.load?.(); } catch {}
+      this.soundtrack = null;
+    }
     for (const source of [this.waveSource, this.boardSource, this.windSource]) {
       try { source?.stop(); } catch {}
     }
@@ -970,6 +999,43 @@ export class SurfAudio {
     if (context && context.state !== "closed") {
       try { context.close()?.catch?.(() => {}); } catch {}
     }
+  }
+
+  syncSoundtrack(duck = this.context && this.context.currentTime < this.duckUntil ? this.duckAmount : 1) {
+    const soundtrack = this.soundtrack;
+    if (!soundtrack || this.destroyed) return Promise.resolve();
+    const lifecycle = LIFECYCLE_MIX[this.lifecycle] ?? LIFECYCLE_MIX.menu;
+    const audible = this.started
+      && this.lifecycle === "running"
+      && !this.mutedByVisibility
+      && !this.settings.muted;
+    soundtrack.volume = audible
+      ? safeLevel(this.settings.music, 0.58) * 0.72 * lifecycle.music * clamp(duck, 0.15, 1)
+      : 0;
+    if (!audible) {
+      try { soundtrack.pause(); } catch {}
+      return Promise.resolve();
+    }
+    if (!soundtrack.paused) return Promise.resolve();
+    try {
+      return Promise.resolve(soundtrack.play()).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+}
+
+export function createSoundtrackPlayer(AudioClass = globalThis.Audio) {
+  if (typeof AudioClass !== "function") return null;
+  try {
+    const audio = new AudioClass(SURF_SONG.source);
+    audio.loop = true;
+    audio.preload = "metadata";
+    audio.crossOrigin = "anonymous";
+    audio.volume = 0;
+    return audio;
+  } catch {
+    return null;
   }
 }
 

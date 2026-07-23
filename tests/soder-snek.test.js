@@ -6,6 +6,7 @@ import {
   drawSoderSnekSprite,
   quantizedAnimationFrame,
   resolveSoderSnekFrame,
+  resolveSoderTrickFrame,
   SODER_SNEK_ATLAS,
   SODER_SNEK_FRAME_NAMES,
   SODER_SNEK_VISUAL_BOUNDS,
@@ -113,6 +114,25 @@ test("Soder animation is stepped at authored 8-12 FPS and Reduced Motion is stab
   assert.equal(resolveSoderSnekFrame({ state: "riding", stateTime: 999 }, { reducedMotion: true }), "regularRide");
 });
 
+test("every canonical trick has readable Soder entry, hold, release, and landing-read frames", () => {
+  const cases = {
+    frontRailGrab: ["tongueTapReach", "tongueTapHold", "tongueTapRelease"],
+    tailGrab: ["tailCoilReach", "tailCoilHold", "tailCoilRelease"],
+    boardVarial: ["shedFlipOpen", "shedFlipSeparate", "shedFlipReconnect"],
+    kakiTwist: ["soderSpiralWindup", "soderSpiralMaximum", "soderSpiralSpot"],
+  };
+  for (const [id, [entry, middle, release]] of Object.entries(cases)) {
+    assert.equal(resolveSoderTrickFrame(id, phaseFor(id, "entry"), 0.1), entry);
+    assert.equal(resolveSoderTrickFrame(id, phaseFor(id, "middle"), 0.55), middle);
+    assert.equal(resolveSoderTrickFrame(id, phaseFor(id, "release"), 0.92), release);
+    assert.equal(resolveSoderTrickFrame(id, "landingRead", 0.96), release);
+    assert.equal(
+      resolveSoderTrickFrame(id, phaseFor(id, "middle"), 0.55, { reducedMotion: true }),
+      middle,
+    );
+  }
+});
+
 test("Kaki dispatcher remains byte-for-byte equivalent to the original Kaki renderer", () => {
   const player = {
     characterId: "kaki",
@@ -210,4 +230,14 @@ class CommandContext {
   fillRect(x, y, width, height) {
     this.commands.push(["fillRect", x, y, width, height]);
   }
+}
+
+function phaseFor(id, stage) {
+  const phases = {
+    frontRailGrab: { entry: "reach", middle: "hold", release: "release" },
+    tailGrab: { entry: "windup", middle: "hold", release: "release" },
+    boardVarial: { entry: "pop", middle: "separate", release: "reconnect" },
+    kakiTwist: { entry: "windup", middle: "maximum", release: "spot" },
+  };
+  return phases[id][stage];
 }

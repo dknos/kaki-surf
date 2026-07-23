@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { SurfAudio, safeLevel, turboAudioMix } from "../js/audio.js";
+import {
+  createSoundtrackPlayer,
+  SurfAudio,
+  safeLevel,
+  SURF_SONG,
+  turboAudioMix,
+} from "../js/audio.js";
 
 function createAudioProbe() {
   const audio = new SurfAudio();
@@ -25,6 +31,48 @@ function createAudioProbe() {
 function firstTone(calls) {
   return calls.find((call) => call.method === "tone");
 }
+
+test("Warm Remix 2 is a local looping soundtrack that follows lifecycle and mute state", async () => {
+  class FakeAudio {
+    constructor(src) {
+      this.src = src;
+      this.paused = true;
+      this.volume = 1;
+      this.playCount = 0;
+      this.pauseCount = 0;
+    }
+
+    play() {
+      this.paused = false;
+      this.playCount += 1;
+      return Promise.resolve();
+    }
+
+    pause() {
+      this.paused = true;
+      this.pauseCount += 1;
+    }
+  }
+
+  const soundtrack = createSoundtrackPlayer(FakeAudio);
+  assert.ok(soundtrack.src.endsWith("/assets/audio/kaki-surfin-remix-2-96k.mp3"));
+  assert.equal(soundtrack.loop, true);
+  assert.equal(soundtrack.preload, "metadata");
+  assert.equal(SURF_SONG.bitrate, 96018);
+
+  const audio = new SurfAudio({ music: 0.5, muted: false });
+  audio.soundtrack = soundtrack;
+  audio.started = true;
+  audio.lifecycle = "running";
+  await audio.syncSoundtrack();
+  assert.equal(soundtrack.paused, false);
+  assert.equal(soundtrack.volume, 0.36);
+
+  audio.settings.muted = true;
+  await audio.syncSoundtrack();
+  assert.equal(soundtrack.paused, true);
+  assert.equal(soundtrack.volume, 0);
+});
 
 test("direction and downhill events have physical, direction-aware pitch sweeps", () => {
   const { audio, calls } = createAudioProbe();
