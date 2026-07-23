@@ -2167,9 +2167,9 @@ export function qaWorldOverride(scene) {
       traffic: [
         { kind: "cargoShip", layer: "far", screenX: 310, y: 70, direction: -1, duration: 30 },
         { kind: "sailboat", layer: "far", screenX: 82, y: 73, direction: 1, duration: 30 },
-        { kind: "gullFlock", layer: "mid", screenX: 122, y: 39, direction: 1, duration: 30 },
-        { kind: "helicopter", layer: "mid", screenX: 290, y: 49, direction: -1, duration: 30 },
-        { kind: "pelican", layer: "near", screenX: 328, y: 91, direction: -1, duration: 30 },
+        { kind: "gullFlock", layer: "far", screenX: 122, y: 46, direction: 1, duration: 30 },
+        { kind: "fishingBoat", layer: "mid", screenX: 304, y: 87, direction: -1, duration: 30 },
+        { kind: "pelican", layer: "mid", screenX: 328, y: 54, direction: -1, duration: 30 },
       ],
     };
   }
@@ -2177,8 +2177,8 @@ export function qaWorldOverride(scene) {
     return {
       traffic: [
         { kind: "cargoShip", layer: "far", screenX: 306, y: 70, direction: 1, duration: 30 },
-        { kind: "gullFlock", layer: "mid", screenX: 126, y: 40, direction: -1, duration: 30 },
-        { kind: "pelican", layer: "near", screenX: 306, y: 88, direction: 1, duration: 30 },
+        { kind: "gullFlock", layer: "far", screenX: 126, y: 44, direction: -1, duration: 30 },
+        { kind: "pelican", layer: "mid", screenX: 306, y: 55, direction: 1, duration: 30 },
       ],
     };
   }
@@ -2186,8 +2186,8 @@ export function qaWorldOverride(scene) {
     return {
       traffic: [
         { kind: "fishingBoat", layer: "far", screenX: 300, y: 70, direction: -1, duration: 30 },
-        { kind: "cormorantFlock", layer: "mid", screenX: 104, y: 42, direction: 1, duration: 30 },
-        { kind: "seaplane", layer: "mid", screenX: 262, y: 46, direction: -1, duration: 30 },
+        { kind: "cormorantFlock", layer: "far", screenX: 104, y: 45, direction: 1, duration: 30 },
+        { kind: "propPlane", layer: "far", screenX: 262, y: 43, direction: -1, duration: 30 },
       ],
     };
   }
@@ -2195,7 +2195,7 @@ export function qaWorldOverride(scene) {
     return {
       traffic: [
         { kind: "rescueCraft", layer: "mid", screenX: 304, y: 89, direction: -1, duration: 30 },
-        { kind: "gullFlock", layer: "near", screenX: 118, y: 49, direction: 1, duration: 30 },
+        { kind: "cormorantFlock", layer: "far", screenX: 118, y: 47, direction: 1, duration: 30 },
         { kind: "helicopter", layer: "mid", screenX: 264, y: 42, direction: -1, duration: 30 },
       ],
     };

@@ -487,3 +487,9 @@ test("passed-wave openings cannot repaint panorama fragments", () => {
   assert.doesNotMatch(waveSource, /repaintTrailingSky|drawPassedSkyWindow/);
   assert.doesNotMatch(heroSource, /repaintTrailingSky|drawPassedSky\(/);
 });
+
+test("Twilight passive traffic is catalog-driven instead of renderer-gated", () => {
+  const rendererSource = readFileSync(new URL("../js/renderer.js", import.meta.url), "utf8");
+  assert.doesNotMatch(rendererSource, /conditionId\s*!==\s*["']twilightGlass["']/);
+  assert.match(rendererSource, /trafficVisibilityPermission/);
+});

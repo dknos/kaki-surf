@@ -87,8 +87,14 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
     const y = lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
     const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
+    const baseScale = layer === "far" ? 0.52 : layer === "mid" ? watercraft ? 0.58 : 0.72 : 1;
+    if (watercraft) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-128, -128, 640, Math.round(y) + 131);
+      ctx.clip();
+    }
     if (frame) {
-      const baseScale = layer === "far" ? 0.52 : layer === "mid" ? watercraft ? 0.58 : 0.72 : 1;
       const drawn = drawAtlasFrame(ctx, assets, frame[0], frame[1], x, y, {
         flipX: visualDirection < 0,
         scale: baseScale * entity.scale,
@@ -108,10 +114,11 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
           settings,
         );
       }
-      drawTrafficActivity(ctx, entity, assets, palette, x, y, baseScale * entity.scale, visualDirection);
     } else {
       drawTrafficFallback(ctx, entity, x, y, palette, layer, atmosphereAlpha);
     }
+    if (watercraft) ctx.restore();
+    drawTrafficActivity(ctx, entity, assets, palette, x, y, baseScale * entity.scale, visualDirection);
   });
 }
 
@@ -436,6 +443,22 @@ function drawTrafficActivity(ctx, entity, assets, palette, x, y, scale, visualDi
       const width = 8 + index * 5;
       const wakeX = x + wakeDirection * (13 + index * 7) * scale;
       ctx.fillRect(Math.round(wakeX - (wakeDirection < 0 ? width : 0)), Math.round(y + 7 * scale + index * 2), width, 1);
+    }
+    ctx.restore();
+  } else if (isBoatKind(entity.kind)) {
+    const wakeDirection = visualDirection < 0 ? 1 : -1;
+    ctx.save();
+    ctx.globalAlpha = 0.48;
+    ctx.fillStyle = palette.foamShade;
+    for (let index = 0; index < 2; index += 1) {
+      const width = Math.max(2, Math.round((7 + index * 5) * scale));
+      const wakeX = x + wakeDirection * (9 + index * 6) * scale;
+      ctx.fillRect(
+        Math.round(wakeX - (wakeDirection < 0 ? width : 0)),
+        Math.round(y + 2 + index * 2),
+        width,
+        1,
+      );
     }
     ctx.restore();
   }

@@ -7,7 +7,10 @@ import {
   WORLD_LAYER_CONFIG,
   WORLD_LAYER_ORDER,
   WORLD_LIMITS,
+  conditionWorldProfile,
   isBoatKind,
+  trafficAllowedByProfile,
+  trafficVisibilityPermission,
 } from "../js/world-catalog.js";
 import {
   isReachablePickup,
@@ -291,7 +294,7 @@ test("same seed and inputs reproduce schedules and pooled world state exactly", 
   assert.equal(first.droppedInteractionCount, 0);
 });
 
-test("Twilight never schedules traffic-backed events hidden by the hero barrel", () => {
+test("Twilight schedules only its explicit far scenic traffic and no special events", () => {
   const world = new WorldSimulation({ seed: 1262570313, condition: "twilightGlass" });
   const events = [];
   const interactions = [];
@@ -300,13 +303,75 @@ test("Twilight never schedules traffic-backed events hidden by the hero barrel",
     interactions,
   });
 
-  assert.equal(Object.values(world.traffic).flat().some((entity) => entity.active), false);
+  const trafficEvents = events.filter((event) => event.type === "trafficSpawned");
+  assert.ok(trafficEvents.length > 0, "Twilight has a sparse living horizon");
+  for (const event of trafficEvents) {
+    assert.equal(event.layer, "far");
+    assert.equal(trafficAllowedByProfile("twilightGlass", event.kind, event.layer), true);
+    assert.notEqual(TRAFFIC_CATALOG[event.kind].renderBand, "playfieldFront");
+  }
   assert.equal(world.carrier.hasAppeared, false);
   assert.equal(world.courier.active, false);
   assert.equal(world.race.active, false);
   assert.equal(world.aircraftDrop.active, false);
-  assert.equal(events.some((event) => ["trafficSpawned", "courierPhase", "racePhase", "aircraftDropPhase", "carrierPhase"].includes(event.type)), false);
+  assert.equal(events.some((event) => ["courierPhase", "racePhase", "aircraftDropPhase", "carrierPhase", "wildlifePhase"].includes(event.type)), false);
   assert.equal(interactions.some((event) => ["speedboatRaceWon", "fleetAirshowCompleted"].includes(event.type)), false);
+});
+
+test("condition traffic permissions encode the curated passive coast bands", () => {
+  const expected = {
+    goldenCoast: {
+      far: ["sailboat", "cargoShip", "fishingBoat", "gullFlock", "cormorantFlock"],
+      mid: ["fishingBoat", "pelican"],
+    },
+    twilightGlass: {
+      far: ["fishingBoat", "sailboat", "cormorantFlock", "propPlane"],
+      mid: [],
+    },
+    stormbreak: {
+      far: ["cargoShip", "cormorantFlock"],
+      mid: ["tugboat", "rescueCraft", "helicopter"],
+    },
+  };
+  for (const [condition, layers] of Object.entries(expected)) {
+    const profile = conditionWorldProfile(condition);
+    assert.deepEqual(profile.traffic.far, layers.far);
+    assert.deepEqual(profile.traffic.mid, layers.mid);
+    assert.deepEqual(profile.traffic.near, []);
+    assert.equal(profile.specialEvents, false);
+    assert.equal(profile.carrierEnabled, false);
+    assert.equal(profile.interactiveWildlife, false);
+    assert.deepEqual(profile.wildlifeWeights, { dolphin: 0, shark: 0, whale: 0 });
+    for (const layer of WORLD_LAYER_ORDER) {
+      for (const kind of profile.traffic[layer]) {
+        assert.equal(trafficAllowedByProfile(condition, kind, layer), true);
+        assert.notEqual(TRAFFIC_CATALOG[kind].renderBand, "playfieldFront");
+      }
+    }
+  }
+  assert.equal(trafficVisibilityPermission("twilightGlass", "far", "water"), true);
+  assert.equal(trafficVisibilityPermission("twilightGlass", "mid", "water"), false);
+  assert.equal(trafficVisibilityPermission("twilightGlass", "far", "sky"), true);
+  assert.equal(trafficVisibilityPermission("twilightGlass", "near", "sky"), false);
+});
+
+test("ambient watercraft stay capped at two per depth region and birds remain above water", () => {
+  for (const condition of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+    const world = new WorldSimulation({ seed: 0x51ce000 + condition.length, condition });
+    for (let step = 0; step < 90 * 120; step += 1) {
+      world.update(STEP, context({ waterlineY: 79 }));
+      world.consumeEvents(() => {});
+      world.consumeInteractions(() => {});
+      for (const layer of WORLD_LAYER_ORDER) {
+        const active = world.traffic[layer].filter((entity) => entity.active);
+        assert.ok(active.filter((entity) => isBoatKind(entity.kind)).length <= 2);
+        for (const entity of active.filter((candidate) => TRAFFIC_CATALOG[candidate.kind].bird)) {
+          const waterline = WORLD_LAYER_CONFIG[layer].waterYRange?.[0] ?? 92;
+          assert.ok(entity.y < waterline, `${condition} ${entity.kind} escaped below ${layer} sky band`);
+        }
+      }
+    }
+  }
 });
 
 test("layer streams are isolated from wildlife and powerup scheduling", () => {
@@ -345,7 +410,7 @@ test("traffic pools enforce caps, cull offscreen, and keep all ambience non-coll
   const world = new WorldSimulation({ seed: 9 });
   const firstReference = world.traffic.far[0];
   for (const layer of WORLD_LAYER_ORDER) {
-    const kinds = world.profile.traffic[layer];
+    const kinds = Object.keys(TRAFFIC_CATALOG);
     for (let index = 0; index < WORLD_LAYER_CONFIG[layer].capacity; index += 1) {
       const kind = kinds.find((candidate) => TRAFFIC_CATALOG[candidate].layers.includes(layer));
       const entity = world.spawnTraffic(kind, { layer, screenX: 192, speed: 0, duration: 30 });

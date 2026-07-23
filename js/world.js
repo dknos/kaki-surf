@@ -17,6 +17,7 @@ import {
   isAircraftKind,
   isBirdKind,
   isFlockBirdKind,
+  trafficAllowedByProfile,
   trafficDefinition,
 } from "./world-catalog.js";
 import {
@@ -146,8 +147,8 @@ export class WorldSimulation {
     this.updateFoamGates(seconds);
     if (this.profile.ambientTraffic !== false) this.updateAmbientScheduler();
     this.updateInteractiveSchedulers();
-    if (this.profile.specialTraffic !== false) this.updateSpecialSchedulers();
-    if (this.profile.carrierEnabled !== false) this.updateCarrierScheduler();
+    if (this.profile.specialEvents === true && this.profile.specialTraffic !== false) this.updateSpecialSchedulers();
+    if (this.profile.specialEvents === true && this.profile.carrierEnabled === true) this.updateCarrierScheduler();
     this.refreshModifiers();
     return this;
   }
@@ -1222,7 +1223,14 @@ export class WorldSimulation {
     for (const layer of WORLD_LAYER_ORDER) {
       if (this.elapsed + 1e-9 < this.nextAmbient[layer]) continue;
       const random = this.streams[layer];
-      const candidates = this.profile.traffic[layer];
+      const candidates = this.profile.traffic[layer].filter((kind) => (
+        trafficAllowedByProfile(this.profile, kind, layer)
+        && (!TRAFFIC_CATALOG[kind]?.boat || this.activeBoatCount(layer) < 2)
+      ));
+      if (candidates.length === 0) {
+        this.scheduleNextAmbient(layer, false);
+        continue;
+      }
       const packet = {
         kind: candidates[Math.min(candidates.length - 1, Math.floor(random() * candidates.length))],
         direction: random() < 0.5 ? 1 : -1,
@@ -1238,7 +1246,7 @@ export class WorldSimulation {
       const layerConfig = WORLD_LAYER_CONFIG[layer];
       const yRange = definition.boat
         ? layerConfig.waterYRange ?? layerConfig.yRange
-        : layerConfig.yRange;
+        : layerConfig.skyYRange ?? layerConfig.yRange;
       this.spawnTraffic(packet.kind, {
         layer,
         direction: packet.direction,
@@ -1255,7 +1263,8 @@ export class WorldSimulation {
   }
 
   updateInteractiveSchedulers() {
-    if (this.elapsed + 1e-9 >= this.nextWildlifeCandidate) {
+    if (this.profile.interactiveWildlife === true
+      && this.elapsed + 1e-9 >= this.nextWildlifeCandidate) {
       const random = this.streams.wildlife;
       const selectionRoll = random();
       const packet = {
@@ -1281,6 +1290,14 @@ export class WorldSimulation {
       this.requestPowerup(packet.kind, packet);
       this.nextPowerupCandidate = this.elapsed + 15 + random() * 12;
     }
+  }
+
+  activeBoatCount(layer) {
+    let count = 0;
+    for (const entity of this.traffic[layer] ?? []) {
+      if (entity.active && TRAFFIC_CATALOG[entity.kind]?.boat) count += 1;
+    }
+    return count;
   }
 
   updateSpecialSchedulers() {

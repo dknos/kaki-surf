@@ -6,6 +6,7 @@ export const WORLD_LAYER_CONFIG = Object.freeze({
     parallax: 0.08,
     interval: Object.freeze([4.8, 8.2]),
     yRange: Object.freeze([48, 78]),
+    skyYRange: Object.freeze([42, 68]),
     waterYRange: Object.freeze([73, 78]),
     cullMargin: 72,
   }),
@@ -14,6 +15,7 @@ export const WORLD_LAYER_CONFIG = Object.freeze({
     parallax: 0.32,
     interval: Object.freeze([3.2, 6.4]),
     yRange: Object.freeze([34, 91]),
+    skyYRange: Object.freeze([34, 72]),
     waterYRange: Object.freeze([82, 94]),
     cullMargin: 82,
   }),
@@ -22,6 +24,7 @@ export const WORLD_LAYER_CONFIG = Object.freeze({
     parallax: 0.88,
     interval: Object.freeze([7.5, 12.5]),
     yRange: Object.freeze([24, 142]),
+    skyYRange: Object.freeze([24, 82]),
     waterYRange: Object.freeze([92, 112]),
     cullMargin: 96,
   }),
@@ -100,7 +103,7 @@ const traffic = {
     boat: true,
   },
   gullFlock: {
-    layers: ["mid", "near"],
+    layers: ["far", "mid", "near"],
     renderBand: "skyTraffic",
     speed: Object.freeze([14, 24]),
     duration: Object.freeze([10, 18]),
@@ -184,47 +187,65 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
   goldenCoast: Object.freeze({
     id: "goldenCoast",
     wind: 0.28,
-    density: 1,
+    density: 0.62,
     ambientTraffic: true,
-    specialTraffic: true,
-    carrierEnabled: true,
+    specialTraffic: false,
+    carrierEnabled: false,
+    farWaterTraffic: true,
+    midWaterTraffic: true,
+    farSkyTraffic: true,
+    midSkyTraffic: true,
+    nearSkyTraffic: false,
+    interactiveWildlife: false,
+    specialEvents: false,
     traffic: Object.freeze({
-      far: Object.freeze(["sailboat", "cargoShip", "fishingBoat", "cormorantFlock", "propPlane"]),
-      mid: Object.freeze(["gullFlock", "pelican", "sailboat", "speedboat", "fishingBoat", "bannerPlane", "seaplane"]),
-      near: Object.freeze(["pelican", "gullFlock", "fishSchool", "bannerPlane"]),
+      far: Object.freeze(["sailboat", "cargoShip", "fishingBoat", "gullFlock", "cormorantFlock"]),
+      mid: Object.freeze(["fishingBoat", "pelican"]),
+      near: Object.freeze([]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0.7, shark: 0.3, whale: 0 }),
+    wildlifeWeights: Object.freeze({ dolphin: 0, shark: 0, whale: 0 }),
   }),
   twilightGlass: Object.freeze({
     id: "twilightGlass",
     wind: 0.18,
-    density: 0.9,
-    // Twilight's hero barrel owns the full left-side composition. Ordinary
-    // traffic and traffic-backed bonuses would be hidden by that wave and can
-    // therefore never be scheduled during a real run.
-    ambientTraffic: false,
+    density: 0.32,
+    ambientTraffic: true,
     specialTraffic: false,
     carrierEnabled: false,
+    farWaterTraffic: true,
+    midWaterTraffic: false,
+    farSkyTraffic: true,
+    midSkyTraffic: false,
+    nearSkyTraffic: false,
+    interactiveWildlife: false,
+    specialEvents: false,
     traffic: Object.freeze({
-      far: Object.freeze(["fishingBoat", "cargoShip", "sailboat", "cormorantFlock", "propPlane"]),
-      mid: Object.freeze(["fishingBoat", "ternFlock", "gullFlock", "helicopter", "bannerPlane", "seaplane"]),
-      near: Object.freeze(["ternFlock", "pelican", "fishSchool", "bannerPlane"]),
+      far: Object.freeze(["fishingBoat", "sailboat", "cormorantFlock", "propPlane"]),
+      mid: Object.freeze([]),
+      near: Object.freeze([]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0.62, shark: 0.38, whale: 0 }),
+    wildlifeWeights: Object.freeze({ dolphin: 0, shark: 0, whale: 0 }),
   }),
   stormbreak: Object.freeze({
     id: "stormbreak",
     wind: 0.82,
-    density: 0.78,
+    density: 0.48,
     ambientTraffic: true,
-    specialTraffic: true,
-    carrierEnabled: true,
+    specialTraffic: false,
+    carrierEnabled: false,
+    farWaterTraffic: true,
+    midWaterTraffic: true,
+    farSkyTraffic: true,
+    midSkyTraffic: true,
+    nearSkyTraffic: false,
+    interactiveWildlife: false,
+    specialEvents: false,
     traffic: Object.freeze({
-      far: Object.freeze(["cargoShip", "fishingBoat", "cormorantFlock", "propPlane"]),
-      mid: Object.freeze(["gullFlock", "rescueCraft", "tugboat", "helicopter", "bannerPlane"]),
-      near: Object.freeze(["gullFlock", "pelican", "bannerPlane"]),
+      far: Object.freeze(["cargoShip", "cormorantFlock"]),
+      mid: Object.freeze(["tugboat", "rescueCraft", "helicopter"]),
+      near: Object.freeze([]),
     }),
-    wildlifeWeights: Object.freeze({ dolphin: 0.44, shark: 0.56, whale: 0 }),
+    wildlifeWeights: Object.freeze({ dolphin: 0, shark: 0, whale: 0 }),
   }),
 });
 
@@ -355,6 +376,22 @@ export const FOAM_GATE_CONFIG = Object.freeze({
 export function conditionWorldProfile(condition) {
   const id = typeof condition === "string" ? condition : condition?.id;
   return CONDITION_WORLD_PROFILES[id] ?? CONDITION_WORLD_PROFILES.goldenCoast;
+}
+
+export function trafficVisibilityPermission(condition, layer, medium) {
+  const profile = conditionWorldProfile(condition);
+  if (layer === "near" && medium === "water") return false;
+  const key = `${layer}${medium === "water" ? "Water" : "Sky"}Traffic`;
+  return profile[key] === true;
+}
+
+export function trafficAllowedByProfile(condition, kind, layer) {
+  const profile = conditionWorldProfile(condition);
+  const definition = trafficDefinition(kind);
+  if (!definition || !definition.layers.includes(layer)) return false;
+  if (!profile.traffic[layer]?.includes(kind)) return false;
+  const medium = definition.boat ? "water" : "sky";
+  return trafficVisibilityPermission(profile, layer, medium);
 }
 
 export function trafficDefinition(kind) {

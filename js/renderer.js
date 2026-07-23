@@ -52,6 +52,7 @@ import {
   drawWorldWildlife,
   drawWorldWildlifeContact,
 } from "./world-visuals.js";
+import { trafficVisibilityPermission } from "./world-catalog.js";
 
 const PARTICLE_COUNT = 176;
 const CALLOUT_QUEUE_LIMIT = 4;
@@ -496,7 +497,13 @@ export class KakiRenderer {
     this.lastStageOffset = stageOffset;
     this.renderCameraWorldX = Number(simulation.camera?.worldX) || 0;
     this.renderRiderOffsetY = this.riderFrameOffsetY(simulation, alpha);
-    const allowsBackgroundTraffic = this.conditionId !== "twilightGlass";
+    const trafficAllowed = (layer, medium) => trafficVisibilityPermission(
+      simulation.world?.profile ?? this.conditionId,
+      layer,
+      medium,
+    );
+    const carrierAllowed = simulation.world?.profile?.specialEvents === true
+      && simulation.world?.profile?.carrierEnabled === true;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.fillStyle = palette.skyTop;
@@ -508,26 +515,35 @@ export class KakiRenderer {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
     this.drawCoastline(simulation);
-    // Twilight keeps a pristine hero-wave sky. Other conditions retain only
-    // correctly depth-sorted traffic behind the break: no craft is allowed to
-    // paste across the barrel, rider, or falling-water curtain.
-    if (allowsBackgroundTraffic) {
+    // Catalog permissions keep every passive craft in an authored background
+    // band without relying on an all-or-nothing condition gate.
+    if (carrierAllowed) {
       drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
+    }
+    if (trafficAllowed("far", "water")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "water");
+    }
+    if (trafficAllowed("near", "water")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "water");
     }
     ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const backdropAltitude = this.aerialBackdrop?.altitude ?? 0;
-    if (allowsBackgroundTraffic) {
+    if (trafficAllowed("far", "sky")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky", backdropAltitude);
+    }
+    if (trafficAllowed("mid", "sky")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky", backdropAltitude);
+    }
+    if (trafficAllowed("near", "sky")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky", backdropAltitude);
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
     this.drawBackWater(simulation);
-    if (allowsBackgroundTraffic) drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "water");
+    if (trafficAllowed("mid", "water")) {
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "water");
+    }
     this.drawWave(simulation);
     // The continuous break owns the entire playable foreground. Near and
     // playfield-front traffic is deliberately omitted so boats cannot float on
