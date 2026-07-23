@@ -16,6 +16,17 @@ import {
   resolveRiderPresentationPose,
   updateRiderAnimation,
 } from "./rider-animation.js";
+import {
+  createTurboPresentationState,
+  drawTurboRiderEffects,
+  drawTurboScreenEffects,
+  drawTurboStageEffects,
+  handleTurboPresentationEvent,
+  resetTurboPresentationState,
+  turboPresentationIntensity,
+  turboPresentationSnapshot,
+  updateTurboPresentation,
+} from "./turbo-presentation.js";
 import { drawBoardSprite, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
 import {
   advanceWavePresentationClocks,
@@ -142,6 +153,7 @@ export class KakiRenderer {
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     this.riderAnimation = createRiderAnimationState();
+    this.turboPresentation = createTurboPresentationState();
     this.wavePresentationClocks = createWavePresentationClocks();
     this.cameraDebug = typeof globalThis.location?.search === "string"
       && new URLSearchParams(globalThis.location.search).has("debugCamera");
@@ -174,6 +186,7 @@ export class KakiRenderer {
     this.turboSparkClock = 0;
     this.lastLandingQuality = "clean";
     resetRiderAnimationState(this.riderAnimation);
+    resetTurboPresentationState(this.turboPresentation);
     this.currentBoard = simulation?.board ?? null;
     this.wavePresentationClocks = createWavePresentationClocks();
   }
@@ -183,6 +196,7 @@ export class KakiRenderer {
     this.currentPlayer = player;
     this.currentBoard = simulation.board;
     const payload = event.payload ?? {};
+    handleTurboPresentationEvent(this.turboPresentation, event, simulation);
     const ridingY = simulation.wave.ridingY(player.x, player.face);
     if ([
       "lip",
@@ -217,6 +231,11 @@ export class KakiRenderer {
         break;
       case "turboRefill":
         this.spawnSparkles(player.x, ridingY - 8, 11);
+        break;
+      case "turboFullBurn":
+        this.impact = Math.max(this.impact, 1.1);
+        if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.075);
+        this.pushCallout("KAKI'S COOKING", "FULL BURN", "perfect", { channel: "turbo" });
         break;
       case "powerLineEnter":
         this.spawnSeamGlints(player.x, ridingY, 9);
@@ -405,6 +424,7 @@ export class KakiRenderer {
     const player = simulation.player;
     this.currentPlayer = player;
     updateRiderAnimation(this.riderAnimation, dt, player);
+    updateTurboPresentation(this.turboPresentation, dt, simulation, this.settings);
     this.aerialBackdrop = advanceAerialBackdropState(this.aerialBackdrop, player, dt);
     advanceWavePresentationClocks(
       this.wavePresentationClocks,
@@ -508,18 +528,24 @@ export class KakiRenderer {
     drawWorldFoamGates(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
     this.drawParticles(false);
     this.drawTrajectoryWake(simulation);
+    drawTurboStageEffects(ctx, this.turboPresentation, simulation, palette, this.settings);
     const deferredAerialRider = player.state === "airborne";
-    if (!deferredAerialRider) this.drawSurfer(simulation, alpha);
+    if (!deferredAerialRider) {
+      drawTurboRiderEffects(ctx, this.turboPresentation, simulation, palette, this.settings);
+      this.drawSurfer(simulation, alpha);
+    }
     drawWorldWildlife(ctx, simulation, this.visualAssets, palette, alpha, true, this.settings);
     if (heroBarrel) this.drawWaveFront(simulation);
     drawWorldWildlifeContact(ctx, simulation, palette, alpha, this.settings);
     this.drawParticles(true);
     ctx.restore();
+    drawTurboScreenEffects(ctx, this.turboPresentation, simulation, palette, this.settings);
     this.drawLandingIndicator(simulation);
     this.drawHud(simulation);
     if (deferredAerialRider) {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
+      drawTurboRiderEffects(ctx, this.turboPresentation, simulation, palette, this.settings);
       this.drawSurfer(simulation, alpha);
       ctx.restore();
     }
@@ -1032,6 +1058,10 @@ export class KakiRenderer {
     return Number(this.lastBackdropSourceY) || aerialBackdropCropShelves().coast;
   }
 
+  turboSnapshot() {
+    return turboPresentationSnapshot(this.turboPresentation);
+  }
+
   presentationPlayer(player) {
     const riderAnimation = resolveRiderPresentationPose(this.riderAnimation, player, {
       reducedMotion: this.settings.reducedMotion,
@@ -1043,6 +1073,7 @@ export class KakiRenderer {
       lastLandingQuality: this.lastLandingQuality,
       presentationPoseId: riderAnimation?.id,
       presentationPose: riderAnimation?.pose,
+      presentationTurboFlutter: riderAnimation?.flutter ?? 0,
     };
   }
 
@@ -1120,25 +1151,40 @@ export class KakiRenderer {
 
     if (contract.fields.includes("turbo")) {
       const turbo = clamp(Number(player.turbo) || 0, 0, 1);
+      const turboTier = player.turboCookingTimer > 0 ? "cooking" : player.turboTier ?? "idle";
+      const turboIntensity = turboPresentationIntensity(player);
       const meterX = 143;
       const meterY = 11;
       const meterWidth = 140;
       panel(ctx, 101, 5, 190, 19, p.deepInk, p.waterDeep);
-      drawPixelText(ctx, "TURBO", 106, 9, {
-        color: player.turboActive ? p.gold : p.foamShade,
+      drawPixelText(ctx, turboTier === "cooking" ? "COOK!" : "TURBO", 106, 9, {
+        color: turboTier === "cooking" || player.turboActive ? p.gold : p.foamShade,
         shadow: p.ink,
       });
-      ctx.fillStyle = p.ink;
+      const pulseFast = turboTier === "redline" || turboTier === "cooking";
+      const pulse = pulseFast
+        ? (Math.floor(this.turboPresentation.time * (turboTier === "cooking" ? 14 : 9)) & 1)
+        : 0;
+      ctx.fillStyle = turboTier === "cooking"
+        ? pulse && !this.settings.reducedFlash ? p.white : p.gold
+        : p.ink;
       ctx.fillRect(meterX, meterY, meterWidth, 7);
       ctx.fillStyle = p.water;
       ctx.fillRect(meterX + 2, meterY + 2, meterWidth - 4, 3);
       const fillWidth = Math.round((meterWidth - 4) * turbo);
       if (fillWidth > 0) {
-        ctx.fillStyle = player.turboActive ? p.gold : turbo < 0.2 ? p.danger : p.sun;
+        ctx.fillStyle = turboTier === "redline"
+          ? p.danger
+          : turboTier === "surge" ? p.gold : player.turboActive ? p.sun : turbo < 0.2 ? p.danger : p.sun;
         ctx.fillRect(meterX + 2, meterY + 2, fillWidth, 3);
         if (player.turboActive && fillWidth > 4) {
           ctx.fillStyle = p.white;
-          ctx.fillRect(meterX + 2, meterY + 2, Math.max(2, Math.round(fillWidth * 0.2)), 1);
+          const highlightWidth = Math.min(8, Math.max(2, Math.round(fillWidth * 0.12)));
+          const highlightTravel = Math.max(0, fillWidth - highlightWidth);
+          const highlightX = Math.round(
+            ((this.turboPresentation.time * (24 + turboIntensity * 36)) % Math.max(1, highlightTravel)),
+          );
+          ctx.fillRect(meterX + 2 + highlightX, meterY + 2, highlightWidth, 1);
         }
       }
       ctx.fillStyle = p.deepInk;

@@ -276,6 +276,13 @@ export function drawKittySprite(ctx, x, y, angle, player, palette, options = {})
   ctx.fillRect(-5, bodyY - 4, 10, 3);
   ctx.fillStyle = palette.hoodie;
   ctx.fillRect(-6, bodyY - 1, 12, 9 + poseData.stretch - poseData.squash);
+  const hoodieFlutter = Math.round(clamp(Number(player.presentationTurboFlutter) || 0, -1, 1));
+  if (hoodieFlutter !== 0) {
+    ctx.fillStyle = palette.hoodie;
+    ctx.fillRect(-8, bodyY + 5 + hoodieFlutter, 2, 2);
+    ctx.fillStyle = palette.white;
+    ctx.fillRect(-7, bodyY + 5 + hoodieFlutter, 1, 1);
+  }
   ctx.fillStyle = palette.white;
   ctx.fillRect(-1, bodyY, 1, 6);
   ctx.fillRect(1, bodyY, 1, 6);

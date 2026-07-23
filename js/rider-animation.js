@@ -197,6 +197,57 @@ const POSES = Object.freeze({
     legSpread: 7,
     expression: "bright",
   }),
+  turboIgnition: makePose({
+    crouch: 4,
+    lean: -2,
+    headX: 2,
+    headY: 2,
+    leftPaw: [-12, -10],
+    rightPaw: [8, -9],
+    legSpread: 7,
+    tailY: -10,
+    expression: "focus",
+  }),
+  turboSurge: makePose({
+    crouch: 3,
+    lean: -4,
+    headX: 3,
+    headY: 1,
+    leftPaw: [-8, -13],
+    rightPaw: [12, -12],
+    legSpread: 8,
+    tailX: -15,
+    tailY: -13,
+    foldedEar: true,
+    expression: "focus",
+  }),
+  turboRedline: makePose({
+    crouch: 4,
+    lean: -6,
+    headX: 4,
+    headY: 2,
+    leftPaw: [-6, -12],
+    rightPaw: [14, -11],
+    legSpread: 9,
+    tailX: -16,
+    tailY: -14,
+    foldedEar: true,
+    expression: "focus",
+  }),
+  turboCooking: makePose({
+    crouch: 2,
+    stretch: 1,
+    lean: -5,
+    headX: 4,
+    headY: -1,
+    leftPaw: [-7, -15],
+    rightPaw: [13, -13],
+    legSpread: 8,
+    tailX: -16,
+    tailY: -16,
+    foldedEar: true,
+    expression: "bright",
+  }),
 });
 
 const TRICK_TIMELINES = Object.freeze({
@@ -235,6 +286,10 @@ export function createRiderAnimationState() {
     landingSerial: 0,
     previousLandingVariant: "",
     landing: null,
+    turboClock: 0,
+    turboTier: "idle",
+    turboReleaseElapsed: 0,
+    turboReleasing: false,
   };
 }
 
@@ -242,6 +297,10 @@ export function resetRiderAnimationState(state = createRiderAnimationState()) {
   state.landingSerial = 0;
   state.previousLandingVariant = "";
   state.landing = null;
+  state.turboClock = 0;
+  state.turboTier = "idle";
+  state.turboReleaseElapsed = 0;
+  state.turboReleasing = false;
   return state;
 }
 
@@ -306,6 +365,7 @@ export function cancelLandingPresentation(state) {
 }
 
 export function updateRiderAnimation(state, dt, player = {}) {
+  updateTurboRiderTimeline(state, dt, player);
   if (!state.landing) return state;
   if (landingPresentationMustCancel(player)) {
     cancelLandingPresentation(state);
@@ -362,7 +422,72 @@ export function trickPresentationPose(player = {}, { reducedMotion = false } = {
 
 export function resolveRiderPresentationPose(state, player = {}, options = {}) {
   return landingPresentationPose(state, player, options)
-    ?? trickPresentationPose(player, options);
+    ?? trickPresentationPose(player, options)
+    ?? turboPresentationPose(state, player, options);
+}
+
+export function turboPresentationPose(state, player = {}, { reducedMotion = false } = {}) {
+  if (!turboPoseAllowed(player)) return null;
+  const active = Boolean(player.turboActive) || (Number(player.turboCookingTimer) || 0) > 0;
+  if (!active && !state?.turboReleasing) return null;
+  const ridePose = player.ridingStance === "goofy" ? POSES.goofyRide : POSES.regularRide;
+  const tier = active
+    ? (Number(player.turboCookingTimer) || 0) > 0 ? "cooking" : player.turboTier || "ignition"
+    : state.turboTier;
+  const target = turboPoseForTier(tier);
+  const progress = clamp(Number(player.turboBurnProgress) || 0, 0, 1);
+  const flutter = reducedMotion || tier === "ignition"
+    ? 0
+    : Math.round(Math.sin((Number(state?.turboClock) || 0) * (tier === "cooking" ? 22 : 16)));
+  const fluttered = flutter === 0
+    ? target
+    : makePose({
+      ...target,
+      tailY: clamp(target.tailY + flutter, -19, -9),
+      headY: clamp(target.headY - Math.max(0, flutter), -4, 5),
+    });
+  if (!active) {
+    const duration = reducedMotion ? 0.12 : 0.22;
+    const amount = clamp((Number(state?.turboReleaseElapsed) || 0) / duration, 0, 1);
+    return {
+      id: "turboRelease",
+      phase: "release",
+      pose: interpolatePixelPose(fluttered, ridePose, amount, { reducedMotion }),
+      progress: 1 - amount,
+      flutter: 0,
+    };
+  }
+  const blend = tier === "ignition"
+    ? clamp(0.58 + progress * 3, 0, 1)
+    : tier === "surge" ? 0.82 : 1;
+  return {
+    id: `turbo${tier[0].toUpperCase()}${tier.slice(1)}`,
+    phase: tier,
+    pose: interpolatePixelPose(ridePose, fluttered, blend, { reducedMotion }),
+    progress,
+    flutter,
+  };
+}
+
+export function sampleTurboPose(tier, progress = 0.5, {
+  ridingStance = "regular",
+  reducedMotion = false,
+  releasing = false,
+} = {}) {
+  const state = createRiderAnimationState();
+  state.turboTier = tier;
+  state.turboReleasing = releasing;
+  state.turboReleaseElapsed = releasing ? 0.11 : 0;
+  return turboPresentationPose(state, {
+    state: "riding",
+    ridingStance,
+    turboActive: !releasing,
+    turboTier: tier,
+    turboBurnProgress: progress,
+    turboCookingTimer: tier === "cooking" && !releasing ? 0.5 : 0,
+    maneuver: { id: "" },
+    tubeRide: { active: false },
+  }, { reducedMotion });
 }
 
 export function interpolatePixelPose(from, to, amount, { reducedMotion = false } = {}) {
@@ -454,6 +579,47 @@ function landingPresentationMustCancel(player) {
     || player.justPumped
   )) return true;
   return false;
+}
+
+function updateTurboRiderTimeline(state, dt, player) {
+  const step = Math.max(0, Number(dt) || 0);
+  state.turboClock += step;
+  const active = Boolean(player.turboActive) || (Number(player.turboCookingTimer) || 0) > 0;
+  if (active) {
+    state.turboTier = (Number(player.turboCookingTimer) || 0) > 0
+      ? "cooking"
+      : player.turboTier || "ignition";
+    state.turboReleaseElapsed = 0;
+    state.turboReleasing = false;
+    return;
+  }
+  if (state.turboTier !== "idle" && !state.turboReleasing) {
+    state.turboReleasing = true;
+    state.turboReleaseElapsed = 0;
+  }
+  if (!state.turboReleasing) return;
+  state.turboReleaseElapsed += step;
+  if (state.turboReleaseElapsed >= 0.22) {
+    state.turboTier = "idle";
+    state.turboReleaseElapsed = 0;
+    state.turboReleasing = false;
+  }
+}
+
+function turboPoseAllowed(player) {
+  if (player.state !== "riding") return false;
+  if (player.animalMount || player.mountKind || player.mountType) return false;
+  if (player.maneuver?.id || player.tubeRide?.active || player.tubeTucked || player.tubeAction) return false;
+  if ((Number(player.compression) || 0) > 0.34 || (Number(player.charge) || 0) > 0.34) return false;
+  if (Math.abs(Number(player.faceVelocity) || 0) > 0.2) return false;
+  return true;
+}
+
+function turboPoseForTier(tier) {
+  if (tier === "cooking") return POSES.turboCooking;
+  if (tier === "redline") return POSES.turboRedline;
+  if (tier === "surge") return POSES.turboSurge;
+  return POSES.turboIgnition;
 }
 
 function landingTimeline(quality, impact, variant, ridePose, reducedMotion) {

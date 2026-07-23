@@ -83,6 +83,45 @@ const POWERUP_NAMES = Object.freeze({
   starFoam: "STAR FOAM",
 });
 
+export const TURBO_TIERS = Object.freeze({
+  idle: Object.freeze({ id: "idle", start: 0, end: 0, capMin: 1, capMax: 1 }),
+  ignition: Object.freeze({ id: "ignition", start: 0, end: 0.2, capMin: 1.1, capMax: 1.14 }),
+  surge: Object.freeze({ id: "surge", start: 0.2, end: 0.55, capMin: 1.14, capMax: 1.26 }),
+  redline: Object.freeze({ id: "redline", start: 0.55, end: 1, capMin: 1.26, capMax: 1.44 }),
+  cooking: Object.freeze({ id: "cooking", start: 1, end: 1, capMin: 1.5, capMax: 1.5 }),
+});
+
+/** Pure authored envelope used by physics, HUD, audio, and deterministic QA. */
+export function turboTierForProgress(progress, cooking = false) {
+  if (cooking) return "cooking";
+  const amount = clamp(Number(progress) || 0, 0, 1);
+  if (amount < 0.2) return "ignition";
+  if (amount < 0.55) return "surge";
+  return "redline";
+}
+
+export function progressiveTurboCapMultiplier(progress, cooking = false, tuning = TUNING) {
+  if (cooking) {
+    return finiteTuning(
+      tuning.turboCookingSpeedCapMultiplier,
+      TUNING.turboCookingSpeedCapMultiplier,
+    );
+  }
+  const amount = clamp(Number(progress) || 0, 0, 1);
+  if (amount <= 0.2) return easedRange(amount / 0.2, 1.1, 1.14);
+  if (amount <= 0.55) return easedRange((amount - 0.2) / 0.35, 1.14, 1.26);
+  if (amount <= 0.9) return easedRange((amount - 0.55) / 0.35, 1.26, 1.42);
+  return easedRange((amount - 0.9) / 0.1, 1.42, 1.44);
+}
+
+export function progressiveTurboAccelerationMultiplier(progress) {
+  const amount = clamp(Number(progress) || 0, 0, 1);
+  if (amount <= 0.2) return easedRange(amount / 0.2, 1, 1.05);
+  if (amount <= 0.55) return easedRange((amount - 0.2) / 0.35, 1.05, 1.22);
+  if (amount <= 0.9) return easedRange((amount - 0.55) / 0.35, 1.22, 1.42);
+  return easedRange((amount - 0.9) / 0.1, 1.42, 1.5);
+}
+
 /**
  * Convert a banked aerial result into Turbo. Empty pops and wobble saves do
  * not pay fuel; rotation, completed entries, landing grade, and repetition
@@ -527,32 +566,119 @@ export class SurfSimulation {
     const requested = Boolean(input.turbo)
       && rideable
       && !player.animalMount;
-    const drain = finiteTuning(
+    const drainPerSecond = finiteTuning(
       this.tuning.turboDrainPerSecond,
       TUNING.turboDrainPerSecond,
-    ) * dt;
-    player.turboActive = requested && player.turbo > 0;
+    );
+    const fullBurnThreshold = finiteTuning(
+      this.tuning.turboFullBurnThreshold,
+      TUNING.turboFullBurnThreshold,
+    );
+    const previousTier = player.turboTier;
+    let beganBurn = false;
 
-    if (player.turboActive) {
-      player.turbo = Math.max(0, player.turbo - Math.min(player.turbo, drain));
-      player.turboOverdrive = damp(
-        player.turboOverdrive,
-        1,
-        finiteTuning(this.tuning.turboOverdriveBuild, TUNING.turboOverdriveBuild),
-        dt,
-      );
-      if (player.turbo <= 0) player.turboActive = false;
-    } else {
-      player.turboOverdrive = Math.max(
-        0,
-        player.turboOverdrive
-          - finiteTuning(this.tuning.turboOverdriveDecay, TUNING.turboOverdriveDecay) * dt,
-      );
+    if (player.turboCookingTimer > 0) {
+      player.turboCookingTimer = Math.max(0, player.turboCookingTimer - dt);
+      if (player.turboCookingTimer <= 0 && !wasActive) this.resetTurboBurn(false);
     }
 
-    if (!wasActive && player.turboActive) {
-      this.emit("turboStart", { level: player.turbo });
-    } else if (wasActive && !player.turboActive) {
+    if (requested && player.turbo > 0) {
+      const continuingGrace = !wasActive
+        && player.turboReleaseGrace > 0
+        && player.turboBurnSpent > 0
+        && player.turboBurnInterruptions <= 1;
+      if (!wasActive && !continuingGrace) {
+        player.turboBurnStartLevel = player.turbo;
+        player.turboBurnSpent = 0;
+        player.turboBurnProgress = 0;
+        player.turboBurnInterruptions = 0;
+        player.turboFullBurnQualified = !player.turboCookingLocked
+          && player.turbo >= finiteTuning(
+            this.tuning.turboFullBurnStartLevel,
+            TUNING.turboFullBurnStartLevel,
+          );
+        beganBurn = true;
+      }
+      player.turboReleaseGrace = 0;
+      player.turboActive = true;
+      const consumed = Math.min(player.turbo, drainPerSecond * dt);
+      player.turbo = Math.max(0, player.turbo - consumed);
+      player.turboBurnSpent += consumed;
+      player.turboBurnProgress = clamp(
+        player.turboBurnSpent / Math.max(0.001, fullBurnThreshold),
+        0,
+        1,
+      );
+      player.turboTier = turboTierForProgress(player.turboBurnProgress);
+      player.turboOverdrive = turboCompatibilityOverdrive(
+        player.turboBurnProgress,
+        this.tuning,
+      );
+
+      if (player.turbo <= 0) {
+        player.turboActive = false;
+        player.turboReleaseGrace = 0;
+        const qualified = player.turboFullBurnQualified
+          && player.turboBurnSpent + 1e-9 >= fullBurnThreshold
+          && !player.turboCookingLocked;
+        if (qualified) {
+          player.turboCookingTimer = finiteTuning(
+            this.tuning.turboCookingDuration,
+            TUNING.turboCookingDuration,
+          );
+          player.turboTier = "cooking";
+          player.turboOverdrive = 1;
+          player.turboFullBurnQualified = false;
+          player.turboCookingLocked = true;
+          this.emit("turboFullBurn", {
+            startLevel: player.turboBurnStartLevel,
+            spent: player.turboBurnSpent,
+            duration: player.turboCookingTimer,
+            speed: player.speed,
+            tier: player.turboTier,
+          });
+        }
+      }
+    } else {
+      player.turboActive = false;
+      if (wasActive && player.turbo > 0 && rideable) {
+        player.turboBurnInterruptions += 1;
+        player.turboReleaseGrace = finiteTuning(
+          this.tuning.turboReleaseGrace,
+          TUNING.turboReleaseGrace,
+        );
+      } else if (player.turboReleaseGrace > 0) {
+        player.turboReleaseGrace = Math.max(0, player.turboReleaseGrace - dt);
+      }
+
+      if (player.turboCookingTimer > 0) {
+        player.turboTier = "cooking";
+        player.turboOverdrive = 1;
+      } else if (player.turboReleaseGrace <= 0) {
+        player.turboFullBurnQualified = false;
+        player.turboTier = "idle";
+        player.turboBurnSpent = 0;
+        player.turboBurnProgress = 0;
+        player.turboBurnStartLevel = player.turbo;
+        player.turboOverdrive = Math.max(
+          0,
+          player.turboOverdrive
+            - finiteTuning(this.tuning.turboOverdriveDecay, TUNING.turboOverdriveDecay) * dt,
+        );
+      }
+    }
+
+    if (beganBurn) {
+      this.emit("turboStart", { level: player.turboBurnStartLevel });
+    }
+    if (previousTier !== player.turboTier && player.turboTier !== "idle") {
+      this.emit("turboTier", {
+        tier: player.turboTier,
+        progress: player.turboBurnProgress,
+        speed: player.speed,
+      });
+    }
+    if (wasActive && !player.turboActive) {
       this.emit("turboStop", {
         level: player.turbo,
         reason: player.turbo <= 0 ? "empty" : rideable ? "released" : "airborne",
@@ -560,12 +686,33 @@ export class SurfSimulation {
     }
   }
 
+  resetTurboBurn(resetCompatibility = true) {
+    const player = this.player;
+    player.turboBurnStartLevel = player.turbo;
+    player.turboBurnSpent = 0;
+    player.turboBurnProgress = 0;
+    player.turboBurnInterruptions = 0;
+    player.turboTier = "idle";
+    player.turboReleaseGrace = 0;
+    player.turboFullBurnQualified = false;
+    if (resetCompatibility) {
+      player.turboOverdrive = Math.max(
+        0,
+        player.turboOverdrive
+          - finiteTuning(this.tuning.turboOverdriveDecay, TUNING.turboOverdriveDecay) * FIXED_STEP,
+      );
+    }
+  }
+
   applyTurboAcceleration(dt) {
     const player = this.player;
     if (!player.turboActive || !["riding", "lip", "landing", "wobble"].includes(player.state)) return;
+    const accelerationScale = progressiveTurboAccelerationMultiplier(player.turboBurnProgress);
     player.speed = Math.min(
       player.speed
-        + finiteTuning(this.tuning.turboAcceleration, TUNING.turboAcceleration) * dt,
+        + finiteTuning(this.tuning.turboAcceleration, TUNING.turboAcceleration)
+          * accelerationScale
+          * dt,
       this.currentRideSpeedCap(),
     );
   }
@@ -577,6 +724,9 @@ export class SurfSimulation {
     this.player.turbo = clamp(previous + refill, 0, 1);
     const applied = this.player.turbo - previous;
     if (applied > 0) {
+      if (applied >= 0.18 || this.player.turbo >= 0.5) {
+        this.player.turboCookingLocked = false;
+      }
       this.emit("turboRefill", {
         amount: applied,
         level: this.player.turbo,
@@ -1097,9 +1247,15 @@ export class SurfSimulation {
     // traverse loses only a little, while climbing and reversals spend what
     // the previous drop earned. There is no invisible attraction to a target.
     const traverseRatio = 1 - Math.abs(player.slopeDrive);
-    const passiveDrag = finiteTuning(this.tuning.rideEnergyDrag, TUNING.rideEnergyDrag)
+    let passiveDrag = finiteTuning(this.tuning.rideEnergyDrag, TUNING.rideEnergyDrag)
       * (player.maneuver.id === "floater" ? 0.45 : 1)
       * (0.78 + traverseRatio * 0.22);
+    if (player.turboCookingTimer > 0) {
+      passiveDrag *= finiteTuning(
+        this.tuning.turboCookingDragScale,
+        TUNING.turboCookingDragScale,
+      );
+    }
     player.speed += (
       finiteTuning(this.tuning.downhillAcceleration, TUNING.downhillAcceleration)
         * Math.max(0, player.slopeDrive)
@@ -1253,8 +1409,10 @@ export class SurfSimulation {
     const landingCarryRatio = player.landingCarryDuration > 0
       ? clamp(player.landingCarryTimer / player.landingCarryDuration, 0, 1)
       : 0;
-    const turboAtLaunch = Boolean(player.turboActive);
-    const turboOverdriveAtLaunch = clamp(Number(player.turboOverdrive) || 0, 0, 1);
+    const turboAtLaunch = Boolean(player.turboActive) || player.turboCookingTimer > 0;
+    const turboOverdriveAtLaunch = player.turboCookingTimer > 0
+      ? 1
+      : clamp(Number(player.turboOverdrive) || 0, 0, 1);
     const lipAngle = Math.abs(Number(player.boardAngle) || 0);
     const wingedLaunch = this.controlMode === "advanced"
       && Math.abs(Number(input.x) || 0) >= 0.25
@@ -1859,8 +2017,27 @@ export class SurfSimulation {
     return Math.max(baseTarget, this.tuning.maxSpeed * this.board.maxSpeed);
   }
 
-  currentRideSpeedCap(overdrive = this.player.turboOverdrive) {
+  currentRideSpeedCap(overdrive) {
     const base = this.baseRideSpeedCap();
+    if (overdrive === undefined) {
+      if (this.player.turboCookingTimer > 0) {
+        return base * progressiveTurboCapMultiplier(1, true, this.tuning);
+      }
+      if (this.player.turboActive || this.player.turboReleaseGrace > 0) {
+        return base * progressiveTurboCapMultiplier(
+          this.player.turboBurnProgress,
+          false,
+          this.tuning,
+        );
+      }
+      const releaseEnvelope = clamp(Number(this.player.turboOverdrive) || 0, 0, 1);
+      if (releaseEnvelope <= 0) return base;
+      const legacyMultiplier = finiteTuning(
+        this.tuning.turboSpeedCapMultiplier,
+        TUNING.turboSpeedCapMultiplier,
+      );
+      return base * (1 + releaseEnvelope * (legacyMultiplier - 1));
+    }
     const envelope = clamp(Number(overdrive) || 0, 0, 1);
     const multiplier = finiteTuning(
       this.tuning.turboSpeedCapMultiplier,
@@ -2379,6 +2556,13 @@ export class SurfSimulation {
     );
     player.turboActive = false;
     player.turboOverdrive = 0;
+    player.turboCookingTimer = 0;
+    player.turboReleaseGrace = 0;
+    player.turboFullBurnQualified = false;
+    player.turboTier = "idle";
+    player.turboBurnSpent = 0;
+    player.turboBurnProgress = 0;
+    player.turboBurnInterruptions = 0;
     player.wipeoutCause = cause;
     player.wipeoutSpin = player.angularVelocity || (cause === "curl" ? -5.4 : 4.7);
     player.airX = player.state === "airborne" ? player.airX : player.x;
@@ -2602,6 +2786,15 @@ function createPlayer() {
     turbo: TUNING.turboStartCharge,
     turboActive: false,
     turboOverdrive: 0,
+    turboBurnStartLevel: TUNING.turboStartCharge,
+    turboBurnSpent: 0,
+    turboBurnProgress: 0,
+    turboBurnInterruptions: 0,
+    turboTier: "idle",
+    turboReleaseGrace: 0,
+    turboCookingTimer: 0,
+    turboFullBurnQualified: false,
+    turboCookingLocked: false,
     flowTier: "",
     flow: 0,
     travelDirection: 1,
@@ -2751,6 +2944,15 @@ function resetPlayer(
   );
   player.turboActive = false;
   player.turboOverdrive = 0;
+  player.turboBurnStartLevel = player.turbo;
+  player.turboBurnSpent = 0;
+  player.turboBurnProgress = 0;
+  player.turboBurnInterruptions = 0;
+  player.turboTier = "idle";
+  player.turboReleaseGrace = 0;
+  player.turboCookingTimer = 0;
+  player.turboFullBurnQualified = false;
+  player.turboCookingLocked = false;
   player.flowTier = "";
   player.flow = 0;
   player.travelDirection = 1;
@@ -3073,6 +3275,20 @@ function finiteOr(value, fallback, min, max) {
 
 function finiteTuning(value, fallback) {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function easedRange(progress, from, to) {
+  const amount = clamp(Number(progress) || 0, 0, 1);
+  const eased = amount * amount * (3 - 2 * amount);
+  return from + (to - from) * eased;
+}
+
+function turboCompatibilityOverdrive(progress, tuning = TUNING) {
+  const legacyRange = Math.max(
+    0.001,
+    finiteTuning(tuning.turboSpeedCapMultiplier, TUNING.turboSpeedCapMultiplier) - 1,
+  );
+  return clamp((progressiveTurboCapMultiplier(progress, false, tuning) - 1) / legacyRange, 0, 1);
 }
 
 function boardHalfLength(board) {

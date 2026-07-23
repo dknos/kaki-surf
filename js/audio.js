@@ -38,6 +38,24 @@ const POWERUP_TONES = Object.freeze({
   starFoam: Object.freeze({ start: 523, end: 698, type: "sine", accent: 1047 }),
 });
 
+export function turboAudioMix(player = {}, board = {}, target = null) {
+  const cooking = (Number(player.turboCookingTimer) || 0) > 0 || player.turboTier === "cooking";
+  const engaged = cooking || Boolean(player.turboActive) || (Number(player.turboReleaseGrace) || 0) > 0;
+  const progress = clamp(Number(player.turboBurnProgress) || 0, 0, 1);
+  const intensity = engaged ? cooking ? 1 : 0.18 + progress * 0.82 : 0;
+  const boardId = board?.id ?? "foamPuff";
+  const boardHiss = boardId === "moonLog" ? 1.12 : boardId === "mangoFish" ? 1.06 : 0.95;
+  const windTone = boardId === "moonLog" ? 0.94 : boardId === "mangoFish" ? 1.08 : 1;
+  const mix = target ?? {};
+  mix.tier = cooking ? "cooking" : engaged ? player.turboTier || "ignition" : "idle";
+  mix.progress = progress;
+  mix.intensity = intensity;
+  mix.boardHiss = boardHiss;
+  mix.windTone = windTone;
+  mix.cooking = cooking;
+  return mix;
+}
+
 export class SurfAudio {
   constructor(settings = {}) {
     this.settings = settings;
@@ -70,6 +88,7 @@ export class SurfAudio {
     this.lastSpeedTier = -1;
     this.lastFinalSecond = -1;
     this.inPowerLine = false;
+    this.turboMix = {};
     this.beatReactive = {
       speedTier: 0,
       risk: 0,
@@ -192,7 +211,7 @@ export class SurfAudio {
     const combo = Number(simulation.score?.combo ?? simulation.currentMultiplier?.() ?? 1);
     const airborne = player.state === "airborne";
     const tubeActive = Boolean(player.tubeRide?.active);
-    const turboActive = Boolean(player.turboActive);
+    const turboMix = turboAudioMix(player, simulation.board, this.turboMix);
     const aerialAltitude = airborne ? clamp(Number(player.aerialAltitude) || 0, 0, 1) : 0;
     const apexQuiet = airborne
       ? smoothAudioStep(0, 12, Math.abs(Number(player.airVY) || 0))
@@ -228,26 +247,36 @@ export class SurfAudio {
 
     const contact = ["riding", "lip", "landing", "wobble"].includes(player.state);
     const speedMix = clamp((speed - 28) / 118, 0, 1);
+    const turboSpeedMix = clamp((speed - 28) / 205, 0, 1);
     const carveMix = clamp(Math.abs(Number(player.faceVelocity) || 0) / 1.4, 0, 1);
     const effectsLevel = safeLevel(this.settings.effects, 0.78);
     const boardLevel = contact
       ? effectsLevel
         * (0.012 + speedMix * 0.045 + carveMix * 0.055)
         * (tubeActive ? 0.58 : 1)
-        * (turboActive ? 1.32 : 1)
+        * (1 + turboMix.intensity * turboSpeedMix * 0.62)
+        * turboMix.boardHiss
       : 0;
     const windLevel = airborne
       ? effectsLevel
         * (0.018 + speedMix * 0.095)
         * (0.82 + aerialAltitude * 0.52 + reentry * 1.35)
         * (0.24 + apexQuiet * 0.76)
-      : effectsLevel * speedMix * (turboActive ? 0.026 : 0.008);
+        * (1 + turboMix.intensity * turboSpeedMix * 0.22)
+      : effectsLevel * (speedMix * 0.008 + turboSpeedMix * turboMix.intensity * 0.05);
     setParamTarget(this.boardGain?.gain, boardLevel, now, 0.045);
-    setParamTarget(this.boardFilter?.frequency, 780 + speedMix * 1750 + carveMix * 920, now, 0.055);
+    setParamTarget(
+      this.boardFilter?.frequency,
+      780 + speedMix * 1750 + carveMix * 920
+        + turboMix.intensity * turboSpeedMix * 680,
+      now,
+      0.055,
+    );
     setParamTarget(this.windGain?.gain, windLevel, now, airborne ? 0.05 : 0.12);
     setParamTarget(
       this.windFilter?.frequency,
-      720 + speedMix * 1900 + aerialAltitude * 580 + reentry * 960,
+      (720 + speedMix * 1900 + aerialAltitude * 580 + reentry * 960
+        + turboMix.intensity * turboSpeedMix * 940) * turboMix.windTone,
       now,
       0.08,
     );
@@ -323,6 +352,20 @@ export class SurfAudio {
       case "turboRefill":
         this.chirp(now, 523, 1175, 0.16, 0.085);
         this.tone(now + 0.075, 1568, 0.09, "sine", 0.05, this.effectsGain, 2093);
+        break;
+      case "turboTier":
+        if (payload.tier === "surge") {
+          this.tone(now, 330, 0.07, "triangle", 0.035, this.effectsGain, 495);
+        } else if (payload.tier === "redline") {
+          this.chirp(now, 392, 880, 0.12, 0.055);
+          this.noiseBurst(now, 0.08, 0.018, "bandpass", 1150, 3100);
+        }
+        break;
+      case "turboFullBurn":
+        this.duck(0.58, 0.26);
+        this.noiseBurst(now, 0.11, 0.09, "highpass", 420, 4200);
+        this.chirp(now, 165, 1320, 0.13, 0.12);
+        this.tone(now + 0.045, 990, 0.12, "triangle", 0.065, this.effectsGain, 1485);
         break;
       case "turboStop":
         if (payload.reason === "empty") {

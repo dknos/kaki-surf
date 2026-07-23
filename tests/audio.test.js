@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { SurfAudio, safeLevel } from "../js/audio.js";
+import { SurfAudio, safeLevel, turboAudioMix } from "../js/audio.js";
 
 function createAudioProbe() {
   const audio = new SurfAudio();
@@ -71,6 +71,27 @@ test("Turbo start, landed-trick refill, and empty-tank stop have distinct cues",
   assert.equal(calls.length, 0, "ordinary release avoids audio chatter");
   audio.onEvent({ type: "turboStop", payload: { reason: "empty" } });
   assert.ok(firstTone(calls).end < firstTone(calls).start, "empty tank resolves downward");
+});
+
+test("Turbo audio follows progressive intensity, actual tier, and board identity", () => {
+  const ignition = turboAudioMix({ turboActive: true, turboTier: "ignition", turboBurnProgress: 0.05 }, { id: "foamPuff" });
+  const surge = turboAudioMix({ turboActive: true, turboTier: "surge", turboBurnProgress: 0.4 }, { id: "mangoFish" });
+  const redline = turboAudioMix({ turboActive: true, turboTier: "redline", turboBurnProgress: 0.8 }, { id: "moonLog" });
+  const cooking = turboAudioMix({ turboCookingTimer: 0.5, turboTier: "cooking", turboBurnProgress: 1 }, { id: "moonLog" });
+  assert.ok(ignition.intensity < surge.intensity);
+  assert.ok(surge.intensity < redline.intensity);
+  assert.ok(redline.intensity < cooking.intensity);
+  assert.equal(cooking.tier, "cooking");
+  assert.ok(redline.boardHiss > ignition.boardHiss);
+
+  const { audio, calls } = createAudioProbe();
+  audio.onEvent({ type: "turboTier", payload: { tier: "redline" } });
+  assert.ok(calls.some((call) => call.method === "noiseBurst"));
+  calls.length = 0;
+  audio.onEvent({ type: "turboFullBurn", payload: { duration: 0.75 } });
+  assert.ok(calls.some((call) => call.method === "noiseBurst" && call.volume >= 0.09));
+  assert.ok(calls.filter((call) => call.method === "tone").length >= 3);
+  assert.ok(audio.duckAmount < 1);
 });
 
 test("dolphin, shark, and whale semantics resolve to distinct frequency identities", () => {
