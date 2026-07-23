@@ -156,7 +156,7 @@ test("every generated production atlas is local, dimension-checked, and compact"
     "twilightHeroWave",
     "waveBreaker", "waveProgression",
     "dolphin", "shark", "whale", "birds", "boats", "airTraffic", "powerups", "boards", "carrier",
-    "uiOrnaments",
+    "uiOrnaments", "soderSnek",
   ];
   assert.deepEqual(Object.keys(GENERATED_ASSET_MANIFEST), requiredFamilies);
 
@@ -173,6 +173,17 @@ test("every generated production atlas is local, dimension-checked, and compact"
       : 8;
     assert.ok(Object.keys(descriptor.frames).length >= minimumFrames, `${family} publishes reusable frame metadata`);
   }
+
+  const soderCheck = spawnSync(
+    "python3",
+    ["tools/art/build-soder-snek-atlas.py", "--check"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  assert.equal(
+    soderCheck.status,
+    0,
+    `Soder atlas validation failed:\n${soderCheck.stdout}${soderCheck.stderr}`,
+  );
 });
 
 test("condition aerial panoramas are tall local masters with unique art direction", () => {

@@ -27,7 +27,7 @@ import {
   turboPresentationSnapshot,
   updateTurboPresentation,
 } from "./turbo-presentation.js";
-import { drawBoardSprite, drawKittySprite, getBoardVisualProfile } from "./sprites.js";
+import { drawBoardSprite, drawPlayableRiderSprite, getBoardVisualProfile } from "./sprites.js";
 import {
   advanceWavePresentationClocks,
   breakerSkyWindow,
@@ -995,9 +995,11 @@ export class KakiRenderer {
         assets: this.visualAssets,
         airborne: true,
       });
-      drawKittySprite(this.ctx, x - direction * 4, y - 1, player.bodyAngle, this.presentationPlayer(player), this.palette, {
+      drawPlayableRiderSprite(this.ctx, x - direction * 4, y - 1, player.bodyAngle, this.presentationPlayer(player), this.palette, {
         direction,
         stanceDirection,
+        assets: this.visualAssets,
+        reducedMotion: this.settings.reducedMotion,
       });
       if (player.stateTime > 0.62) drawEmbarrassedPaw(this.ctx, x - 2, Math.min(188, y + 13), this.palette);
       return;
@@ -1020,14 +1022,19 @@ export class KakiRenderer {
           airborne: true,
         });
       }
-      drawKittySprite(
+      drawPlayableRiderSprite(
         this.ctx,
         0,
         mounted ? -5 : 0,
         player.bodyAngle + trickBodyPose,
         this.presentationPlayer(player),
         this.palette,
-        { direction, stanceDirection },
+        {
+          direction,
+          stanceDirection,
+          assets: this.visualAssets,
+          reducedMotion: this.settings.reducedMotion,
+        },
       );
       this.ctx.restore();
       return;
@@ -1040,9 +1047,11 @@ export class KakiRenderer {
         airborne: player.state === "airborne",
       });
     }
-    drawKittySprite(this.ctx, x, y - (mounted ? 5 : 0), player.bodyAngle, this.presentationPlayer(player), this.palette, {
+    drawPlayableRiderSprite(this.ctx, x, y - (mounted ? 5 : 0), player.bodyAngle, this.presentationPlayer(player), this.palette, {
       direction,
       stanceDirection,
+      assets: this.visualAssets,
+      reducedMotion: this.settings.reducedMotion,
     });
   }
 

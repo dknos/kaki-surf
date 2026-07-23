@@ -156,6 +156,7 @@ export class KakiSurfGame {
       );
     }
     this.settings = this.save.settings;
+    this.selectedCharacter = normalizeCharacterId(this.save.selectedCharacter);
     this.state = "menu";
     this.pausedFrom = null;
     this.accumulator = 0;
@@ -163,6 +164,7 @@ export class KakiSurfGame {
     this.frameHandle = 0;
     this.started = false;
     this.destroyed = false;
+    this.characterFallbackWarned = false;
     this.runSequence = 0;
     this.viewportOrientation = stableViewportOrientation(
       globalThis.window?.innerWidth,
@@ -176,6 +178,7 @@ export class KakiSurfGame {
       tuning: TUNING,
       controlMode: this.settings.controlMode,
       mode: this.save.selectedMode,
+      character: this.selectedCharacter,
     });
     this.renderer = new KakiRenderer(this.elements.canvas, this.settings, visualAssets);
     this.ownsInput = !externalInput;
@@ -185,7 +188,6 @@ export class KakiSurfGame {
     });
     this.input.setControlMode?.(this.settings.controlMode);
     this.audio = externalAudio ?? new SurfAudio(this.settings);
-    this.selectedCharacter = normalizeCharacterId(this.save.selectedCharacter);
     this.selectedBoard = BOARDS[this.save.selectedBoard] ? this.save.selectedBoard : "foamPuff";
     this.selectedCondition = CONDITIONS[this.save.selectedCondition] ? this.save.selectedCondition : "goldenCoast";
     this.selectedMode = RUN_MODES[this.save.selectedMode] ? this.save.selectedMode : DEFAULT_RUN_MODE_ID;
@@ -231,6 +233,13 @@ export class KakiSurfGame {
 
   async startRun() {
     if (this.destroyed) return;
+    const soderFallbackActive = this.selectedCharacter === "soderSnek"
+      && !this.renderer.visualAssets?.generated?.soderSnek;
+    this.host.dataset.characterAsset = soderFallbackActive ? "fallback" : "atlas";
+    if (soderFallbackActive && !this.characterFallbackWarned) {
+      this.characterFallbackWarned = true;
+      console.warn("Soder Snek atlas could not be loaded; using the complete code-authored Soder renderer.");
+    }
     const landscapeLock = lockMobileLandscape({
       enabled: this.isTouchControlEnvironment(),
       host: this.host,
@@ -278,7 +287,7 @@ export class KakiSurfGame {
       this.announce("Turn your phone sideways to surf.", { urgent: true });
       return;
     }
-    this.announce(`${characterDefinition(this.selectedCharacter).displayName}, ${RUN_MODES[this.selectedMode].name}, ${BOARDS[this.selectedBoard].name}, ${CONDITIONS[this.selectedCondition].name}.`);
+    this.announce(`${characterDefinition(this.selectedCharacter).displayName}, ${RUN_MODES[this.selectedMode].name}, ${BOARDS[this.selectedBoard].name}, ${CONDITIONS[this.selectedCondition].name}.${soderFallbackActive ? " Code-authored Soder art active." : ""}`);
   }
 
   pause(reason = "manual") {
@@ -777,6 +786,8 @@ export class KakiSurfGame {
     this.selectedCharacter = normalized;
     this.host.dataset.character = normalized;
     this.save.selectedCharacter = normalized;
+    this.simulation.characterId = normalized;
+    this.simulation.player.characterId = normalized;
     this.elements.characterGrid.querySelectorAll("[data-character]").forEach((button) => {
       const selected = button.dataset.character === normalized;
       button.classList.toggle("is-selected", selected);

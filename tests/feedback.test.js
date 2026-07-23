@@ -341,7 +341,7 @@ test("Kaki, board, and rider effects share the same stage-camera transform", () 
   assert.match(surferSource, /y = projection\.finalY/);
   assert.match(surferSource, /this\.ctx\.translate\(x, y\)/);
   assert.match(surferSource, /drawBoardSprite\(this\.ctx, 0, 1/);
-  assert.match(surferSource, /drawKittySprite\([\s\S]*?this\.ctx,[\s\S]*?\n\s*0,/);
+  assert.match(surferSource, /drawPlayableRiderSprite\([\s\S]*?this\.ctx,[\s\S]*?\n\s*0,/);
   assert.doesNotMatch(surferSource, /riderScale|\.scale\(/,
     "the shared rider group must stay at its authored size throughout the jump");
   const renderSource = KakiRenderer.prototype.render.toString();

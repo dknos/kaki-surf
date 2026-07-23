@@ -1,5 +1,6 @@
 import { clamp } from "./math.js";
 import { drawAtlasFrame } from "./asset-drawing.js";
+import { drawSoderSnekSprite } from "./soder-snek.js";
 
 const BOARD_PROFILES = Object.freeze({
   foamPuff: Object.freeze({ half: 17, thickness: 6, wake: 0.86, spray: "round", flex: 1.25 }),
@@ -104,6 +105,13 @@ function pose(overrides = {}) {
 
 export function getBoardVisualProfile(board) {
   return BOARD_PROFILES[board?.id] ?? BOARD_PROFILES.foamPuff;
+}
+
+export function drawPlayableRiderSprite(ctx, x, y, angle, player, palette, options = {}) {
+  if (player?.characterId === "soderSnek") {
+    return drawSoderSnekSprite(ctx, x, y, angle, player, palette, options);
+  }
+  return drawKittySprite(ctx, x, y, angle, player, palette, options);
 }
 
 export function resolveKakiPose(player = {}) {

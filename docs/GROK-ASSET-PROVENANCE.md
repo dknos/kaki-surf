@@ -297,6 +297,35 @@ Selected source: `docs/art-source/grok/ui-ornaments-source-v2.png`.
 Corrected production UI ornament sheet for a 384x216 neo-chibi plush surf arcade game: eight small independent ornaments, each fully contained within the middle 60 percent of its own implied cell, centered at four evenly spaced columns and two rows on one uninterrupted flat chroma-magenta field; generous empty magenta gutters prevent any overlap or cropping. Top: compact blank curling-wave crest, round yellow-coral Foam Puff emblem, orange-indigo fish-tail emblem, lavender longboard-moon emblem. Bottom: arrows plus star plus shell Simple Controls glyph with no letters, completely blank coral-and-cream ribbon with no marks, paw-and-wave special badge, blank-center gold results medallion. Chunky hand-cleaned pixel clusters, deep-navy outline, controlled cream coral gold sea-glass violet palette. Absolutely no words, pseudo-writing, letters, numbers, labels, logos, watermark, borders, grid lines, scenery, characters, photorealism, gradients, or noisy AI texture.
 ```
 
+### 15. Soder Snek character concept — selected as reference only
+
+Selected concept: `docs/art-source/grok/soder-snek-source.png`.
+
+The attached plush photograph was supplied as the authoritative identity
+reference. Grok image-edit produced two sheets; Variant A was selected because
+it retained the hood eyes, tongue, cheek patches, bangs, belly, paws, and one
+attached tail. Variant B was rejected because it introduced detached coil props
+and a boxed final cell. Neither generated sheet is loaded by the game.
+
+```text
+Use the supplied Soder Snek image as the authoritative image-edit reference.
+Create one consistent late-16-bit neo-chibi sprite concept in sixteen implied
+cells on flat chroma magenta. Preserve the large green snake hood, two glossy
+vertical hood eyes, long pink tongue, purple-pink hood cheeks, brown-orange
+stripes, teal bangs, pale happy face, green body, segmented tan belly, white
+mitten paws, and one expressive attached tail. Include ride, carve, compression,
+lip, air, landing, grab, flip, spiral, Turbo, and wipeout silhouettes. Avoid
+dinosaur, dragon, frog, lizard, human costume, cat anatomy, extra limbs,
+detached tail, scenery, board, water, gradients, antialiasing, text, logos,
+watermarks, and cell borders.
+```
+
+Production output is `assets/generated/soder-snek-atlas.png`: 56 code-authored
+64x64 cells packed 8x7. `tools/art/build-soder-snek-atlas.py` authors and checks
+the final native pixels, binary alpha, compact palette, and one-pixel minimum
+cell padding. A complete recognizable code renderer remains available if the
+required atlas cannot decode.
+
 ## Runtime policy
 
 - Original source dimensions are preserved for provenance and future curation but are not runtime dependencies.

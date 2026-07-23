@@ -3,9 +3,11 @@ import { createKakiSurf } from "./integration-adapter.js";
 const host = document.querySelector("#kaki-surf-root");
 
 try {
-  const qaScene = new URLSearchParams(location.search).get("qa");
+  const query = new URLSearchParams(location.search);
+  const qaScene = query.get("qa");
+  const character = query.get("character");
   const game = await createKakiSurf({ host, qaScene });
-  game.start();
+  game.start({ character });
   globalThis.kakiSurf = game;
 } catch (error) {
   console.error("Kaki Surf failed to launch.", error);
