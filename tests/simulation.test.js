@@ -328,28 +328,34 @@ test("Twilight lets a fast rider earn a lead while the barrel visibly pursues", 
   assert.ok(player.worldX - simulation.wave.contactX() > 80, "the fast rider still earns a readable lead");
 
   const leadCamera = simulation.cameraWorldX;
-  for (let step = 0; step < 600 && player.x > 190; step += 1) {
+  const offscreenBreakX = simulation.wave.contactX() - leadCamera;
+  for (let step = 0; step < 600 && player.worldX - simulation.cameraWorldX > 190; step += 1) {
     simulation.update(FIXED_STEP, { x: -1 });
   }
   assert.equal(player.travelDirection, -1);
-  assert.ok(player.x < 360, `cutback reached only ${player.x}`);
+  assert.ok(player.worldX - simulation.cameraWorldX < 200,
+    `cutback screen position reached only ${player.worldX - simulation.cameraWorldX}`);
   const cutbackCamera = simulation.cameraWorldX;
-  assert.ok(cutbackCamera < leadCamera, "the bidirectional camera follows a committed cutback left");
-  assert.equal(simulation.world.context.cameraWorldX, cutbackCamera, "world presentation receives the reverse camera");
+  assert.ok(cutbackCamera <= leadCamera, "left intent cannot keep chasing forward");
+  assert.ok(leadCamera - cutbackCamera < 8,
+    `camera reversed before Kaki spent the earned screen width: ${leadCamera - cutbackCamera}`);
+  assert.equal(simulation.world.context.cameraWorldX, cutbackCamera,
+    "world presentation receives the stopped chase camera");
 
-  const offscreenContact = simulation.wave.contactX();
-  // Isolate the late pursuit from the already-dangerous cutback state.
-  player.worldX = Math.max(player.worldX, offscreenContact + 160);
-  player.previousWorldX = player.worldX;
-  player.state = "riding";
-  player.stateTime = 1;
-  player.curlTimer = 0;
-  player.face = simulation.wave.powerFaceAt(player.worldX);
   simulation.wave.time = 54;
-  for (let step = 0; step < 720 && simulation.wave.contactX() < player.worldX && player.state !== "wipeout"; step += 1) {
+  for (let step = 0;
+    step < 1_800
+      && simulation.wave.contactX() - simulation.cameraWorldX < 20
+      && player.state !== "wipeout";
+    step += 1) {
     simulation.update(FIXED_STEP, { x: -1 });
   }
-  assert.ok(simulation.wave.contactX() > offscreenContact, "world-space pursuit closes the earned lead");
+  const returningBreakX = simulation.wave.contactX() - simulation.cameraWorldX;
+  assert.ok(returningBreakX > offscreenBreakX + 40,
+    `visible break advanced only from ${offscreenBreakX} to ${returningBreakX}`);
+  assert.ok(returningBreakX >= 20, `the pursuing break remained offscreen at ${returningBreakX}`);
+  assert.ok(simulation.cameraWorldX <= cutbackCamera,
+    "the camera cannot move the break farther offscreen during the return");
 });
 
 test("every production condition scrolls forward before the right edge can stop the board", () => {

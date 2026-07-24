@@ -74,15 +74,16 @@ async function waitForSnapshot(predicate, timeout, label) {
   while (Date.now() - started < timeout) {
     const snapshot = await evaluate(`(() => {
       const value = globalThis.kakiSurf.getSnapshot();
+      const camera = globalThis.kakiSurf.getCameraDebugSnapshot();
       return {
         lifecycle: value.lifecycle,
         state: value.state,
         elapsed: value.elapsed,
         wipeouts: value.wipeouts,
         travelDirection: value.travelDirection,
-        playerX: value.playerX,
-        cameraWorldX: value.cameraWorldX,
-        breakX: value.breakX,
+        playerX: camera.playerScreenX,
+        cameraWorldX: camera.cameraWorldX,
+        breakX: value.breakX - camera.cameraWorldX,
       };
     })()`);
     if (predicate(snapshot)) return snapshot;
@@ -90,15 +91,16 @@ async function waitForSnapshot(predicate, timeout, label) {
   }
   const snapshot = await evaluate(`(() => {
     const value = globalThis.kakiSurf.getSnapshot();
+    const camera = globalThis.kakiSurf.getCameraDebugSnapshot();
     return {
       lifecycle: value.lifecycle,
       state: value.state,
       elapsed: value.elapsed,
       wipeouts: value.wipeouts,
       travelDirection: value.travelDirection,
-      playerX: value.playerX,
-      cameraWorldX: value.cameraWorldX,
-      breakX: value.breakX,
+      playerX: camera.playerScreenX,
+      cameraWorldX: camera.cameraWorldX,
+      breakX: value.breakX - camera.cameraWorldX,
     };
   })()`);
   throw new Error(`${label} timed out: ${JSON.stringify(snapshot)}`);
@@ -178,8 +180,8 @@ if (!(lead.breakX < -58)) throw new Error(`Lead did not clear the complete barre
 if (!(cutback.playerX < 220 && cutback.travelDirection === -1)) {
   throw new Error(`Cutback did not cross the face: ${JSON.stringify(cutback)}`);
 }
-if (Math.abs(cutback.cameraWorldX - returning.cameraWorldX) > 0.5) {
-  throw new Error("Camera reversed during the return line");
+if (returning.cameraWorldX > cutback.cameraWorldX + 0.5) {
+  throw new Error("Camera kept chasing forward during the return line");
 }
 if (!(returning.breakX >= 20)) {
   throw new Error(`Barrel did not pursue back: ${returning.breakX}`);

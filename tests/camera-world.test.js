@@ -49,19 +49,22 @@ test("right travel exceeds 1000 world pixels without clamping", () => {
   assert.ok(simulation.player.worldX - simulation.camera.worldX >= 88);
 });
 
-test("left reversal moves a viewport and reverses camera smoothly", () => {
+test("left reversal stops forward chase before reversing the camera smoothly", () => {
   const simulation = riding();
   for (let frame = 0; frame < 2200; frame += 1) simulation.update(FIXED_STEP, RIGHT);
   const rightEdge = simulation.player.worldX;
   const cameraPeak = simulation.camera.worldX;
   let previous = cameraPeak;
   let largestStep = 0;
+  let largestCameraX = cameraPeak;
   for (let frame = 0; frame < 2400; frame += 1) {
     simulation.update(FIXED_STEP, { ...RIGHT, x: -1 });
     largestStep = Math.max(largestStep, Math.abs(simulation.camera.worldX - previous));
+    largestCameraX = Math.max(largestCameraX, simulation.camera.worldX);
     previous = simulation.camera.worldX;
   }
   assert.ok(rightEdge - simulation.player.worldX > LOGICAL_WIDTH);
+  assert.equal(largestCameraX, cameraPeak, "left intent stops residual forward follow immediately");
   assert.ok(simulation.camera.worldX < cameraPeak - 100);
   assert.ok(largestStep <= 1.51, `camera jumped ${largestStep}`);
 });

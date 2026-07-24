@@ -35,11 +35,19 @@ export function updateCamera(camera, player, dt) {
   const settings = camera.settings;
   const playerWorldX = Number(player?.worldX) || 0;
   const screenX = playerWorldX - camera.worldX;
+  const forwardIntent = Number(
+    player?.directionIntent ?? player?.travelDirection ?? 1,
+  ) >= 0;
   let targetX = camera.worldX;
-  if (screenX > settings.right) targetX = playerWorldX - settings.right;
+  if (forwardIntent && screenX > settings.right) targetX = playerWorldX - settings.right;
   else if (screenX < settings.left) targetX = playerWorldX - settings.left;
+  if (!forwardIntent && camera.velocityX > 0) camera.velocityX = 0;
   stepAxis(camera, "worldX", "velocityX", targetX, settings.horizontalFrequency,
     settings.maxVelocityX, settings.maxAccelerationX, dt);
+  // A cutback must spend the earned screen width before the camera follows it
+  // left. Braking on steering intent, rather than waiting for world momentum
+  // to reverse, prevents a long residual forward chase from carrying the
+  // independently advancing break farther offscreen after the player turns.
 
   const airborne = player?.state === "airborne" || player?.state === "wipeout";
   const playerWorldY = Number(player?.airY) || 0;
