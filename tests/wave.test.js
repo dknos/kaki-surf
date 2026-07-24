@@ -241,6 +241,42 @@ test("Twilight's protected opening visibly advances before any wipeout", () => {
   assert.ok(classic.curlX > classicInitial + 12, "classic opening also advances in world space");
 });
 
+test("the second-jump and shark window cannot reset pursuit speed to zero", () => {
+  const step = 1 / 120;
+  const threat = {
+    playerX: 420,
+    speed: 132,
+    skillMomentum: 1,
+    active: true,
+  };
+  for (const profile of ["classic", "heroBarrel"]) {
+    const wave = new GameplayWave(0x5a4f1, profile);
+    wave.time = TUNING.curlGrace - 0.5;
+    wave.curlX = -300;
+
+    const openingStart = wave.curlX;
+    for (let frame = 0; frame < 60; frame += 1) {
+      wave.update(step, threat.speed, TUNING.curlSpeed, threat.speed, threat);
+    }
+    const openingAdvance = wave.curlX - openingStart;
+
+    const handoffStart = wave.curlX;
+    for (let frame = 0; frame < 60; frame += 1) {
+      wave.update(step, threat.speed, TUNING.curlSpeed, threat.speed, threat);
+    }
+    const handoffAdvance = wave.curlX - handoffStart;
+    assert.ok(handoffAdvance > 1.4,
+      `${profile} pursuit stopped at grace: ${openingAdvance} -> ${handoffAdvance}`);
+
+    const sharkWindowStart = wave.curlX;
+    for (let frame = 0; frame < 600; frame += 1) {
+      wave.update(step, threat.speed, TUNING.curlSpeed, threat.speed, threat);
+    }
+    assert.ok(wave.curlX > sharkWindowStart + 12,
+      `${profile} barely moved in the first shark window`);
+  }
+});
+
 test("the hero barrel may leave the viewport instead of sticking to a minimum screen x", () => {
   const wave = new GameplayWave(0x54574c47, "heroBarrel");
   wave.curlX = -230;

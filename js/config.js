@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.4.2";
+export const GAME_VERSION = "2.4.3";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -272,6 +272,9 @@ export const TUNING = {
   curlSkillRelief: 0.46,
   curlSpeedRelief: 0.18,
   curlMaxRelief: 0.58,
+  curlOpeningHandoffDuration: 3,
+  curlMinimumPursuitSpeed: 3,
+  curlReliefRampDuration: 8,
   curlReliefSpeedStart: 94,
   curlReliefSpeedEnd: 126,
   curlRespawnRetreat: 42,

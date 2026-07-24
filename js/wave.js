@@ -155,10 +155,16 @@ export class GameplayWave {
         if (this.time <= TUNING.curlGrace) {
           const openingSpeed = Math.max(0, Number(threatProfile.openingSpeed) || 0);
           const openingRamp = smoothstep(0.35, 1.5, this.time);
-          this.curlX += openingSpeed * paceScale * openingRamp * dt;
+          const handoff = smoothstep(
+            TUNING.curlGrace - TUNING.curlOpeningHandoffDuration,
+            TUNING.curlGrace,
+            this.time,
+          );
+          const continuousOpeningSpeed = openingSpeed
+            + (TUNING.curlMinimumPursuitSpeed - openingSpeed) * handoff;
+          this.curlX += continuousOpeningSpeed * paceScale * openingRamp * dt;
           return;
         }
-        const escalation = smoothstep(TUNING.curlGrace, TUNING.curlRampEnd, this.time);
         const skill = clamp(Number(threat.skillMomentum) || 0, 0, 1);
         const speedRelief = smoothstep(
           TUNING.curlReliefSpeedStart,
@@ -175,9 +181,20 @@ export class GameplayWave {
         const maximumThreatSpeed = Number.isFinite(threatProfile.maxSpeed)
           ? threatProfile.maxSpeed
           : TUNING.curlThreatMaxSpeed;
-        const advance = maximumThreatSpeed * paceScale * escalation * (1 - relief);
+        const escalation = smoothstep(TUNING.curlGrace, TUNING.curlRampEnd, this.time);
+        const baseThreatSpeed = TUNING.curlMinimumPursuitSpeed
+          + (maximumThreatSpeed - TUNING.curlMinimumPursuitSpeed) * escalation;
+        const reliefBlend = smoothstep(
+          TUNING.curlGrace,
+          TUNING.curlGrace + TUNING.curlReliefRampDuration,
+          this.time,
+        );
+        const advance = baseThreatSpeed * paceScale * (1 - relief * reliefBlend);
         // The threat can slow when Kaki surfs well, but it never moves backward
-        // merely because the rider reverses direction.
+        // merely because the rider reverses direction. The tapered opening
+        // hands off at the same nonzero floor used here; restarting escalation
+        // at zero made the breaker appear frozen around the second jump and
+        // first shark window.
         this.curlX += Math.max(0, advance) * dt;
       }
       return;
