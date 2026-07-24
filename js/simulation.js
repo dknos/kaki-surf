@@ -1489,6 +1489,9 @@ export class SurfSimulation {
     // control modes. Simple keeps the same core spin axis as Advanced; only the
     // direct Q/E/F/T trick grammar is mode-specific.
     player.angularVelocity = input.x * (wingedLaunch ? TUNING.wingedInitialSpin : 1.6);
+    if (Math.abs(Number(input.x) || 0) >= 0.22) {
+      player.directionIntent = Math.sign(input.x);
+    }
     player.takeoffDirection = player.travelDirection;
     player.landingDirection = player.travelDirection;
     player.bodyAngle = player.boardAngle;
@@ -1580,6 +1583,12 @@ export class SurfSimulation {
 
   updateAirborne(dt, input) {
     const player = this.player;
+    // Air steering is also camera intent. Without this handoff, a cutback
+    // started during a jump leaves the presentation camera chasing the
+    // takeoff direction until after touchdown.
+    if (Math.abs(Number(input.x) || 0) >= 0.22) {
+      player.directionIntent = Math.sign(input.x);
+    }
     if (!this.aerialSession) {
       this.aerialSession = new AerialTrickSession({ boardId: this.board.id });
       player.trickManifest = this.aerialSession.manifest;

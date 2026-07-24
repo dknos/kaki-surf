@@ -23,7 +23,7 @@ import {
   updateRiderAnimation,
 } from "../js/rider-animation.js";
 import { SurfSimulation } from "../js/simulation.js";
-import { drawBoardSprite, drawKittySprite } from "../js/sprites.js";
+import { boardAtlasFrame, drawBoardSprite, drawKittySprite } from "../js/sprites.js";
 import { TRICK_CATALOG } from "../js/trick-catalog.js";
 
 test("landing variants are deterministic, reproducible, and never immediately duplicate", () => {
@@ -209,6 +209,14 @@ test("pose changes cannot move the rider root or board and draw calls keep save/
   const baseline = draw(sampleTrickPose("frontRailGrab", 0).pose);
   const maximum = draw(sampleTrickPose("frontRailGrab", 0.56).pose);
   assert.deepEqual(maximum.slice(0, 2), baseline.slice(0, 2));
+});
+
+test("jumping preserves the selected board deck instead of changing its color", () => {
+  for (const board of Object.values(BOARDS)) {
+    assert.equal(boardAtlasFrame(board, { airborne: false }), `${board.id}Top`);
+    assert.equal(boardAtlasFrame(board, { airborne: true }), `${board.id}Top`);
+    assert.equal(boardAtlasFrame(board, { underside: true }), `${board.id}Underside`);
+  }
 });
 
 test("pixel differences remain inside an expanded Kaki-and-board rectangle", () => {

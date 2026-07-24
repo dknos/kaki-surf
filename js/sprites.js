@@ -178,10 +178,9 @@ export function drawBoardSprite(ctx, x, y, angle, board, palette, options = {}) 
   ctx.rotate(snapAngle(angle + Number(options.relativeAngle ?? 0)));
   ctx.scale(Math.sign(options.direction ?? 1) || 1, 1);
 
-  const family = id === "mangoFish" ? "mangoFish" : id === "moonLog" ? "moonLog" : "foamPuff";
-  const view = options.airborne || options.underside ? "Underside" : "Top";
+  const frame = boardAtlasFrame(board, options);
   const atlasScale = id === "moonLog" ? 0.72 : id === "mangoFish" ? 0.62 : 0.6;
-  const drawn = drawAtlasFrame(ctx, options.assets, "boards", `${family}${view}`, 0, 1 + flex * 0.35, {
+  const drawn = drawAtlasFrame(ctx, options.assets, "boards", frame, 0, 1 + flex * 0.35, {
     scale: atlasScale,
   });
 
@@ -192,6 +191,14 @@ export function drawBoardSprite(ctx, x, y, angle, board, palette, options = {}) 
   }
 
   ctx.restore();
+}
+
+export function boardAtlasFrame(board, options = {}) {
+  const id = board?.id ?? "foamPuff";
+  const family = id === "mangoFish" ? "mangoFish" : id === "moonLog" ? "moonLog" : "foamPuff";
+  // Being airborne does not itself flip the deck. An underside frame is only
+  // appropriate when a trick explicitly asks to reveal it.
+  return `${family}${options.underside ? "Underside" : "Top"}`;
 }
 
 function drawPuffBoard(ctx, board, p, flex) {

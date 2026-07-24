@@ -406,6 +406,36 @@ test("Simple and Advanced directional input both steer and rotate in the air", (
   assert.ok(Math.abs(advanced.player.boardAngle) > Math.PI / 3, "Advanced directional rotation remains available");
 });
 
+test("air steering updates camera intent before a repeated-jump cutback can chase forward", () => {
+  const simulation = beginRiding(BOARDS.foamPuff, { controlMode: "simple" });
+  Object.assign(simulation.player, {
+    state: "lip",
+    worldX: 420,
+    previousWorldX: 420,
+    face: 0.01,
+    faceVelocity: -0.8,
+    slopeDrive: -0.8,
+    speed: 110,
+    charge: 0.8,
+    directionIntent: 1,
+  });
+  Object.assign(simulation.camera, {
+    worldX: 112,
+    velocityX: 72,
+  });
+  simulation.wave.curlX = -500;
+  simulation.launch({ x: 1 });
+  const cameraAtCutback = simulation.camera.worldX;
+
+  simulation.update(FIXED_STEP, { x: -1 });
+
+  assert.equal(simulation.player.state, "airborne");
+  assert.equal(simulation.player.directionIntent, -1);
+  assert.ok(simulation.camera.velocityX <= 0, "air cutback brakes stale forward camera velocity");
+  assert.ok(simulation.camera.worldX <= cameraAtCutback,
+    "camera cannot carry the wave farther offscreen after airborne left input");
+});
+
 test("high-speed reversals draw a heavier arc and scrub more speed than low-speed pivots", () => {
   const reverse = (speed) => {
     const simulation = beginRiding(BOARDS.mangoFish);
