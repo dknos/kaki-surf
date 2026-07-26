@@ -20,6 +20,8 @@ Shipping values live in `js/config.js` under `TUNING`, `WAVE_STYLES`, `BOARDS`, 
 
 The game loop accumulates at most 14 fixed steps per frame. Render interpolation, camera motion, particles, and Web Audio do not calculate gameplay outcomes. Event-driven impact freeze may briefly pause fixed-step consumption, but it does not write simulation fields or change per-step physics. Endless set time and displayed distance accumulate only during active riding/air/landing states; entry and wipeout recovery are excluded. Score Attack decrements only during the same active states. The set stake multiplies the ordinary Flow/risk/board result and remains capped at x7.5.
 
+Visual Quality is presentation-only. Auto resolves to Mobile on compact touch hardware; otherwise it starts at Full and makes one session-only Mobile downgrade after roughly 0.9 accumulated seconds of frames slower than 45 Hz. Healthy frames bleed that pressure away, paused/hidden frames are ignored, and the profile never changes `FIXED_STEP`, input, collision, scoring, seeded schedules, or save records. Mobile scales cosmetic particles to 50%, suppresses far decorative traffic, reduces secondary wave/Turbo density, and disables CSS backdrop blur.
+
 ## Riding and wave defaults
 
 | Key | Default | Meaning |

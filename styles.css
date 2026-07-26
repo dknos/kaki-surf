@@ -680,6 +680,27 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.45;
 }
 
+.performance-note {
+  margin: 8px 0 0;
+  color: var(--foam-shadow);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.quality-status {
+  display: block;
+  margin-top: 7px;
+  color: var(--gold);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+[data-quality-profile="mobile"] .compact-layer,
+[data-quality-profile="mobile"] .settings-dialog::backdrop {
+  backdrop-filter: none;
+}
+
 .tutorial-replay {
   display: block;
   width: calc(100% - 44px);

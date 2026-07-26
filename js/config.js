@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.4.3";
+export const GAME_VERSION = "2.5.0";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -500,6 +500,7 @@ export const DEFAULT_SETTINGS = {
   steeringAssist: false,
   landingAssist: false,
   touchControls: true,
+  qualityMode: "auto",
   waveReadAssist: "full",
   controlMode: "simple",
 };

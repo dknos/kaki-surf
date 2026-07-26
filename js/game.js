@@ -28,6 +28,7 @@ import {
   sanitizeSettings,
   writeSave,
 } from "./persistence.js";
+import { AdaptiveQualityProfile } from "./performance-profile.js";
 import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
 import {
@@ -181,6 +182,11 @@ export class KakiSurfGame {
       character: this.selectedCharacter,
     });
     this.renderer = new KakiRenderer(this.elements.canvas, this.settings, visualAssets);
+    this.qualityProfile = new AdaptiveQualityProfile({
+      requested: this.settings.qualityMode,
+      mobilePreferred: this.isTouchControlEnvironment(),
+    });
+    this.applyQualityProfile();
     this.ownsInput = !externalInput;
     this.input = externalInput ?? new InputManager({
       touchRoot: this.elements.touchControls,
@@ -376,6 +382,7 @@ export class KakiSurfGame {
       tutorial: this.simulation.tutorial?.snapshot?.() ?? null,
       assists: { ...this.simulation.assists },
       controlMode: this.simulation.controlMode,
+      quality: this.qualityProfile.snapshot(),
       travelDirection: this.simulation.player.travelDirection,
       ridingStance: this.simulation.player.ridingStance,
       stanceSwitches: this.simulation.player.stanceSwitches,
@@ -482,6 +489,12 @@ export class KakiSurfGame {
     this.input.update?.(frameDelta);
     const ui = this.input.consumeUi?.() ?? EMPTY_UI;
     const controlsBlocked = Boolean(this.elements.settingsDialog.open);
+    if (this.qualityProfile.observeFrame(frameDelta, {
+      active: this.state === "running" && !controlsBlocked,
+      visible: globalThis.document?.visibilityState !== "hidden",
+    })) {
+      this.applyQualityProfile({ adapted: true });
+    }
     const bufferedMeta = this.input.consumeMeta?.() ?? EMPTY_META;
     const meta = controlsBlocked ? EMPTY_META : bufferedMeta;
 
@@ -923,9 +936,15 @@ export class KakiSurfGame {
       this.simulation.controlMode = this.settings.controlMode;
       this.host.dataset.controlMode = this.settings.controlMode;
     }
+    if (key === "qualityMode") {
+      this.qualityProfile.setRequested(this.settings.qualityMode, {
+        mobilePreferred: this.isTouchControlEnvironment(),
+      });
+    }
     const output = this.host.querySelector(`[data-setting-output="${key}"]`);
     if (output) output.textContent = `${Math.round(this.settings[key] * 100)}%`;
     this.renderer.applySettings(this.settings);
+    this.applyQualityProfile();
     this.audio.applySettings?.(this.settings);
     this.syncTouchControlsVisibility();
     this.save.settings = this.settings;
@@ -953,7 +972,30 @@ export class KakiSurfGame {
     this.selectMode(this.selectedMode);
     this.selectCondition(this.selectedCondition);
     this.syncTouchActionState();
+    this.syncQualityStatus();
     this.syncTutorialReplayUI();
+  }
+
+  applyQualityProfile({ adapted = false } = {}) {
+    const snapshot = this.qualityProfile.snapshot();
+    this.renderer.setQualityProfile(snapshot.resolved);
+    this.host.dataset.qualityProfile = snapshot.resolved;
+    this.host.dataset.qualityMode = snapshot.requested;
+    this.syncQualityStatus();
+    if (adapted) {
+      console.info("Kaki Surf switched Auto quality to Mobile after sustained frame pressure.");
+    }
+  }
+
+  syncQualityStatus() {
+    const output = this.host.querySelector("[data-quality-status]");
+    if (!output || !this.qualityProfile) return;
+    const snapshot = this.qualityProfile.snapshot();
+    const label = snapshot.requested === "auto"
+      ? `AUTO · ${snapshot.resolved.toUpperCase()}${snapshot.adapted ? " ADAPTED" : ""}`
+      : snapshot.resolved.toUpperCase();
+    output.value = label;
+    output.textContent = label;
   }
 
   syncTutorialReplayUI() {
@@ -1993,6 +2035,12 @@ function gameMarkup() {
             <label class="toggle"><input type="checkbox" data-setting="highContrast"><span>HIGH-CONTRAST SURF MARKERS</span></label>
             <label class="toggle"><input type="checkbox" data-setting="touchControls"><span>ALLOW TOUCH CONTROLS · AUTO</span></label>
             <label><span>WAVE READ</span><select data-setting="waveReadAssist" aria-label="Wave Read Assist"><option value="full">FULL</option><option value="subtle">SUBTLE</option><option value="off">OFF</option></select></label>
+          </section>
+          <section aria-labelledby="performance-heading">
+            <h3 id="performance-heading">PERFORMANCE</h3>
+            <label><span>QUALITY</span><select data-setting="qualityMode" aria-label="Visual quality"><option value="auto">AUTO · RECOMMENDED</option><option value="full">FULL</option><option value="mobile">MOBILE</option></select></label>
+            <p class="performance-note">AUTO uses Mobile quality on touch devices and adapts after sustained missed frames. Surf physics and controls stay identical.</p>
+            <output class="quality-status" data-quality-status aria-live="polite">AUTO</output>
           </section>
           <section aria-labelledby="assist-heading">
             <h3 id="assist-heading">ASSISTS <small>−18% SCORE, NO SHAME</small></h3>

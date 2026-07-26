@@ -1,6 +1,6 @@
 # Validation checklist and results
 
-Date: 2026-07-22.
+Date: 2026-07-26.
 
 ## Automated checkpoint
 
@@ -12,10 +12,11 @@ npm run check
 git diff --check
 ```
 
-The current native Node run passed **243 tests with 0 failures**. `npm run check` parsed **35 JavaScript modules** successfully.
+The current native Node run passed **318 tests with 0 failures**. `npm run check` parsed **40 JavaScript modules** successfully.
 
 The current suite covers:
 
+- Persistent Auto/Full/Mobile quality sanitization, compact-touch Mobile selection, a one-way session adaptation after sustained slow frames, recovery from isolated frame pressure, presentation-only particle/traffic/wave/Turbo scaling, and CSS blur removal without changing simulation timing or saves.
 - Simple line/Action/Trick/Turbo input and HUD contracts, Advanced Q/E/F/T, mode-switch clearing, aliases, edge buffering, gamepad selection, dead zone, and independent touch pointers.
 - Controller UI confirm/back edges, dominant-axis navigation, deliberate hold repeat, spatial focus selection, in-place range/select adjustment, and an allocation-free no-pad poll/consume path.
 - Native slider/select/checkbox/button keyboard behavior while Settings is open, modal gameplay-input suppression, safe Escape cleanup, and scrollable touch surfaces outside the Canvas control zone.
@@ -53,6 +54,7 @@ The canonical local-browser matrix contains 143 deterministic captures.
 - Fresh Chromium interaction probes selected and started both modes. Score Attack exposed `START SCORE ATTACK`, `78 SECONDS`, a finite 78-second snapshot, and the `78 SEC BEST` record; Endless exposed `CHASE THE HORIZON`, `3 PAWS / NO CLOCK`, a null public timer, Set 1, and the `ENDLESS BEST` record. Both probes reported **0 page errors**.
 - The responsive rerun captured menu, active play, pause, results, and options at 1280 x 720, 1366 x 768, 1024 x 768, 390 x 844, and 844 x 390. The 844 x 390 fixture shows the continuous stick and large independent actions around a full-height playfield; the 390 x 844 active fixture shows the landscape gate instead of portrait controls.
 - A focused mobile-browser pointer probe moved the live analog deck diagonally to x=0.564/y=-0.705 while independent Action and Turbo pointers stayed held. Releasing only the stick neutralized X/Y; the same session measured a 693.33 × 389.98 Canvas at 844 × 390 and a hidden/inert touch layer behind the paused landscape gate at 390 × 844, with zero runtime exceptions.
+- A fresh 844 × 390 touch profile selected `AUTO · MOBILE`, exposed matching public snapshot/dataset state, removed CSS backdrop blur, and kept the scrolled Performance/Assists Settings view readable with zero runtime exceptions or log errors. At device scale factor 2 and 4× CPU throttling, explicit Mobile reduced average measured renderer time from 3.25 ms to 2.53 ms and p95 from 4.90 ms to 3.30 ms while preserving the 384 × 216 Canvas and 1/120 simulation.
 - A browser fault injection temporarily removed the dolphin atlas. Launch remained successful and the deterministic dolphin fallback stayed visibly readable; the production atlas was then restored and size-checked.
 - Live banner text remains simulation-positioned on flexible cloth. Breaker-aware occlusion hides ordinary mid-watercraft before they enter the curl/player zone while retaining deliberate wake-race craft ahead of it, and gameplay callouts queue instead of stacking.
 - Selected Grok sources, all 13 runtime atlases, menu/results, the shared column break in Golden Coast/Stormbreak/Twilight, distant race craft, wildlife, controls, banners, carrier, and access modes were inspected at actual output size. The active break is code-native and consumes canonical contact directly.

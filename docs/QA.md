@@ -1,6 +1,6 @@
 # QA matrix
 
-Date: 2026-07-22.
+Date: 2026-07-26.
 
 This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 143 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, all four aerial tiers plus re-entry in all three conditions, and whale takeoff/apex/return.
 
@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **243/243 tests pass** and **35 JavaScript modules pass syntax checking**.
+Current result: **318/318 tests pass** and **40 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
@@ -29,6 +29,7 @@ Current result: **243/243 tests pass** and **35 JavaScript modules pass syntax c
 | Set piece | Carrier haze, arrival, deck activity, launch, Fleet Airshow and foam gates | Whimsical/nonmilitary identity, horizon scale, airshow hierarchy, no gameplay collision | Pass |
 | Conditions | Every board in Golden Coast, Twilight Glass, and Stormbreak; condition-specific traffic | Correct local strip, palette and readable player/world contrast | Pass |
 | Access | Simple keyboard/gamepad/touch, Advanced controls, mobile landscape gate, Settings, High Contrast, Reduced Motion, Reduced Flash | Touch uses continuous analog X/Y with independent actions; mobile start requests fullscreen landscape; portrait falls back to a rotate gate; Advanced deliberately restores Q/E/F/T | Pass |
+| Performance | Auto, Full, Mobile, sustained slow-frame adaptation | Auto resolves Mobile on compact touch hardware; only presentation density changes; physics, input, collision, scoring, and saves remain shared | Pass |
 | Audio lifecycle | Running, pause, visibility, resume, results, record, rapid retry, mute | No missed-beat catch-up, stale board/wind bed, stacked completion fanfare, invalid gain, or unbounded major-event peak | Pass |
 | Asset failure | Manifest and dimension rejection plus an absent-dolphin-atlas browser injection | Game starts; semantic fallback remains visible; restored production asset revalidates | Pass |
 

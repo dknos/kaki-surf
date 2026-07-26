@@ -10,6 +10,11 @@ import { wakeParticleVelocity, WAKE_SAMPLE_LIFETIME } from "./motion.js";
 import { persistentHudContract } from "./hud-contract.js";
 import { drawPixelText } from "./pixel-font.js";
 import {
+  QUALITY_PROFILES,
+  resolveQualityProfile,
+  scaledVisualCount,
+} from "./performance-profile.js";
+import {
   beginLandingPresentation,
   cancelLandingPresentation,
   createRiderAnimationState,
@@ -127,7 +132,8 @@ export class KakiRenderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
     this.ctx.imageSmoothingEnabled = false;
-    this.settings = settings;
+    this.qualityProfile = QUALITY_PROFILES.full;
+    this.settings = { ...settings, qualityProfile: this.qualityProfile.id };
     this.visualAssets = visualAssets;
     this.palette = settings.highContrast ? PALETTES.contrast : PALETTES.standard;
     this.conditionId = "goldenCoast";
@@ -163,8 +169,17 @@ export class KakiRenderer {
   }
 
   applySettings(settings) {
-    this.settings = { ...this.settings, ...settings };
+    this.settings = {
+      ...this.settings,
+      ...settings,
+      qualityProfile: this.qualityProfile.id,
+    };
     this.palette = this.settings.highContrast ? PALETTES.contrast : paletteForCondition(this.conditionId);
+  }
+
+  setQualityProfile(profile) {
+    this.qualityProfile = resolveQualityProfile(profile);
+    this.settings.qualityProfile = this.qualityProfile.id;
   }
 
   resetRunPresentation(simulation = null) {
@@ -534,7 +549,7 @@ export class KakiRenderer {
     if (carrierAllowed) {
       drawCarrierEvent(ctx, simulation, this.visualAssets, palette, this.settings);
     }
-    if (trafficAllowed("far", "water")) {
+    if (this.qualityProfile.renderFarTraffic && trafficAllowed("far", "water")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "water");
     }
     if (trafficAllowed("near", "water")) {
@@ -543,7 +558,7 @@ export class KakiRenderer {
     ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const backdropAltitude = this.aerialBackdrop?.altitude ?? 0;
-    if (trafficAllowed("far", "sky")) {
+    if (this.qualityProfile.renderFarTraffic && trafficAllowed("far", "sky")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky", backdropAltitude);
     }
     if (trafficAllowed("mid", "sky")) {
@@ -1461,7 +1476,11 @@ export class KakiRenderer {
 
   spawnSpray(x, y, count, force) {
     const profile = getBoardVisualProfile(this.currentBoard);
-    const adjustedCount = Math.max(1, Math.round(count * (this.settings.reducedMotion ? 0.45 : 1)));
+    const adjustedCount = scaledVisualCount(
+      count,
+      this.qualityProfile,
+      this.settings.reducedMotion ? 0.45 : 1,
+    );
     for (let index = 0; index < adjustedCount; index += 1) {
       const heavy = profile.spray === "heavy";
       const round = profile.spray === "round";
@@ -1495,7 +1514,11 @@ export class KakiRenderer {
 
   spawnContactSpray(player, count, force = 1, color = null) {
     if (!player || player.state === "airborne") return;
-    const amount = Math.max(1, Math.round(count * (this.settings.reducedMotion ? 0.5 : 1)));
+    const amount = scaledVisualCount(
+      count,
+      this.qualityProfile,
+      this.settings.reducedMotion ? 0.5 : 1,
+    );
     for (let index = 0; index < amount; index += 1) {
       const sequence = this.particleSerial + index;
       const turbulence = signedNoise(sequence * 7 + 3) * 11 * force;
@@ -1523,7 +1546,11 @@ export class KakiRenderer {
   }
 
   spawnSeamGlints(x, y, count) {
-    const amount = this.settings.reducedMotion ? Math.ceil(count * 0.45) : count;
+    const amount = scaledVisualCount(
+      count,
+      this.qualityProfile,
+      this.settings.reducedMotion ? 0.45 : 1,
+    );
     for (let index = 0; index < amount; index += 1) {
       this.spawnParticle(x - 17 + index * 4, y - 3 + (index & 1) * 3, -5 + index, -7 - (index % 3) * 2, 0.38, index & 1 ? this.palette.crest : this.palette.gold, index % 4 === 0 ? 2 : 1, 18, 0.3, "star", true);
     }
@@ -1539,7 +1566,11 @@ export class KakiRenderer {
         : key.includes("varial") ? this.palette.violet
           : key.includes("twist") || key.includes("signature") ? this.palette.gold
             : this.palette.crest;
-    const amount = this.settings.reducedMotion ? Math.ceil(count * 0.4) : count;
+    const amount = scaledVisualCount(
+      count,
+      this.qualityProfile,
+      this.settings.reducedMotion ? 0.4 : 1,
+    );
     for (let index = 0; index < amount; index += 1) {
       const angle = (index / Math.max(1, amount)) * Math.PI * 2;
       this.spawnParticle(
@@ -1560,14 +1591,16 @@ export class KakiRenderer {
   }
 
   spawnSparkles(x, y, count, space = "stage") {
-    for (let index = 0; index < count; index += 1) {
-      this.spawnParticle(x + (index - count / 2) * 6, y - 3 + (index % 2) * 5, (index - count / 2) * 2.5, -6, 0.48, this.palette.gold, 2, 10, 0.2, "star", true, space);
+    const amount = scaledVisualCount(count, this.qualityProfile);
+    for (let index = 0; index < amount; index += 1) {
+      this.spawnParticle(x + (index - amount / 2) * 6, y - 3 + (index % 2) * 5, (index - amount / 2) * 2.5, -6, 0.48, this.palette.gold, 2, 10, 0.2, "star", true, space);
     }
   }
 
   spawnWipeout(x, y) {
     this.spawnSpray(x, y, 35, 1.8);
-    for (let index = 0; index < 10; index += 1) {
+    const amount = scaledVisualCount(10, this.qualityProfile);
+    for (let index = 0; index < amount; index += 1) {
       const sequence = this.particleSerial + index;
       this.spawnParticle(
         x + signedNoise(sequence * 5 + 1) * 10,
@@ -1583,7 +1616,7 @@ export class KakiRenderer {
         true,
       );
     }
-    this.particleSerial += 10;
+    this.particleSerial += amount;
   }
 
   spawnParticle(x, y, vx, vy, life, color, size, gravity, drag, kind = "spray", foreground = false, space = "stage") {

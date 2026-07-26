@@ -113,6 +113,9 @@ export function sanitizeSettings(candidate = {}, { legacyControlMode = DEFAULT_S
   settings.controlMode = source.controlMode === "simple" || source.controlMode === "advanced"
     ? source.controlMode
     : legacyControlMode;
+  settings.qualityMode = ["auto", "full", "mobile"].includes(source.qualityMode)
+    ? source.qualityMode
+    : DEFAULT_SETTINGS.qualityMode;
   settings.waveReadAssist = ["full", "subtle", "off"].includes(source.waveReadAssist)
     ? source.waveReadAssist
     : DEFAULT_SETTINGS.waveReadAssist;

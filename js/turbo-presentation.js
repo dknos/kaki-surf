@@ -76,16 +76,17 @@ export function updateTurboPresentation(state, dt, simulation, settings = {}) {
   const intensity = turboPresentationIntensity(player);
   const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? 1) || 1;
   const reducedMotion = Boolean(settings.reducedMotion);
+  const qualityScale = settings.qualityProfile === "mobile" ? 0.55 : 1;
   state.lastTier = tier;
 
   if (intensity > 0 && ACTIVE_RIDE_STATES.has(player.state)) {
-    const dashRate = reducedMotion ? 0 : 3 + intensity * 13;
+    const dashRate = reducedMotion ? 0 : (3 + intensity * 13) * qualityScale;
     state.dashClock += step * dashRate;
     while (state.dashClock >= 1) {
       state.dashClock -= 1;
       spawnDash(state, direction, intensity);
     }
-    const sparkRate = reducedMotion ? 2 + intensity * 4 : 4 + intensity * 13;
+    const sparkRate = (reducedMotion ? 2 + intensity * 4 : 4 + intensity * 13) * qualityScale;
     state.sparkClock += step * sparkRate;
     while (state.sparkClock >= 1) {
       state.sparkClock -= 1;
@@ -97,7 +98,7 @@ export function updateTurboPresentation(state, dt, simulation, settings = {}) {
   }
 
   if (!reducedMotion && (tier === "redline" || tier === "cooking")) {
-    state.echoClock += step * (tier === "cooking" ? 18 : 10 + intensity * 4);
+    state.echoClock += step * (tier === "cooking" ? 18 : 10 + intensity * 4) * qualityScale;
     while (state.echoClock >= 1) {
       state.echoClock -= 1;
       captureEcho(state, simulation, tier === "cooking" ? 0.24 : 0.18);
@@ -377,7 +378,7 @@ function drawWakeRibbon(ctx, state, simulation, palette, settings) {
   ctx.fillRect(x - direction * length, y, direction * length, 2);
   ctx.fillStyle = accent;
   ctx.fillRect(x - direction * Math.round(length * 0.78), y + 3, direction * Math.round(length * 0.78), 1);
-  const accents = settings.reducedMotion ? 2 : 4;
+  const accents = settings.reducedMotion || settings.qualityProfile === "mobile" ? 2 : 4;
   for (let index = 0; index < accents; index += 1) {
     const offset = 5 + index * Math.max(4, Math.floor(length / accents));
     drawBoardAccentShape(ctx, simulation.board?.id, x - direction * offset, y + 2 + index % 2, direction, accent);
@@ -405,7 +406,11 @@ function drawRings(ctx, state, simulation, palette, settings) {
 
 function drawSparks(ctx, state, simulation, palette, settings) {
   const cameraX = Number(simulation.camera?.worldX) || 0;
-  const reducedLimit = settings.reducedMotion ? 16 : state.sparks.length;
+  const reducedLimit = settings.reducedMotion
+    ? 16
+    : settings.qualityProfile === "mobile"
+      ? 24
+      : state.sparks.length;
   let drawn = 0;
   for (const spark of state.sparks) {
     if (spark.life <= 0 || drawn >= reducedLimit) continue;

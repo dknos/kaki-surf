@@ -183,7 +183,8 @@ export function drawHeroBackWater(ctx, simulation, palette, settings, presentati
   ctx.globalAlpha = settings?.highContrast ? 0.26 : 0.12;
   const fall = Math.floor(clock * 0.24) % 17;
   const forwardDrift = Math.floor(clock * 0.7);
-  for (let index = 0; index < 18; index += 1) {
+  const fleckCount = mobileQuality(settings) ? 10 : 18;
+  for (let index = 0; index < fleckCount; index += 1) {
     const x = positiveModulo(18 + index * 47 - forwardDrift, LOGICAL_WIDTH + 36) - 18;
     const y = 96 + ((index * 19 + fall) % 88);
     const length = 3 + index % 5;
@@ -214,17 +215,19 @@ function drawCanonicalFaceStructure(ctx, wave, p, settings, clock) {
   // Five collision-aligned contour seams teach lip, upper face, pocket,
   // lower face, and trough. They are broken water texture, never glow lanes.
   const faces = [0.08, 0.24, 0.43, 0.62, 0.82];
+  const segmentCount = mobileQuality(settings) ? 5 : 8;
+  const sampleStep = mobileQuality(settings) ? 6 : 4;
   for (let lane = 0; lane < faces.length; lane += 1) {
     const face = faces[lane];
     ctx.strokeStyle = lane === 0 ? p.foamShade : lane >= 3 ? p.water : p.waterLight;
     ctx.lineWidth = lane === 0 ? 2 : 1;
     ctx.globalAlpha = highContrast ? 0.58 : lane === 0 ? 0.42 : 0.2;
     const phase = settings?.reducedMotion ? 0 : Math.floor(clock * (0.22 + lane * 0.035));
-    for (let segment = 0; segment < 8; segment += 1) {
+    for (let segment = 0; segment < segmentCount; segment += 1) {
       const x = positiveModulo(segment * 61 + lane * 19 - phase, LOGICAL_WIDTH + 72) - 36;
       const length = 20 + positiveModulo(segment * 11 + lane * 7, 23);
       ctx.beginPath();
-      for (let step = 0; step <= length; step += 4) {
+      for (let step = 0; step <= length; step += sampleStep) {
         const sampleX = x + step;
         const y = wave.ridingY(sampleX, face);
         if (step === 0) ctx.moveTo(sampleX, y);
@@ -238,7 +241,8 @@ function drawCanonicalFaceStructure(ctx, wave, p, settings, clock) {
   ctx.fillStyle = p.crest;
   ctx.globalAlpha = highContrast ? 0.76 : 0.34;
   const drift = settings?.reducedMotion ? 0 : Math.floor(clock * 0.46);
-  for (let index = 0; index < 15; index += 1) {
+  const powerFleckCount = mobileQuality(settings) ? 9 : 15;
+  for (let index = 0; index < powerFleckCount; index += 1) {
     const x = positiveModulo(17 + index * 41 - drift, LOGICAL_WIDTH + 30) - 15;
     const face = wave.powerFaceAt(x);
     const y = Math.round(wave.ridingY(x, face));
@@ -352,6 +356,7 @@ function drawColumnBreak(ctx, g, p, settings, clock) {
 
   // Stable contrail tiles: their positions depend only on screen-grid column
   // and segment number. Once revealed, they never slide or reverse direction.
+  const trailGap = mobileQuality(settings) ? 3 : 0;
   for (const column of columns) {
     const columnFade = 1 - smoothstep(0.88, 1, column.progress);
     const trailTop = Math.ceil(column.topY + 5);
@@ -375,7 +380,7 @@ function drawColumnBreak(ctx, g, p, settings, clock) {
         ctx.globalAlpha = (highContrast ? 1 : 0.72) * columnFade;
         ctx.fillRect(Math.round(column.x + jitterX), y + height + 1, 2, 2);
       }
-      y += height + 2 + seed % 2;
+      y += height + 2 + seed % 2 + trailGap;
     }
   }
 
@@ -504,7 +509,8 @@ function drawTrailingWhitewater(ctx, g, p, settings, clock) {
   ctx.fillStyle = p.foam;
   ctx.globalAlpha = settings?.highContrast ? 0.68 : 0.22;
   const width = Math.max(18, Math.floor(c.edgeX - washLeft + 4));
-  for (let index = 0; index < 34; index += 1) {
+  const churnCount = mobileQuality(settings) ? 18 : 34;
+  for (let index = 0; index < churnCount; index += 1) {
     const x = washLeft + (index * 47 + (index % 5) * 13) % width;
     const depth = (index * 31 + phase * 2) % Math.max(28, c.baseY - HORIZON_Y - 18);
     const y = HORIZON_Y + 18 + depth;
@@ -534,7 +540,8 @@ function drawLongFaceCrest(ctx, g, p, settings) {
   // pixels rise and dip like the original surf line; there are no repeated
   // dashed rails whose direction could flip with Kaki.
   const crestOffset = positiveModulo(Math.round(startX / 3), CREST_STEPS.length);
-  for (let index = 0, x = startX; x < LOGICAL_WIDTH + 5; index += 1, x += 3) {
+  const crestStep = mobileQuality(settings) ? 4 : 3;
+  for (let index = 0, x = startX; x < LOGICAL_WIDTH + 5; index += 1, x += crestStep) {
     const step = CREST_STEPS[(index + crestOffset) % CREST_STEPS.length];
     const y = Math.round(crestY + step);
     const seed = positiveModulo(index * 17 + crestOffset * 7, 19);
@@ -546,7 +553,8 @@ function drawLongFaceCrest(ctx, g, p, settings) {
 
   // Sparse hooked face marks establish the upright wave plane without laying
   // repeated rails across the player's route.
-  for (let index = 0; index < 7; index += 1) {
+  const hookCount = mobileQuality(settings) ? 4 : 7;
+  for (let index = 0; index < hookCount; index += 1) {
     const x = startX + 18 + index * 39;
     if (x > LOGICAL_WIDTH - 5) break;
     const seed = positiveModulo(index * 11 + Math.round(startX), 9);
@@ -585,7 +593,8 @@ function drawTubeRiderForeground(ctx, simulation, g, p, settings, clock) {
   // arc across the opening. Their clock moves down only.
   ctx.fillStyle = p.foamShade;
   ctx.globalAlpha = (settings?.highContrast ? 0.32 : 0.16) * entry;
-  for (let lane = 0; lane < 6; lane += 1) {
+  const laneCount = mobileQuality(settings) ? 4 : 6;
+  for (let lane = 0; lane < laneCount; lane += 1) {
     const x = Math.round(riderX - 10 + lane * 7);
     const top = Math.round(Math.min(riderY - 25, c.lipTipY + 12) + ((lane * 5 + phase) % 8));
     const height = 7 + (lane * 3 + phase) % 11;
@@ -624,7 +633,7 @@ function drawImpactChurn(ctx, g, p, settings, assets, clock, front) {
 
   ctx.fillStyle = front ? p.foam : p.foamShade;
   ctx.globalAlpha = settings?.highContrast ? (front ? 0.98 : 0.84) : (front ? 0.82 : 0.56);
-  const count = front ? 8 : 12;
+  const count = mobileQuality(settings) ? (front ? 6 : 8) : (front ? 8 : 12);
   for (let index = 0; index < count; index += 1) {
     const x = centerX - 38 + CHURN_OFFSETS[index] * 3 + (phase + index) % 4;
     const lift = (index * 7 + phase * 3) % (front ? 13 : 20);
@@ -694,6 +703,10 @@ function columnBreakSpan(growth, collapse) {
 
 function positiveModulo(value, divisor) {
   return ((value % divisor) + divisor) % divisor;
+}
+
+function mobileQuality(settings) {
+  return settings?.qualityProfile === "mobile";
 }
 
 function canonicalContactX(wave) {
