@@ -88,7 +88,7 @@ python3 tools/art/build-aerial-panoramas.py --condition kakiLand
 ```
 
 The first command creates the continuous source, menu art, and decor atlas from
-the preserved reviewed Grok masters, then applies two-pixel cleanup, a 64-color
+the preserved reviewed Grok masters, then retains native one-pixel detail, applies an 80-color
 panorama cap, chroma extraction, and the canonical Relay face grid. The shared
 panorama build then fixes the 1536 x 640 contract, y=502 ocean anchor,
 continuity, and compression. The rejected Vertex/Nano exploration is

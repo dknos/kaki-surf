@@ -601,7 +601,10 @@ export class WorldSimulation {
   }
 
   triggerBirdReaction(entity, reaction, reason, force = false) {
-    if (!entity?.active || !isBirdKind(entity.kind) || entity.activity) return false;
+    if (!entity?.active
+      || !isBirdKind(entity.kind)
+      || TRAFFIC_CATALOG[entity.kind]?.reactiveBird === false
+      || entity.activity) return false;
     if (!force && entity.reaction) return false;
     entity.reaction = reaction;
     entity.reactionReason = String(reason || reaction);
@@ -1605,7 +1608,9 @@ export class WorldSimulation {
         const duration = Math.max(0.001, entity.despawnTime - entity.spawnTime);
         const progress = clamp((this.elapsed - entity.spawnTime) / duration, 0, 1);
         const definition = TRAFFIC_CATALOG[entity.kind];
-        if (definition?.bird) this.updateBirdTraffic(entity, dt, config);
+        if (definition?.bird && definition.reactiveBird !== false) {
+          this.updateBirdTraffic(entity, dt, config);
+        }
         if (!entity.reaction && !entity.activity) {
           if (definition?.banner) {
             entity.phase = progress < 0.18 ? "approach" : progress < 0.82 ? "tow" : "exit";

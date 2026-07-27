@@ -30,7 +30,7 @@ SPECS = (
     Spec("golden", "goldenCoast", "golden-continuous.png", 0.868, 72),
     Spec("twilight", "twilightGlass", "twilight-continuous.png", 0.906, 72),
     Spec("storm", "stormbreak", "storm-continuous.png", 0.878, 64),
-    Spec("kaki-land", "kakiLand", "kaki-land-continuous.png", 502 / 640, 64, 502),
+    Spec("kaki-land", "kakiLand", "kaki-land-continuous.png", 502 / 640, 80, 502),
 )
 
 

@@ -35,7 +35,7 @@ cloud tops into blue-black atmosphere, then sparse stars and one small meteor.
 `kaki-land-continuous.png` is emitted by
 `tools/art/build-kaki-land-assets.py` from the selected local Grok network
 master. The deterministic conversion maps the continuous scene to the live
-camera range, enforces a two-pixel grid and 64-color cap, and retains one
+camera range, retains native one-pixel detail with an 80-color cap, and keeps one
 y=502 ocean anchor. The Last Relay remains a separate reactive atlas layer
 rather than a baked second guardian. See
 [`../KAKI-LAND.md`](../KAKI-LAND.md) for exact sessions, prompts, hashes,

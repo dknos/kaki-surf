@@ -3,9 +3,9 @@
 
 The selected source images remain checked in beside their provenance. This
 deterministic offline pass reframes the continuous panorama around the shared
-ocean anchor, removes sub-pixel softness on a two-pixel grid, chroma-keys the
-reviewed decor sheet, and builds the menu crop. Runtime generation is never
-used.
+ocean anchor, resolves sub-pixel softness onto the native one-pixel grid,
+chroma-keys the reviewed decor sheet, and builds the menu crop. Runtime
+generation is never used.
 """
 
 from __future__ import annotations
@@ -23,9 +23,8 @@ MENU = ROOT / "assets/backgrounds/kakiLand-menu.png"
 ATLAS = ROOT / "assets/generated/kaki-land-decor-atlas.png"
 NANO_REFERENCE = ROOT / "docs/art-source/aerial/nano/kaki-land-1.png"
 GROK_PANORAMA = ROOT / "docs/art-source/aerial/grok/kaki-land-network-master.png"
-GROK_DECOR = ROOT / "docs/art-source/atlases/grok/kaki-land-decor-sheet.jpg"
+GROK_DECOR = ROOT / "docs/art-source/atlases/grok/kaki-land-decor-sheet-v2.png"
 RUNTIME_SIZE = (1536, 640)
-LOW_RES_SIZE = (768, 320)
 HORIZON_Y = 502
 SOURCE_HORIZON_RATIO = 393 / 576
 
@@ -289,27 +288,28 @@ def draw_panorama() -> Image.Image:
     with Image.open(GROK_PANORAMA) as opened:
         source = opened.convert("RGB")
 
-    # Work at half resolution, then enlarge with nearest-neighbor. This cleans
-    # JPEG-scale softness into deliberate two-pixel clusters while retaining
-    # the many tiny maintenance gestures in the selected master.
-    proportional_height = round(source.height * LOW_RES_SIZE[0] / source.width)
+    # Work directly on the runtime pixel grid. The former half-resolution pass
+    # enlarged every source cluster to two logical pixels, which erased the
+    # tiny maintenance gestures and made Kaki-Land visibly coarser than the
+    # other production conditions.
+    proportional_height = round(source.height * RUNTIME_SIZE[0] / source.width)
     wide = source.resize(
-        (LOW_RES_SIZE[0], proportional_height),
+        (RUNTIME_SIZE[0], proportional_height),
         Image.Resampling.LANCZOS,
     )
     source_horizon = max(
         1,
         min(wide.height - 1, round(wide.height * SOURCE_HORIZON_RATIO)),
     )
-    low_horizon = HORIZON_Y // 2
+    runtime_horizon = HORIZON_Y
     # The live camera can reveal source rows 274..490 at exceptional air; it
     # never reaches row zero. Expand the authored tiled heaven down to that
     # reachable band, then compress the lower cloud network toward the normal
     # coast crop. This is one continuous vertical map, not a shelf swap.
     upper_source_break = round(wide.height * (220 / 576))
-    upper_target_break = 205
+    upper_target_break = 410
     upper_sky = wide.crop((0, 0, wide.width, upper_source_break)).resize(
-        (LOW_RES_SIZE[0], upper_target_break),
+        (RUNTIME_SIZE[0], upper_target_break),
         Image.Resampling.LANCZOS,
     )
     lower_sky = wide.crop((
@@ -318,26 +318,25 @@ def draw_panorama() -> Image.Image:
         wide.width,
         source_horizon,
     )).resize(
-        (LOW_RES_SIZE[0], low_horizon - upper_target_break),
+        (RUNTIME_SIZE[0], runtime_horizon - upper_target_break),
         Image.Resampling.LANCZOS,
     )
     water = wide.crop((0, source_horizon, wide.width, wide.height)).resize(
-        (LOW_RES_SIZE[0], LOW_RES_SIZE[1] - low_horizon),
+        (RUNTIME_SIZE[0], RUNTIME_SIZE[1] - runtime_horizon),
         Image.Resampling.LANCZOS,
     )
-    cleaned = Image.new("RGB", LOW_RES_SIZE)
+    cleaned = Image.new("RGB", RUNTIME_SIZE)
     cleaned.paste(upper_sky, (0, 0))
     cleaned.paste(lower_sky, (0, upper_target_break))
-    cleaned.paste(water, (0, low_horizon))
+    cleaned.paste(water, (0, runtime_horizon))
     cleaned = cleaned.filter(
-        ImageFilter.UnsharpMask(radius=0.55, percent=115, threshold=4),
+        ImageFilter.UnsharpMask(radius=0.42, percent=105, threshold=3),
     )
-    cleaned = cleaned.quantize(
-        colors=64,
+    return cleaned.quantize(
+        colors=80,
         method=Image.Quantize.MEDIANCUT,
         dither=Image.Dither.NONE,
     )
-    return cleaned.resize(RUNTIME_SIZE, Image.Resampling.NEAREST)
 
 
 def draw_menu(panorama: Image.Image, atlas: Image.Image) -> Image.Image:

@@ -758,6 +758,36 @@ test("birds react, dodge harmlessly, and award Feather Thread only once", () => 
   assert.equal(splashWorld.forceBirdReaction("not-a-reaction"), 0);
 });
 
+test("Guestbook Gull stays on its authored route when Kaki jumps past it", () => {
+  const world = new WorldSimulation({ seed: 0x6a115, condition: "kakiLand" });
+  const gull = world.spawnTraffic("guestbookGull", {
+    layer: "mid",
+    screenX: 202,
+    y: 61,
+    speed: 0,
+    duration: 8,
+  });
+  assert.ok(gull);
+  assert.equal(TRAFFIC_CATALOG.guestbookGull.reactiveBird, false);
+  const originalY = gull.y;
+  for (let step = 0; step < 90; step += 1) {
+    const playerY = 118 - step;
+    world.update(STEP, context({
+      player: {
+        x: 202,
+        previousX: 202,
+        y: playerY,
+        previousY: playerY + 1,
+        state: "airborne",
+      },
+    }));
+  }
+  assert.equal(gull.y, originalY);
+  assert.equal(gull.vy, 0);
+  assert.equal(gull.reaction, "");
+  assert.equal(gull.dodged, false);
+});
+
 test("pelican and gull couriers telegraph one fair pooled pickup with no miss penalty", () => {
   const world = new WorldSimulation({ seed: 0xc0471e2 });
   runFor(world, 8, context({ player: { x: 40, y: 188 } }));
