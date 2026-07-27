@@ -239,12 +239,16 @@ export class KakiSurfGame {
 
   async startRun() {
     if (this.destroyed) return;
-    const soderFallbackActive = this.selectedCharacter === "soderSnek"
-      && !this.renderer.visualAssets?.generated?.soderSnek;
-    this.host.dataset.characterAsset = soderFallbackActive ? "fallback" : "atlas";
-    if (soderFallbackActive && !this.characterFallbackWarned) {
+    const characterAtlasFamily = this.selectedCharacter === "soderSnek"
+      ? "soderSnek"
+      : this.selectedCharacter === "simplyTerrell" ? "simplyTerrell" : null;
+    const characterFallbackActive = characterAtlasFamily
+      ? !this.renderer.visualAssets?.generated?.[characterAtlasFamily]
+      : false;
+    this.host.dataset.characterAsset = characterFallbackActive ? "fallback" : "atlas";
+    if (characterFallbackActive && !this.characterFallbackWarned) {
       this.characterFallbackWarned = true;
-      console.warn("Soder Snek atlas could not be loaded; using the complete code-authored Soder renderer.");
+      console.warn(`${this.selectedCharacter} atlas could not be loaded; using its complete code-authored renderer.`);
     }
     const landscapeLock = lockMobileLandscape({
       enabled: this.isTouchControlEnvironment(),
@@ -293,7 +297,7 @@ export class KakiSurfGame {
       this.announce("Turn your phone sideways to surf.", { urgent: true });
       return;
     }
-    this.announce(`${characterDefinition(this.selectedCharacter).displayName}, ${RUN_MODES[this.selectedMode].name}, ${BOARDS[this.selectedBoard].name}, ${CONDITIONS[this.selectedCondition].name}.${soderFallbackActive ? " Code-authored Soder art active." : ""}`);
+    this.announce(`${characterDefinition(this.selectedCharacter).displayName}, ${RUN_MODES[this.selectedMode].name}, ${BOARDS[this.selectedBoard].name}, ${CONDITIONS[this.selectedCondition].name}.${characterFallbackActive ? " Code-authored character art active." : ""}`);
   }
 
   pause(reason = "manual") {

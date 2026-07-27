@@ -1,0 +1,31 @@
+{
+  "menuContract": {
+    "cardCount": 3,
+    "selected": true,
+    "ariaPressed": "true",
+    "selectedName": "SIMPLYTERRELL",
+    "gridFitsViewport": true,
+    "atlasLoaded": true
+  },
+  "report": {
+    "character": "simplyTerrell",
+    "state": "airborne",
+    "characterAsset": "atlas",
+    "hostCharacter": "simplyTerrell"
+  },
+  "mobileMenuContract": {
+    "viewport": [
+      844,
+      390
+    ],
+    "selected": true,
+    "selectedName": "SIMPLYTERRELL",
+    "gridFitsViewport": true
+  },
+  "mobileReport": {
+    "character": "simplyTerrell",
+    "state": "riding",
+    "resolvedQuality": "mobile",
+    "characterAsset": "atlas"
+  }
+}

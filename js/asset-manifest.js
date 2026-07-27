@@ -89,6 +89,22 @@ export const GENERATED_ASSET_MANIFEST = Object.freeze({
     "shedFlipOpen", "shedFlipSeparate", "shedFlipReconnect", "soderSpiralWindup",
     "soderSpiralMaximum", "soderSpiralSpot", "dolphinMount", "sharkStartled",
   ], { anchor: [0.5, 0.88], optional: false }),
+  simplyTerrell: atlas("simply-terrell-atlas.png", 8, 7, 64, 64, [
+    "neutralRide", "regularRide", "goofyRide", "highLineCarve",
+    "downFaceCarve", "deepCompression", "pumpRelease", "snekSnap",
+    "coilCutback", "lipAnticipation", "serpentTuck", "takeoffUncoil",
+    "risingStretch", "floatingApex", "controlledFall", "landingAnticipation",
+    "perfectImpactCoil", "cleanImpact", "wobble", "perfectRideAwayA",
+    "perfectRideAwayB", "perfectRideAwayC", "perfectRideAwayD", "cleanRideAwayA",
+    "cleanRideAwayB", "cleanRideAwayC", "cleanRideAwayD", "switchLanding",
+    "turboLanding", "wipeoutA", "wipeoutB", "wipeoutC",
+    "curlWipeout", "tailKnotTumble", "tongueFlop", "victory",
+    "disappointed", "turboIgnition", "turboSurge", "turboRedline",
+    "turboCooking", "turboRelease", "tongueTapReach", "tongueTapHold",
+    "tongueTapRelease", "tailCoilReach", "tailCoilHold", "tailCoilRelease",
+    "shedFlipOpen", "shedFlipSeparate", "shedFlipReconnect", "soderSpiralWindup",
+    "soderSpiralMaximum", "soderSpiralSpot", "dolphinMount", "sharkStartled",
+  ], { anchor: [0.5, 0.92], optional: false }),
 });
 
 export function atlasFrame(manifest, name) {

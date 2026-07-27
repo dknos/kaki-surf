@@ -36,7 +36,7 @@ The lower environment sources were generated offline, curated, then cropped and 
 
 ## Generated runtime atlases
 
-Thirteen families are loaded at runtime and remain optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family. The continuous side-break and six-cell travelling-break outputs remain in the offline 15-family build for provenance, but browser review rejected both as active MVP silhouettes and they are absent from `js/asset-manifest.js`.
+Fifteen families are loaded at runtime and remain optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family. The continuous side-break and six-cell travelling-break outputs remain in the offline build for provenance, but browser review rejected both as active MVP silhouettes and they are absent from `js/asset-manifest.js`.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
@@ -53,10 +53,15 @@ Thirteen families are loaded at runtime and remain optional. Missing or invalid 
 | `boards` | `boards-atlas.png` | 256 x 72 | Top, rail, flex concept, underside for three boards | Existing inspectable board renderer |
 | `carrier` | `carrier-atlas.png` | 384 x 100 | Haze, festival carrier, lights, radar, crew, airshow, wake | Layered festival-fleet silhouette |
 | `uiOrnaments` | `ui-ornaments-atlas.png` | 320 x 104 | Crest, board emblems, controls, ribbon, badge, medal | Existing Canvas/CSS panels and glyphs |
+| `soderSnek` | `soder-snek-atlas.png` | 512 x 448 | Complete 56-pose Soder rider timeline | Code-authored Soder renderer |
+| `simplyTerrell` | `simply-terrell-atlas.png` | 512 x 448 | Complete 56-pose comedian-surfer timeline with microphone | Code-authored SimplyTerrell renderer |
 
 The flexible-board concept cells are source references; live board deformation remains code-driven so physics state, landing angle, and sprite alignment stay coherent. The renderer can use top/rail/underside art without treating a baked bent pose as collision truth.
 
 Exact source paths, hashes, selection decisions, all Grok prompts including rejected iterations, and the rebuild command are recorded in [Grok asset provenance](./GROK-ASSET-PROVENANCE.md).
+The SimplyTerrell identity reference, ImageGen prompt, source hash, and
+deterministic rebuild command are recorded in
+[SimplyTerrell character source](./art-source/imagegen/SIMPLY-TERRELL.md).
 
 ## Shipping code assets
 

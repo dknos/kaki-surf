@@ -1158,6 +1158,64 @@ input[type="range"]::-moz-range-thumb {
   background: #df759d;
 }
 
+.character-card--simplyTerrell .character-portrait {
+  background: #31395f;
+}
+
+.character-card--simplyTerrell .character-portrait::before {
+  left: 7px;
+  top: 4px;
+  width: 25px;
+  height: 27px;
+  border: 2px solid var(--ink);
+  background: #a9633f;
+  box-shadow:
+    -4px 1px 0 #171421,
+    4px -2px 0 #171421,
+    -3px 8px 0 #171421,
+    3px 9px 0 #171421;
+}
+
+.character-card--simplyTerrell .character-portrait::after {
+  left: 11px;
+  top: 24px;
+  width: 17px;
+  height: 13px;
+  background: #20294c;
+  box-shadow:
+    -4px 0 0 #969aa8,
+    4px 0 0 #969aa8,
+    6px 3px 0 #20294c,
+    8px 6px 0 #20294c;
+}
+
+.character-card--simplyTerrell .character-portrait i {
+  left: 13px;
+  top: 13px;
+  width: 3px;
+  height: 2px;
+  background: var(--ink);
+  box-shadow: 10px 0 0 var(--ink), 5px 7px 0 1px #f3ddc2;
+}
+
+.character-card--simplyTerrell .character-portrait b {
+  left: 18px;
+  top: 24px;
+  width: 4px;
+  height: 3px;
+  background: #bb344f;
+}
+
+.character-card--simplyTerrell .character-portrait em {
+  left: 29px;
+  top: 12px;
+  width: 3px;
+  height: 15px;
+  background: var(--ink);
+  box-shadow: -1px -3px 0 2px #d8dbe2;
+  transform: rotate(-12deg);
+}
+
 .mode-card {
   min-height: 50px;
   padding: 8px 10px;

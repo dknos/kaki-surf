@@ -1,6 +1,7 @@
 import { clamp } from "./math.js";
 import { drawAtlasFrame } from "./asset-drawing.js";
 import { drawSoderSnekSprite } from "./soder-snek.js";
+import { drawSimplyTerrellSprite } from "./simply-terrell.js";
 
 const BOARD_PROFILES = Object.freeze({
   foamPuff: Object.freeze({ half: 17, thickness: 6, wake: 0.86, spray: "round", flex: 1.25 }),
@@ -110,6 +111,9 @@ export function getBoardVisualProfile(board) {
 export function drawPlayableRiderSprite(ctx, x, y, angle, player, palette, options = {}) {
   if (player?.characterId === "soderSnek") {
     return drawSoderSnekSprite(ctx, x, y, angle, player, palette, options);
+  }
+  if (player?.characterId === "simplyTerrell") {
+    return drawSimplyTerrellSprite(ctx, x, y, angle, player, palette, options);
   }
   return drawKittySprite(ctx, x, y, angle, player, palette, options);
 }

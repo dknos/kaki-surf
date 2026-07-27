@@ -165,7 +165,7 @@ test("every generated production atlas is local, dimension-checked, and compact"
     "twilightHeroWave",
     "waveBreaker", "waveProgression",
     "dolphin", "shark", "whale", "birds", "boats", "airTraffic", "powerups", "boards", "carrier",
-    "uiOrnaments", "soderSnek",
+    "uiOrnaments", "soderSnek", "simplyTerrell",
   ];
   assert.deepEqual(Object.keys(GENERATED_ASSET_MANIFEST), requiredFamilies);
 
@@ -192,6 +192,17 @@ test("every generated production atlas is local, dimension-checked, and compact"
     soderCheck.status,
     0,
     `Soder atlas validation failed:\n${soderCheck.stdout}${soderCheck.stderr}`,
+  );
+
+  const terrellCheck = spawnSync(
+    "python3",
+    ["tools/art/build-simply-terrell-atlas.py", "--check"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  assert.equal(
+    terrellCheck.status,
+    0,
+    `SimplyTerrell atlas validation failed:\n${terrellCheck.stdout}${terrellCheck.stderr}`,
   );
 });
 

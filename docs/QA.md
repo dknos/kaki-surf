@@ -1,6 +1,6 @@
 # QA matrix
 
-Date: 2026-07-26.
+Date: 2026-07-27.
 
 This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 143 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, all four aerial tiers plus re-entry in all three conditions, and whale takeoff/apex/return.
 
@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **318/318 tests pass** and **40 JavaScript modules pass syntax checking**.
+Current result: **322/322 tests pass** and **41 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 

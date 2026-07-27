@@ -1,4 +1,4 @@
-const CHARACTER_IDS = Object.freeze(["kaki", "soderSnek"]);
+const CHARACTER_IDS = Object.freeze(["kaki", "soderSnek", "simplyTerrell"]);
 
 const kaki = Object.freeze({
   id: "kaki",
@@ -45,9 +45,37 @@ const soderSnek = Object.freeze({
   animationProfile: "soderSnek",
 });
 
+const simplyTerrell = Object.freeze({
+  id: "simplyTerrell",
+  displayName: "SIMPLYTERRELL",
+  menuDescription: "SIMPLYTERRELL — LA stand-up flow, mic in hand, ready for the set.",
+  portraitFrame: "simplyTerrellPortrait",
+  riderRendererId: "simplyTerrell",
+  paletteAccents: Object.freeze({
+    primary: "#d8dbe2",
+    secondary: "#bb344f",
+    trail: "#7f8cbf",
+  }),
+  moveNameOverrides: Object.freeze({
+    snap: "MIC CHECK",
+    cutback: "CROWD WORK",
+    frontRailGrab: "ONE-LINER GRAB",
+    tailGrab: "ENCORE GRAB",
+    boardVarial: "PUNCHLINE FLIP",
+    kakiTwist: "TERRELL TURN",
+    tubeTuck: "CLOSE TALK",
+    turboFullBurn: "TERRELL'S COOKING",
+  }),
+  trickEffectProfile: "simplyTerrellSpotlight",
+  turboEffectProfile: "simplyTerrellElectric",
+  audioAccentProfile: "simplyTerrell",
+  animationProfile: "simplyTerrell",
+});
+
 export const CHARACTER_CATALOG = Object.freeze({
   kaki,
   soderSnek,
+  simplyTerrell,
 });
 
 export const PLAYABLE_CHARACTER_IDS = CHARACTER_IDS;

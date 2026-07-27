@@ -12,8 +12,8 @@ import { BOARDS, CONDITIONS, FIXED_STEP, SAVE_KEY } from "../js/config.js";
 import { createDefaultSave, loadSave, writeSave } from "../js/persistence.js";
 import { SurfSimulation } from "../js/simulation.js";
 
-test("character catalog exposes Kaki and Soder through one cosmetic contract", () => {
-  assert.deepEqual(Object.keys(CHARACTER_CATALOG), ["kaki", "soderSnek"]);
+test("character catalog exposes every surfer through one cosmetic contract", () => {
+  assert.deepEqual(Object.keys(CHARACTER_CATALOG), ["kaki", "soderSnek", "simplyTerrell"]);
   for (const definition of Object.values(CHARACTER_CATALOG)) {
     for (const key of [
       "id",
@@ -35,20 +35,23 @@ test("character catalog exposes Kaki and Soder through one cosmetic contract", (
     CHARACTER_CATALOG.soderSnek.menuDescription,
     "SODER SNEK — Coiled style, elastic poses, tremendous tongue control.",
   );
+  assert.match(CHARACTER_CATALOG.simplyTerrell.menuDescription, /LA stand-up flow/);
 });
 
-test("character IDs normalize safely and Soder move names remain display-only", () => {
+test("character IDs normalize safely and custom move names remain display-only", () => {
   assert.equal(normalizeCharacterId("soderSnek"), "soderSnek");
+  assert.equal(normalizeCharacterId("simplyTerrell"), "simplyTerrell");
   assert.equal(normalizeCharacterId("unknown"), "kaki");
   assert.equal(characterDefinition(null).id, "kaki");
   assert.equal(characterMoveName("soderSnek", "kakiTwist", "KAKI TWIST"), "SODER SPIRAL");
   assert.equal(characterMoveName("kaki", "kakiTwist", "KAKI TWIST"), "KAKI TWIST");
   assert.equal(characterMoveText("soderSnek", "PERFECT KAKI TWIST"), "PERFECT SODER SPIRAL");
   assert.equal(characterMoveText("soderSnek", "FRONTSIDE GRAB + BOARD VARIAL"), "TONGUE TAP + SHED FLIP");
+  assert.equal(characterMoveText("simplyTerrell", "FRONTSIDE GRAB + BOARD VARIAL"), "ONE-LINER GRAB + PUNCHLINE FLIP");
   assert.equal(characterMoveText("kaki", "KAKI'S COOKING"), "KAKI'S COOKING");
 });
 
-test("existing saves migrate to Kaki, Soder persists, and invalid IDs fall back", () => {
+test("existing saves migrate to Kaki, every alternate persists, and invalid IDs fall back", () => {
   const legacy = createDefaultSave();
   delete legacy.selectedCharacter;
   const legacyStorage = new MemoryStorage({ [SAVE_KEY]: JSON.stringify(legacy) });
@@ -60,14 +63,19 @@ test("existing saves migrate to Kaki, Soder persists, and invalid IDs fall back"
   assert.equal(writeSave(selected, selectedStorage), true);
   assert.equal(loadSave(selectedStorage).selectedCharacter, "soderSnek");
 
+  selected.selectedCharacter = "simplyTerrell";
+  selectedStorage.setItem(SAVE_KEY, JSON.stringify(selected));
+  assert.equal(loadSave(selectedStorage).selectedCharacter, "simplyTerrell");
+
   selected.selectedCharacter = "dragon";
   selectedStorage.setItem(SAVE_KEY, JSON.stringify(selected));
   assert.equal(loadSave(selectedStorage).selectedCharacter, "kaki");
 });
 
-test("Kaki and Soder preserve byte-identical physical gameplay for one complete air", () => {
+test("all surfers preserve byte-identical physical gameplay for one complete air", () => {
   const kaki = preparedSimulation("kaki");
   const soder = preparedSimulation("soderSnek");
+  const terrell = preparedSimulation("simplyTerrell");
   let landed = false;
 
   for (let step = 0; step < 900; step += 1) {
@@ -83,9 +91,12 @@ test("Kaki and Soder preserve byte-identical physical gameplay for one complete 
     };
     kaki.update(FIXED_STEP, input);
     soder.update(FIXED_STEP, input);
+    terrell.update(FIXED_STEP, input);
     kaki.consumeEvents(() => {});
     soder.consumeEvents(() => {});
+    terrell.consumeEvents(() => {});
     assert.deepEqual(physicalSnapshot(soder), physicalSnapshot(kaki), `fixed step ${step}`);
+    assert.deepEqual(physicalSnapshot(terrell), physicalSnapshot(kaki), `SimplyTerrell fixed step ${step}`);
     if (step > 10 && kaki.player.state === "riding") {
       landed = true;
       break;
@@ -94,6 +105,7 @@ test("Kaki and Soder preserve byte-identical physical gameplay for one complete 
 
   assert.equal(kaki.player.characterId, "kaki");
   assert.equal(soder.player.characterId, "soderSnek");
+  assert.equal(terrell.player.characterId, "simplyTerrell");
   assert.equal(landed, true, "the comparison includes takeoff, flight, and landing");
 });
 
