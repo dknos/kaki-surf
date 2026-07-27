@@ -48,7 +48,7 @@ const soderSnek = Object.freeze({
 const simplyTerrell = Object.freeze({
   id: "simplyTerrell",
   displayName: "SIMPLYTERRELL",
-  menuDescription: "SIMPLYTERRELL — LA stand-up flow, balanced stance, ready for the set.",
+  menuDescription: "SIMPLYTERRELL — Beta tester with LA stand-up flow, balanced stance, ready for the set.",
   portraitFrame: "simplyTerrellPortrait",
   riderRendererId: "simplyTerrell",
   paletteAccents: Object.freeze({

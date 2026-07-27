@@ -37,6 +37,7 @@ test("character catalog exposes every surfer through one cosmetic contract", () 
   );
   assert.equal(CHARACTER_CATALOG.kaki.displayName, "KITTYKAKI");
   assert.match(CHARACTER_CATALOG.kaki.menuDescription, /^KITTYKAKI —/);
+  assert.match(CHARACTER_CATALOG.simplyTerrell.menuDescription, /Beta tester/);
   assert.match(CHARACTER_CATALOG.simplyTerrell.menuDescription, /LA stand-up flow/);
   assert.doesNotMatch(CHARACTER_CATALOG.simplyTerrell.menuDescription, /mic|microphone/i);
   assert.equal(characterMoveName("simplyTerrell", "snap"), "OPENING BIT");

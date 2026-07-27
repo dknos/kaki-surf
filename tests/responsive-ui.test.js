@@ -295,9 +295,10 @@ function feedbackButton(control) {
   };
 }
 
-test("settings dialog includes the creator and inspiration credits", () => {
+test("settings dialog includes the creator, beta tester, and inspiration credits", () => {
   assert.match(GAME_SOURCE, /<section class="credits-section" aria-labelledby="credits-heading">/);
   assert.match(GAME_SOURCE, /MADE BY <strong>@dknos<\/strong>/);
+  assert.match(GAME_SOURCE, /<strong>SIMPLYTERRELL<\/strong> · BETA TESTER/);
   assert.match(
     GAME_SOURCE,
     /Thanks to Oekaki Connect for inspiring me to learn about video games, web3, and cute neo-chibi drawings\./,

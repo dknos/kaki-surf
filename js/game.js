@@ -2177,6 +2177,7 @@ function gameMarkup() {
           <section class="credits-section" aria-labelledby="credits-heading">
             <h3 id="credits-heading">CREDITS</h3>
             <p class="credits-byline">MADE BY <strong>@dknos</strong></p>
+            <p class="credits-copy"><strong>SIMPLYTERRELL</strong> · BETA TESTER</p>
             <p class="credits-copy">Thanks to Oekaki Connect for inspiring me to learn about video games, web3, and cute neo-chibi drawings.</p>
           </section>
           <button class="secondary-button tutorial-replay" type="button" data-action="replay-tutorial" aria-pressed="false">REPLAY SURF SCHOOL</button>
