@@ -57,6 +57,7 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   const locHighlight = "#553426";
   const skin = "#a9633f";
   const skinLight = "#d08a5b";
+  const mouth = "#85323d";
   const navy = "#20294c";
   const navyLight = "#343d68";
   const shoulder = "#969aa8";
@@ -103,16 +104,18 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   // Free gesturing arm.
   const gestureUp = /victory|Star|Release|Cooking/i.test(frame);
   const gestureOut = /Snap|Cutback|wobble|wipeout|Spiral/i.test(frame);
-  const handX = bodyX - (gestureOut ? 19 : 15);
-  const handY = bodyY + (gestureUp ? -10 : gestureOut ? 5 : 12);
+  const handX = bodyX - (gestureOut ? 16 : 12);
+  const handY = bodyY + (gestureUp ? -8 : gestureOut ? 6 : 11);
   ctx.fillStyle = ink;
-  ctx.fillRect(Math.min(bodyX - 10, handX), Math.min(bodyY + 3, handY), 7, Math.abs(handY - bodyY - 3) + 7);
+  ctx.fillRect(Math.min(bodyX - 10, handX), Math.min(bodyY + 3, handY), 8, Math.abs(handY - bodyY - 3) + 7);
   ctx.fillStyle = navy;
-  ctx.fillRect(Math.min(bodyX - 9, handX + 1), Math.min(bodyY + 4, handY + 1), 5, Math.abs(handY - bodyY - 3) + 5);
+  ctx.fillRect(Math.min(bodyX - 9, handX + 1), Math.min(bodyY + 4, handY + 1), 6, Math.abs(handY - bodyY - 3) + 5);
+  ctx.fillStyle = ink;
+  ctx.fillRect(handX - 1, handY - 1, 6, 6);
   ctx.fillStyle = skin;
-  ctx.fillRect(handX, handY, 5, 5);
+  ctx.fillRect(handX, handY, 4, 4);
   ctx.fillStyle = skinLight;
-  ctx.fillRect(handX + 1, handY, 3, 1);
+  ctx.fillRect(handX + 1, handY, 2, 1);
 
   // Microphone arm stays close to the face in every state.
   ctx.fillStyle = ink;
@@ -120,13 +123,13 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillStyle = navy;
   ctx.fillRect(bodyX + 9, bodyY + 4, 5, 13);
   ctx.fillStyle = skin;
-  ctx.fillRect(headX + 6, headY + 13, 5, 5);
+  ctx.fillRect(headX + 8, headY + 16, 5, 5);
   ctx.fillStyle = ink;
-  ctx.fillRect(headX + 8, headY + 4, 3, 12);
+  ctx.fillRect(headX + 10, headY + 12, 3, 10);
   ctx.fillStyle = silver;
-  ctx.fillRect(headX + 7, headY + 2, 5, 4);
+  ctx.fillRect(headX + 8, headY + 9, 5, 4);
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(headX + 8, headY + 2, 2, 1);
+  ctx.fillRect(headX + 9, headY + 9, 2, 1);
 
   // Loc silhouette, face, and warm comedian expression.
   ctx.fillStyle = locs;
@@ -134,20 +137,23 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillRect(headX - 14, headY + 4, 5, 24);
   ctx.fillRect(headX + 10, headY + 3, 5, 23);
   ctx.fillRect(headX - 9, headY - 6, 18, 6);
+  ctx.fillStyle = locHighlight;
+  ctx.fillRect(headX - 11, headY, 3, 18);
+  ctx.fillRect(headX + 8, headY - 1, 3, 20);
   ctx.fillStyle = skin;
   ctx.fillRect(headX - 8, headY + 2, 16, 15);
   ctx.fillStyle = skinLight;
   ctx.fillRect(headX - 6, headY + 3, 5, 3);
-  ctx.fillStyle = locHighlight;
-  ctx.fillRect(headX - 11, headY, 3, 18);
-  ctx.fillRect(headX + 8, headY - 1, 3, 20);
-  ctx.fillRect(headX - 6, headY - 4, 3, 9);
   ctx.fillStyle = ink;
   ctx.fillRect(headX - 5, headY + 8, 2, 2);
   ctx.fillRect(headX + 3, headY + 8, 2, 2);
-  ctx.fillRect(headX - 2, headY + 13, 6, 2);
+  ctx.fillRect(headX - 3, headY + 13, 7, 3);
   ctx.fillStyle = "#f3ddc2";
-  ctx.fillRect(headX, headY + 13, 3, 1);
+  ctx.fillRect(headX - 2, headY + 13, 5, 1);
+  ctx.fillStyle = mouth;
+  ctx.fillRect(headX - 1, headY + 14, 3, 1);
+  ctx.fillStyle = skinLight;
+  ctx.fillRect(headX, headY + 15, 1, 1);
 }
 
 function snapAngle(angle = 0) {

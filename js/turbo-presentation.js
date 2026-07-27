@@ -369,21 +369,38 @@ function drawWakeRibbon(ctx, state, simulation, palette, settings) {
   if (intensity <= 0 || !ACTIVE_RIDE_STATES.has(player.state) || player.animalMount) return;
   const cameraX = Number(simulation.camera?.worldX) || 0;
   const direction = Math.sign(player.motionDirection ?? player.travelDirection ?? 1) || 1;
-  const x = Math.round(player.worldX - cameraX - direction * 12);
-  const y = Math.round(simulation.wave.ridingY(player.worldX, player.face) + 3);
-  const length = Math.round(10 + intensity * (simulation.board?.id === "moonLog" ? 36 : 27));
+  const x = Math.round(player.worldX - cameraX);
+  const y = Math.round(simulation.wave.ridingY(player.worldX, player.face) + 1);
+  const tangent = Number(player.boardAngle) || simulation.wave.slopeAt(player.worldX, player.face);
+  const contactX = -direction * 12;
+  const length = Math.round(8 + intensity * (simulation.board?.id === "moonLog" ? 28 : 20));
   const accent = boardAccent(simulation.board?.id, palette);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tangent);
   ctx.globalAlpha = 0.45 + intensity * 0.35;
   ctx.fillStyle = palette.foam;
-  ctx.fillRect(x - direction * length, y, direction * length, 2);
+  ctx.fillRect(contactX - direction * length, 0, direction * length, 2);
   ctx.fillStyle = accent;
-  ctx.fillRect(x - direction * Math.round(length * 0.78), y + 3, direction * Math.round(length * 0.78), 1);
+  ctx.fillRect(
+    contactX - direction * Math.round(length * 0.72),
+    3,
+    direction * Math.round(length * 0.72),
+    1,
+  );
   const accents = settings.reducedMotion || settings.qualityProfile === "mobile" ? 2 : 4;
   for (let index = 0; index < accents; index += 1) {
     const offset = 5 + index * Math.max(4, Math.floor(length / accents));
-    drawBoardAccentShape(ctx, simulation.board?.id, x - direction * offset, y + 2 + index % 2, direction, accent);
+    drawBoardAccentShape(
+      ctx,
+      simulation.board?.id,
+      contactX - direction * offset,
+      2 + index % 2,
+      direction,
+      accent,
+    );
   }
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawRings(ctx, state, simulation, palette, settings) {

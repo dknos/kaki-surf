@@ -81,13 +81,20 @@ async function capture(name) {
 }
 
 async function key(code, down) {
-  const keyCode = code === "ArrowUp" ? 38 : 0;
+  const keyCodes = {
+    ArrowUp: 38,
+    ShiftLeft: 16,
+  };
+  const keys = {
+    ArrowUp: "ArrowUp",
+    ShiftLeft: "Shift",
+  };
   await call("Input.dispatchKeyEvent", {
     type: down ? "keyDown" : "keyUp",
-    key: code,
+    key: keys[code] ?? code,
     code,
-    windowsVirtualKeyCode: keyCode,
-    nativeVirtualKeyCode: keyCode,
+    windowsVirtualKeyCode: keyCodes[code] ?? 0,
+    nativeVirtualKeyCode: keyCodes[code] ?? 0,
   });
 }
 
@@ -158,6 +165,30 @@ await waitFor(
   "SimplyTerrell riding with production atlas",
 );
 await capture("01-riding");
+
+await key("ShiftLeft", true);
+await waitFor(
+  `(() => {
+    const snapshot = globalThis.kakiSurf.getSnapshot();
+    return snapshot.state === "riding"
+      && snapshot.turboActive
+      && snapshot.character === "simplyTerrell";
+  })()`,
+  "SimplyTerrell Turbo contact",
+);
+await sleep(350);
+await capture("01b-turbo");
+const turboReport = await evaluate(`(() => {
+  const snapshot = globalThis.kakiSurf.getSnapshot();
+  return {
+    character: snapshot.character,
+    state: snapshot.state,
+    turboActive: snapshot.turboActive,
+    turboTier: snapshot.turboTier,
+  };
+})()`);
+await key("ShiftLeft", false);
+await sleep(120);
 
 await key("ArrowUp", true);
 await waitFor(
@@ -247,7 +278,7 @@ const mobileReport = await evaluate(`(() => {
 })()`);
 await writeFile(
   path.join(outputDir, "report.json"),
-  `${JSON.stringify({ menuContract, report, mobileMenuContract, mobileReport }, null, 2)}\n`,
+  `${JSON.stringify({ menuContract, turboReport, report, mobileMenuContract, mobileReport }, null, 2)}\n`,
 );
 
 socket.close();
@@ -256,6 +287,7 @@ if (failures.length) {
 }
 console.log(`SimplyTerrell browser QA passed: ${JSON.stringify({
   menuContract,
+  turboReport,
   report,
   mobileMenuContract,
   mobileReport,

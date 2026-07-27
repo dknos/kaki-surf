@@ -200,6 +200,22 @@ test("Reduced Flash substitutes gold outlines for full-burn white rings", () => 
   assert.ok(reduced.styles.has(PALETTES.standard.gold));
 });
 
+test("Turbo contact ribbon follows the canonical board tangent instead of drawing a flat water seam", () => {
+  const simulation = beginRiding();
+  Object.assign(simulation.player, {
+    turboActive: true,
+    turboTier: "surge",
+    turboBurnProgress: 0.68,
+    boardAngle: 0.37,
+  });
+  const state = createTurboPresentationState();
+  const ctx = new ContextProbe();
+  drawTurboStageEffects(ctx, state, simulation, PALETTES.standard, {});
+  assert.ok(ctx.rotations.some((value) => Math.abs(value - 0.37) < 1e-9));
+  assert.ok(ctx.translations.some(([x, y]) => Number.isFinite(x) && Number.isFinite(y)));
+  assert.equal(ctx.depth, 0);
+});
+
 function simulationSnapshot(simulation) {
   const player = simulation.player;
   return {
@@ -241,6 +257,8 @@ class ContextProbe {
     this.clipState = "unclipped";
     this.drawCalls = 0;
     this.styles = new Set();
+    this.rotations = [];
+    this.translations = [];
   }
 
   snapshot() {
@@ -266,9 +284,15 @@ class ContextProbe {
   }
 
   setTransform(...values) { this.transform = `set:${values.join(",")}`; }
-  translate(x, y) { this.transform += `:t${x},${y}`; }
+  translate(x, y) {
+    this.translations.push([x, y]);
+    this.transform += `:t${x},${y}`;
+  }
   scale(x, y) { this.transform += `:s${x},${y}`; }
-  rotate(value) { this.transform += `:r${value}`; }
+  rotate(value) {
+    this.rotations.push(value);
+    this.transform += `:r${value}`;
+  }
   fillRect() {
     this.drawCalls += 1;
     this.styles.add(this.fillStyle);

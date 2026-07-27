@@ -47,6 +47,7 @@ P = {
     "skin_dark": (105, 55, 37, 255),
     "skin": (169, 99, 63, 255),
     "skin_light": (208, 138, 91, 255),
+    "mouth": (133, 50, 61, 255),
     "navy_dark": (26, 33, 65, 255),
     "navy": (32, 41, 76, 255),
     "navy_light": (52, 61, 104, 255),
@@ -126,23 +127,20 @@ def draw_frame(name: str, index: int) -> Image.Image:
     shoulder_left = (body_x - 8, body_top + 4)
     gesture = specification["gesture"]
     gesture_end = {
-        "high": (max(7, body_x - 16), max(6, body_top - 14)),
-        "wide": (max(10, body_x - 23), body_top + 2),
-        "low": (max(8, body_x - 17), min(55, body_top + 19)),
-        "talk": (max(8, body_x - 19), body_top + 8),
-        "rest": (max(10, body_x - 14), body_top + 14),
+        "high": (max(9, body_x - 14), max(8, body_top - 12)),
+        "wide": (max(12, body_x - 20), body_top + 3),
+        "low": (max(10, body_x - 14), min(53, body_top + 17)),
+        "talk": (max(10, body_x - 16), body_top + 8),
+        "rest": (max(12, body_x - 12), body_top + 13),
     }[gesture]
-    elbow = (body_x - 13, round((body_top + gesture_end[1]) / 2) + 3)
+    elbow = (body_x - 12, round((body_top + 4 + gesture_end[1]) / 2) + 2)
     line(draw, [shoulder_left, elbow, gesture_end], P["ink"], P["navy"], 8, 5)
-    draw.rectangle((gesture_end[0] - 3, gesture_end[1] - 2,
-                    gesture_end[0] + 3, gesture_end[1] + 3), fill=P["skin_dark"])
     draw.rectangle((gesture_end[0] - 2, gesture_end[1] - 2,
-                    gesture_end[0] + 2, gesture_end[1] + 2), fill=P["skin"])
-    if gesture in {"high", "wide", "talk"}:
-        draw.line((gesture_end[0] - 3, gesture_end[1] - 3,
-                   gesture_end[0] - 5, gesture_end[1] - 5), fill=P["skin"], width=2)
-        draw.line((gesture_end[0] + 2, gesture_end[1] - 2,
-                   gesture_end[0] + 4, gesture_end[1] - 4), fill=P["skin"], width=2)
+                    gesture_end[0] + 2, gesture_end[1] + 2), fill=P["skin_dark"])
+    draw.rectangle((gesture_end[0] - 1, gesture_end[1] - 1,
+                    gesture_end[0] + 2, gesture_end[1] + 1), fill=P["skin"])
+    draw.rectangle((gesture_end[0] + 1, gesture_end[1] + 1,
+                    gesture_end[0] + 3, gesture_end[1] + 2), fill=P["skin"])
 
     # Loose navy tracksuit torso with gray shoulder panels and red shirt peek.
     draw.polygon([
@@ -169,7 +167,7 @@ def draw_frame(name: str, index: int) -> Image.Image:
 
     # Bent microphone arm; this never disappears in trick or recovery frames.
     shoulder_right = (body_x + 8, body_top + 4)
-    mic_hand = (head_x + 8, head_top + 14)
+    mic_hand = (head_x + 10, head_top + 18)
     mic_elbow = (body_x + 14, body_top + 12)
     line(draw, [shoulder_right, mic_elbow, mic_hand], P["ink"], P["navy"], 8, 5)
     draw.rectangle((mic_hand[0] - 2, mic_hand[1] - 2,
@@ -198,17 +196,19 @@ def draw_frame(name: str, index: int) -> Image.Image:
     draw.rectangle((head_x + 3, head_top + 9, head_x + 5, head_top + 10), fill=P["ink"])
     draw.point((head_x, head_top + 12), fill=P["skin_dark"])
     draw.rectangle((head_x - 4, head_top + 14, head_x + 4, head_top + 16), fill=P["skin_dark"])
-    draw.rectangle((head_x - 2, head_top + 14, head_x + 3, head_top + 14), fill=P["white"])
+    draw.rectangle((head_x - 3, head_top + 14, head_x + 3, head_top + 14), fill=P["white"])
+    draw.rectangle((head_x - 2, head_top + 15, head_x + 2, head_top + 15), fill=P["mouth"])
+    draw.rectangle((head_x - 1, head_top + 16, head_x + 1, head_top + 16), fill=P["skin_light"])
 
     # One handheld microphone per frame, close enough to read at 0.76x.
     draw.line(
-        (mic_hand[0] + 1, mic_hand[1], head_x + 7, head_top + 7),
+        (mic_hand[0] + 1, mic_hand[1], head_x + 10, head_top + 14),
         fill=P["ink"],
         width=3,
     )
-    draw.rectangle((head_x + 5, head_top + 4, head_x + 10, head_top + 8), fill=P["silver_dark"])
-    draw.rectangle((head_x + 6, head_top + 4, head_x + 9, head_top + 6), fill=P["silver"])
-    draw.point((head_x + 7, head_top + 4), fill=P["white"])
+    draw.rectangle((head_x + 7, head_top + 10, head_x + 12, head_top + 14), fill=P["silver_dark"])
+    draw.rectangle((head_x + 8, head_top + 10, head_x + 11, head_top + 12), fill=P["silver"])
+    draw.point((head_x + 9, head_top + 10), fill=P["white"])
 
     if any(term in name for term in ("turbo", "Cooking", "victory")):
         draw.rectangle((55, 14 + (index % 3) * 5, 57, 16 + (index % 3) * 5), fill=P["spark"])
@@ -223,7 +223,7 @@ def validate_cell(name: str, cell: Image.Image) -> None:
     if not {pixel[3] for pixel in pixels}.issubset({0, 255}):
         raise SystemExit(f"{name}: semitransparent pixels")
     colors = {pixel for pixel in pixels if pixel[3]}
-    for required in ("navy", "shoulder", "red", "locs", "skin", "silver"):
+    for required in ("navy", "shoulder", "red", "locs", "skin", "mouth", "silver"):
         if P[required] not in colors:
             raise SystemExit(f"{name}: missing {required} landmark")
     if len(colors) > 20:

@@ -58,7 +58,7 @@ test("SimplyTerrell fallback keeps locs, tracksuit, red collar, skin, and microp
 
   assert.deepEqual(dispatched.commands, direct.commands);
   assert.equal(direct.depth, 0);
-  for (const color of ["#171421", "#20294c", "#969aa8", "#bb344f", "#a9633f", "#d8dbe2"]) {
+  for (const color of ["#171421", "#20294c", "#969aa8", "#bb344f", "#a9633f", "#85323d", "#d8dbe2"]) {
     assert.ok(direct.colors.has(color), `fallback landmark ${color}`);
   }
   assert.ok(

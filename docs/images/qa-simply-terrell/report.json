@@ -7,6 +7,12 @@
     "gridFitsViewport": true,
     "atlasLoaded": true
   },
+  "turboReport": {
+    "character": "simplyTerrell",
+    "state": "riding",
+    "turboActive": true,
+    "turboTier": "ignition"
+  },
   "report": {
     "character": "simplyTerrell",
     "state": "airborne",
