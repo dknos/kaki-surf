@@ -3,7 +3,7 @@
 
 The user-supplied photo and ImageGen concept sheet establish identity and
 wardrobe. Runtime cells are authored at final resolution for hard alpha,
-stable landmarks, and consistent microphone readability.
+stable landmarks, and a continuous head-to-collar silhouette.
 """
 
 from __future__ import annotations
@@ -54,7 +54,6 @@ P = {
     "shoulder": (150, 154, 168, 255),
     "red": (187, 52, 79, 255),
     "silver_dark": (123, 129, 143, 255),
-    "silver": (216, 219, 226, 255),
     "white": (248, 241, 225, 255),
     "shoe_dark": (75, 74, 82, 255),
     "shoe": (171, 169, 169, 255),
@@ -165,15 +164,16 @@ def draw_frame(name: str, index: int) -> Image.Image:
     ], fill=P["red"])
     draw.line((body_x, body_top + 6, body_x, hip_y - 2), fill=P["silver_dark"], width=1)
 
-    # Bent microphone arm; this never disappears in trick or recovery frames.
+    # Relaxed second arm stays clear of the face and balances the gesture.
     shoulder_right = (body_x + 8, body_top + 4)
-    mic_hand = (head_x + 10, head_top + 18)
-    mic_elbow = (body_x + 14, body_top + 12)
-    line(draw, [shoulder_right, mic_elbow, mic_hand], P["ink"], P["navy"], 8, 5)
-    draw.rectangle((mic_hand[0] - 2, mic_hand[1] - 2,
-                    mic_hand[0] + 3, mic_hand[1] + 3), fill=P["skin_dark"])
-    draw.rectangle((mic_hand[0] - 1, mic_hand[1] - 2,
-                    mic_hand[0] + 2, mic_hand[1] + 2), fill=P["skin"])
+    resting_hand = (body_x + 12, body_top + 16)
+    resting_elbow = (body_x + 13, body_top + 10)
+    line(draw, [shoulder_right, resting_elbow, resting_hand],
+         P["ink"], P["navy"], 8, 5)
+    draw.rectangle((resting_hand[0] - 2, resting_hand[1] - 2,
+                    resting_hand[0] + 2, resting_hand[1] + 2), fill=P["skin_dark"])
+    draw.rectangle((resting_hand[0] - 1, resting_hand[1] - 1,
+                    resting_hand[0] + 1, resting_hand[1] + 1), fill=P["skin"])
 
     # Hair mass and individual shoulder-length locs.
     draw.rectangle((head_x - 11, head_top - 2, head_x + 11, head_top + 18), fill=P["locs"])
@@ -189,6 +189,12 @@ def draw_frame(name: str, index: int) -> Image.Image:
         )
         draw.point((head_x + offset + bend, head_top + 8 + loc_index), fill=P["loc_highlight"])
 
+    # Opaque neck bridge closes the center gap between the head and collar.
+    draw.rectangle(
+        (head_x - 3, head_top + 15, head_x + 3, body_top + 1),
+        fill=P["skin_dark"],
+    )
+
     # Face, eyes, beard edge, and a warm on-stage smile.
     draw.rectangle((head_x - 7, head_top + 3, head_x + 7, head_top + 16), fill=P["skin"])
     draw.rectangle((head_x - 5, head_top + 4, head_x - 1, head_top + 6), fill=P["skin_light"])
@@ -200,32 +206,31 @@ def draw_frame(name: str, index: int) -> Image.Image:
     draw.rectangle((head_x - 2, head_top + 15, head_x + 2, head_top + 15), fill=P["mouth"])
     draw.rectangle((head_x - 1, head_top + 16, head_x + 1, head_top + 16), fill=P["skin_light"])
 
-    # One handheld microphone per frame, close enough to read at 0.76x.
-    draw.line(
-        (mic_hand[0] + 1, mic_hand[1], head_x + 10, head_top + 14),
-        fill=P["ink"],
-        width=3,
-    )
-    draw.rectangle((head_x + 7, head_top + 10, head_x + 12, head_top + 14), fill=P["silver_dark"])
-    draw.rectangle((head_x + 8, head_top + 10, head_x + 11, head_top + 12), fill=P["silver"])
-    draw.point((head_x + 9, head_top + 10), fill=P["white"])
-
     if any(term in name for term in ("turbo", "Cooking", "victory")):
         draw.rectangle((55, 14 + (index % 3) * 5, 57, 16 + (index % 3) * 5), fill=P["spark"])
         draw.point((54, 15 + (index % 3) * 5), fill=P["white"])
 
-    validate_cell(name, frame)
+    validate_cell(name, frame, head_x, head_top, body_top)
     return frame
 
 
-def validate_cell(name: str, cell: Image.Image) -> None:
+def validate_cell(
+    name: str,
+    cell: Image.Image,
+    head_x: int,
+    head_top: int,
+    body_top: int,
+) -> None:
     pixels = list(cell.get_flattened_data())
     if not {pixel[3] for pixel in pixels}.issubset({0, 255}):
         raise SystemExit(f"{name}: semitransparent pixels")
     colors = {pixel for pixel in pixels if pixel[3]}
-    for required in ("navy", "shoulder", "red", "locs", "skin", "mouth", "silver"):
+    for required in ("navy", "shoulder", "red", "locs", "skin", "mouth"):
         if P[required] not in colors:
             raise SystemExit(f"{name}: missing {required} landmark")
+    for y in range(head_top + 15, body_top + 1):
+        if cell.getpixel((head_x, y))[3] != 255:
+            raise SystemExit(f"{name}: transparent head-to-collar gap at {head_x},{y}")
     if len(colors) > 20:
         raise SystemExit(f"{name}: palette grew to {len(colors)} colors")
     for position in range(CELL):

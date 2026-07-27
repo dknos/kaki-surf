@@ -62,7 +62,6 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   const navyLight = "#343d68";
   const shoulder = "#969aa8";
   const red = "#bb344f";
-  const silver = "#d8dbe2";
   const shoe = "#aba9a9";
   const crouch = /Compression|Impact|Tuck|Coil|wobble|Hold|Mount/i.test(frame) ? 4 : 0;
   const stretch = /takeoff|rising|victory|Cooking/i.test(frame) ? 3 : 0;
@@ -117,19 +116,15 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillStyle = skinLight;
   ctx.fillRect(handX + 1, handY, 2, 1);
 
-  // Microphone arm stays close to the face in every state.
+  // Relaxed second arm stays clear of the face.
   ctx.fillStyle = ink;
   ctx.fillRect(bodyX + 8, bodyY + 3, 7, 15);
   ctx.fillStyle = navy;
   ctx.fillRect(bodyX + 9, bodyY + 4, 5, 13);
-  ctx.fillStyle = skin;
-  ctx.fillRect(headX + 8, headY + 16, 5, 5);
   ctx.fillStyle = ink;
-  ctx.fillRect(headX + 10, headY + 12, 3, 10);
-  ctx.fillStyle = silver;
-  ctx.fillRect(headX + 8, headY + 9, 5, 4);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(headX + 9, headY + 9, 2, 1);
+  ctx.fillRect(bodyX + 10, bodyY + 14, 6, 6);
+  ctx.fillStyle = skin;
+  ctx.fillRect(bodyX + 11, bodyY + 15, 4, 4);
 
   // Loc silhouette, face, and warm comedian expression.
   ctx.fillStyle = locs;
@@ -140,6 +135,8 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillStyle = locHighlight;
   ctx.fillRect(headX - 11, headY, 3, 18);
   ctx.fillRect(headX + 8, headY - 1, 3, 20);
+  ctx.fillStyle = "#693725";
+  ctx.fillRect(headX - 3, headY + 15, 7, bodyY - headY - 13);
   ctx.fillStyle = skin;
   ctx.fillRect(headX - 8, headY + 2, 16, 15);
   ctx.fillStyle = skinLight;

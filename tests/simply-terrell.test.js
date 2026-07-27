@@ -37,7 +37,7 @@ test("SimplyTerrell follows canonical rider state and trick animation", () => {
   assert.equal(resolveSimplyTerrellFrame({ state: "complete", resultWon: true }), "victory");
 });
 
-test("SimplyTerrell fallback keeps locs, tracksuit, red collar, skin, and microphone readable", () => {
+test("SimplyTerrell fallback keeps an opaque neck, locs, tracksuit, skin, and two readable hands", () => {
   const direct = new CommandContext();
   const dispatched = new CommandContext();
   const player = {
@@ -58,14 +58,14 @@ test("SimplyTerrell fallback keeps locs, tracksuit, red collar, skin, and microp
 
   assert.deepEqual(dispatched.commands, direct.commands);
   assert.equal(direct.depth, 0);
-  for (const color of ["#171421", "#20294c", "#969aa8", "#bb344f", "#a9633f", "#85323d", "#d8dbe2"]) {
+  for (const color of ["#171421", "#20294c", "#969aa8", "#bb344f", "#a9633f", "#85323d"]) {
     assert.ok(direct.colors.has(color), `fallback landmark ${color}`);
   }
   assert.ok(
     direct.commands.filter(([command, , , width, height]) => (
       command === "fillRect" && width >= 3 && height >= 4
     )).length >= 12,
-    "full biped, locs, stage jacket, hands, and microphone",
+    "full biped, opaque neck, locs, stage jacket, and hands",
   );
   assert.deepEqual(direct.scales[0], [1, 1]);
   assert.ok(SIMPLY_TERRELL_VISUAL_BOUNDS.left > -32);
