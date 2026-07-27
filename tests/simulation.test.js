@@ -1420,6 +1420,45 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
   assert.ok(simulation.elapsed > 0, "the restarted run advances normally");
 });
 
+test("wave motion stays monotonic through a crash and the protected recovery lane", () => {
+  for (const condition of [CONDITIONS.goldenCoast, CONDITIONS.twilightGlass]) {
+    const simulation = beginRiding(BOARDS.foamPuff, { condition });
+    const player = simulation.player;
+    simulation.wave.time = 24;
+    simulation.wave.curlX = 118;
+    simulation.cameraWorldX = 96;
+    player.x = 260;
+    player.previousX = player.x;
+    simulation.triggerWipeout("TEST CRASH", "landing");
+
+    const crashStart = simulation.wave.curlX;
+    let previousCurl = crashStart;
+    let respawnCurl = null;
+    let minimumRecoveryGap = Number.POSITIVE_INFINITY;
+    for (let step = 0; step < 360 && player.state !== "riding"; step += 1) {
+      simulation.update(FIXED_STEP, {});
+      assert.ok(
+        simulation.wave.curlX > previousCurl,
+        `${condition.id} wave stopped or reversed in ${player.state}: ${previousCurl} -> ${simulation.wave.curlX}`,
+      );
+      previousCurl = simulation.wave.curlX;
+      if (player.state === "entry") {
+        respawnCurl ??= simulation.wave.curlX;
+        minimumRecoveryGap = Math.min(
+          minimumRecoveryGap,
+          player.x - simulation.wave.contactX(),
+        );
+      }
+    }
+
+    assert.equal(player.state, "riding");
+    assert.ok(respawnCurl > crashStart, `${condition.id} crash presentation advances the wave`);
+    assert.ok(simulation.wave.curlX > respawnCurl, `${condition.id} entry keeps the wave advancing`);
+    assert.ok(minimumRecoveryGap >= TUNING.curlRespawnSafeGap - 0.1,
+      `${condition.id} moving entry lane preserved only ${minimumRecoveryGap} px`);
+  }
+});
+
 test("Endless Surf replaces the clock with deterministic escalating sets and capped stakes", () => {
   const simulation = beginRiding(BOARDS.mangoFish, { mode: "endless" });
   assert.equal(simulation.modeId, "endless");

@@ -343,7 +343,10 @@ export class SurfSimulation {
       : player.x;
     threatContext.speed = waveSpeed;
     threatContext.skillMomentum = player.skillMomentum;
-    threatContext.active = player.state !== "entry" && player.state !== "wipeout";
+    // Threat collision is state-gated by updateCurlDanger/updateAirborne. Its
+    // world-space motion is not: the break must keep travelling through entry,
+    // jumps, landings, and wipeout presentation instead of visibly freezing.
+    threatContext.active = true;
     this.wave.update(
       dt,
       waveSpeed,
@@ -929,7 +932,12 @@ export class SurfSimulation {
   updateEntry(dt, input) {
     const player = this.player;
     const t = smoothstep(0, 0.72, player.stateTime);
-    player.x = 324 - t * 112;
+    const recoveryWaveAdvance = Number.isFinite(player.entryWaveAnchorX)
+      ? this.wave.curlX - player.entryWaveAnchorX
+      : 0;
+    player.x = player.entryStartX
+      + (player.entryEndX - player.entryStartX) * t
+      + recoveryWaveAdvance;
     player.face = this.wave.profileId === "heroBarrel"
       ? this.wave.powerFaceAt(player.x)
       : 0.44 + Math.sin(t * Math.PI) * 0.05;
@@ -2622,22 +2630,29 @@ export class SurfSimulation {
       return;
     }
 
-    // Respawning is an explicit recovery reset, not ordinary threat motion.
-    // Keep the curl behind the entry endpoint so one mistake cannot cascade
-    // into unavoidable re-catches while the entry animation owns control.
-    const retreat = Math.max(
-      38,
-      Math.min(
-        this.wave.curlX - TUNING.curlRespawnRetreat,
-        TUNING.curlRespawnSafeX,
-      ),
-    );
-    this.wave.curlX = retreat;
     const preservedTurbo = player.turbo;
     resetPlayer(player, false, this.tuning.speed);
     player.turbo = preservedTurbo;
     this.aerialSession = null;
-    player.x = clamp(this.wave.curlX + 122, 160, 282);
+    // Recovery moves Kaki's protected entry lane ahead of the travelling
+    // contact instead of rewinding the break. Translating that lane by any
+    // wave advance during entry preserves the safety gap while the wave keeps
+    // visibly moving in world space.
+    const recoveryGap = finiteTuning(
+      this.tuning.curlRespawnSafeGap,
+      TUNING.curlRespawnSafeGap,
+    );
+    player.entryWaveAnchorX = this.wave.curlX;
+    player.entryEndX = Math.max(
+      this.cameraWorldX + 212,
+      this.wave.contactX() + recoveryGap,
+    );
+    player.entryStartX = Math.max(
+      this.cameraWorldX + 324,
+      player.entryEndX + 112,
+    );
+    player.x = player.entryStartX;
+    player.previousX = player.x;
     player.face = 0.5;
     player.speed = this.tuning.speed * 0.92;
     this.setState("entry");
@@ -2794,6 +2809,9 @@ function createPlayer() {
     stateTime: 0,
     worldX: 212,
     previousWorldX: 212,
+    entryStartX: 324,
+    entryEndX: 212,
+    entryWaveAnchorX: null,
     face: 0.48,
     previousFace: 0.48,
     faceVelocity: 0,
@@ -2947,6 +2965,9 @@ function resetPlayer(
   if (resetPosition) {
     player.worldX = 212;
     player.face = 0.48;
+    player.entryStartX = 324;
+    player.entryEndX = 212;
+    player.entryWaveAnchorX = null;
   }
   player.previousWorldX = player.worldX;
   player.previousFace = player.face;

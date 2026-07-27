@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.5.0";
+export const GAME_VERSION = "2.5.1";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -277,8 +277,7 @@ export const TUNING = {
   curlReliefRampDuration: 8,
   curlReliefSpeedStart: 94,
   curlReliefSpeedEnd: 126,
-  curlRespawnRetreat: 42,
-  curlRespawnSafeX: 90,
+  curlRespawnSafeGap: 122,
   tubeEntryRisk: 0.58,
   tubeHoldRisk: 0.5,
   tubeEntryFaceMin: 0.16,
