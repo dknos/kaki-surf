@@ -72,21 +72,26 @@ export function createInputStep() {
     turboReleased: false,
     trick1: false,
     trick1Pressed: false,
+    trick1PressOrder: 0,
     trick1Released: false,
     trick2: false,
     trick2Pressed: false,
+    trick2PressOrder: 0,
     trick2Released: false,
     trick3: false,
     trick3Pressed: false,
+    trick3PressOrder: 0,
     trick3Released: false,
     trick4: false,
     trick4Pressed: false,
+    trick4PressOrder: 0,
     trick4Released: false,
     style: false,
     stylePressed: false,
     styleReleased: false,
     trick: false,
     trickPressed: false,
+    trickPressOrder: 0,
     trickReleased: false,
     special: false,
     specialPressed: false,
@@ -122,6 +127,7 @@ export class InputManager {
     this.previousActions = createBooleanRecord(STEP_ACTIONS);
     this.previousMeta = createBooleanRecord(META_ACTIONS);
     this.actionBuffers = createActionBuffers();
+    this.nextPressOrder = 1;
     this.restartBuffered = false;
     this.pauseBuffered = false;
     this.retryBuffered = false;
@@ -343,8 +349,13 @@ export class InputManager {
       const buffer = this.actionBuffers[action];
       this.step[`${action}Pressed`] = buffer.pressed > 0;
       this.step[`${action}Released`] = buffer.released > 0;
+      const orderField = `${action}PressOrder`;
+      if (orderField in this.step) {
+        this.step[orderField] = buffer.pressed > 0 ? buffer.pressOrder : 0;
+      }
       buffer.pressed = 0;
       buffer.released = 0;
+      buffer.pressOrder = 0;
     }
     this.step.style = this.step.trick1;
     this.step.stylePressed = this.step.trick1Pressed;
@@ -413,7 +424,11 @@ export class InputManager {
     for (const action of STEP_ACTIONS) {
       const held = Boolean(this.isActionHeld(action));
       const previous = this.previousActions[action];
-      if (held && !previous) this.actionBuffers[action].pressed = BUFFER_WINDOW;
+      if (held && !previous) {
+        this.actionBuffers[action].pressed = BUFFER_WINDOW;
+        this.actionBuffers[action].pressOrder = this.nextPressOrder;
+        this.nextPressOrder += 1;
+      }
       if (!held && previous) this.actionBuffers[action].released = BUFFER_WINDOW;
       this.previousActions[action] = held;
     }
@@ -486,7 +501,9 @@ export class InputManager {
       this.previousActions[action] = false;
       this.actionBuffers[action].pressed = 0;
       this.actionBuffers[action].released = 0;
+      this.actionBuffers[action].pressOrder = 0;
     }
+    this.nextPressOrder = 1;
     for (const action of META_ACTIONS) this.previousMeta[action] = false;
     this.restartBuffered = false;
     this.pauseBuffered = false;
@@ -662,7 +679,9 @@ function createBooleanRecord(actions) {
 }
 
 function createActionBuffers() {
-  return Object.fromEntries(STEP_ACTIONS.map((action) => [action, { pressed: 0, released: 0 }]));
+  return Object.fromEntries(
+    STEP_ACTIONS.map((action) => [action, { pressed: 0, released: 0, pressOrder: 0 }]),
+  );
 }
 
 function createUiInput() {

@@ -17,7 +17,9 @@ Simple Controls are the default for new saves. Advanced Controls preserve the di
 
 Action is always readable: its first 0.5 seconds add a small tuck-preload speed impulse while reducing carve authority, then full steering returns even if the hold continues. Release while carving upward on a useful line to earn an efficiency-scaled pump; carry that uphill line through the lip to launch. Releases below the charge/line gate consume their partial charge without a burst, and a short cadence floor rejects tapping. Action is not a permission button for ordinary speed; wave slope and signed motion produce the base acceleration.
 
-Simple Trick is contextual and buffered. A quick tap on the face switches regular/goofy stance; holding it past the grab threshold inside Twilight's eligible critical pocket tucks Kaki into the tube, and Moon Log uses its Soul Arch variant. A slightly wider hold band and 0.12-second grace keep tiny pocket jitter from cancelling the pose. Releasing Trick exits deliberately; if the barrel forces Kaki out, Trick must be released before another tube session can begin. The compact tube HUD shows live time and points, and a 0.45-second or longer ride receives a clean-exit result. Around a launch, a held request chooses Frontside Grab, or Stalefish Grab when held with down intent. A tap starts with Board Varial, then chooses an unused grab, then Kaki Twist when the launch is large enough. If a tap reaches a gate too late or without enough air, the simulation falls back to an unused grab instead of simply eating the input. The request buffer is 0.34 seconds in simulation time. Any aerial trick still held at contact causes a wipeout.
+Simple Trick is contextual and buffered. **Down + a quick tap while clearly grounded** switches regular/goofy stance; a neutral/up tap remains a takeoff intent and expires without changing stance if no launch follows. Holding inside Twilight's eligible critical pocket tucks Kaki into the tube, and Moon Log uses its Soul Arch variant. Pocket-exit grace remains 0.12 seconds. Around a launch, the dedicated intent buffer lasts 0.50 seconds and preserves the direction and hold/release state from the physical press.
+
+An aerial hold becomes Frontside Grab with neutral/up intent or Stalefish Grab with down intent after 0.18 seconds. A tap checks Board Varial, Frontside Grab, Stalefish Grab, then Kaki Twist, skipping used tricks and moves whose board-adjusted entry cannot finish before the 0.16-second landing-safety lead. This makes a low ordinary air choose Frontside immediately while medium and large airs retain Varial and longer chains. During descent, Simple automatically releases an active grab inside that safety lead, stops adding hold value, displays `RELEASE`, and hands control to the existing board-specific auto-level.
 
 In the air, left/right keeps steering the flight line and also rotates Kaki's body and board; up/down trims the board. This shared axis is available in both control modes so Simple players can spin, score rotations, and actively match a landing.
 
@@ -34,7 +36,9 @@ Turbo is the same common action in both modes: hold either Shift, L3 (10), or th
 | Varial / `trick3` | F | B (1) | Trick button | Regular/goofy stance; Floater at lip | Board Varial |
 | Twist / `trick4` | T | Left trigger (6) or right-stick press (11) | T / Twist button | Tube Tuck; Moon Log Soul Arch | Kaki Twist |
 
-Advanced gamepad B is Board Varial during a run and retry only on the results screen. Advanced touch remaps the same physical five-button cluster to Q/E/F/T plus Action; the labels remain compact enough for the Simple layout.
+Advanced gamepad B is Board Varial during a run and retry only on the results screen. Advanced touch uses a stable 2 x 2 Q/E/F/T trick block with 52 x 52 px targets, plus the separate 76 px Action and wide Turbo targets.
+
+Q/E/F/T presses that reach `WAIT FOR AIR` or `NEED MORE POP` enter a 0.35-second ordered simulation buffer and retry at the first legal step. Q/E remain hold tricks; a release before their readable entry completes supplies one 0.18-second minimum hold, while a longer physical hold continues normally. F/T are committed discrete tricks: release never cancels their animation. Advanced Q/E held through contact still carry the intended wipeout risk.
 
 ## Input contract
 
@@ -46,7 +50,9 @@ Advanced gamepad B is Board Varial during a run and retry only on the results sc
 
 Keyboard repeat cannot create duplicate edges. In Advanced mode Q/X/C are aliases for one action, so releasing one alias while another remains held does not generate a release. The legacy `style`, `stylePressed`, and `styleReleased` fields mirror `trick1` for old host adapters.
 
-Simple mode exposes `edge`, `turbo`, and contextual `trick`; `special`, spin impulses, and direct trick slots remain false. Advanced mode exposes `edge`, `turbo`, and `trick1` through `trick4`. Gamepad axes use an 18% dead zone; the touch stick uses a 12% radial dead zone over 42 px of travel. Both preserve continuous magnitude outside the dead zone. Blur, pause, restart, mode change, and destroy clear keys, touch pointers, stick position, gamepad state, and buffers.
+Trick press edges also carry a monotonic `PressOrder` value. This preserves the actual event order when multiple keyboard or touch presses occur between two fixed steps; simultaneous gamepad transitions use deterministic action order.
+
+Simple mode exposes `edge`, `turbo`, and contextual `trick`; `special`, spin impulses, and direct trick slots remain false. Advanced mode exposes `edge`, `turbo`, and `trick1` through `trick4`. Gamepad axes use an 18% dead zone; the touch stick uses a 12% radial dead zone over 42 px of travel. Both preserve continuous magnitude outside the dead zone. Blur, pause, restart, orientation change, mode change, and destroy clear keys, touch pointers, stick position, gamepad state, input edges, and queued trick intents.
 
 The analog stick owns one pointer independently from Action, Trick, and Turbo, so steering and multiple held actions remain simultaneous. Releasing the stick returns only X/Y to neutral and does not cancel another pointer.
 

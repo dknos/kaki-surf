@@ -619,16 +619,25 @@ test("a half-second Action tuck adds a bounded speed preload and trades away ste
     "holding past the preload window cannot farm repeated speed kicks");
 });
 
-test("grounded Trick switches regular and goofy stance without scoring an aerial trick", () => {
+test("only Down plus a grounded Simple Trick tap switches stance", () => {
   const simple = beginRiding(BOARDS.foamPuff, { controlMode: "simple" });
   assert.equal(simple.player.ridingStance, "regular");
   simple.update(FIXED_STEP, { trick: true, trickPressed: true });
   simple.update(FIXED_STEP, { trickReleased: true });
+  assert.equal(simple.player.ridingStance, "regular", "a neutral pre-lip tap remains an aerial intent");
+  for (let step = 0; step < Math.ceil(TUNING.simpleTakeoffTrickBuffer / FIXED_STEP) + 1; step += 1) {
+    simple.update(FIXED_STEP, {});
+  }
+  assert.equal(simple.player.ridingStance, "regular", "an expired neutral tap never changes stance");
+  assert.equal(simple.player.stanceSwitches, 0);
+
+  simple.update(FIXED_STEP, { y: 1, trick: true, trickPressed: true });
+  simple.update(FIXED_STEP, { y: 1, trickReleased: true });
   assert.equal(simple.player.ridingStance, "goofy");
   assert.equal(simple.player.stanceSwitches, 1);
   assert.ok(collectEvents(simple).some((event) => event.type === "stanceSwitch"));
-  simple.update(FIXED_STEP, { trick: true, trickPressed: true });
-  simple.update(FIXED_STEP, { trickReleased: true });
+  simple.update(FIXED_STEP, { y: 1, trick: true, trickPressed: true });
+  simple.update(FIXED_STEP, { y: 1, trickReleased: true });
   assert.equal(simple.player.ridingStance, "regular");
 
   const advanced = beginRiding(BOARDS.foamPuff, { controlMode: "advanced" });

@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.6.4";
+export const GAME_VERSION = "2.7.0";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -334,8 +334,15 @@ export const TUNING = {
   landingCoyote: 0.095,
   launchCoyote: 0.11,
   simpleAutoLevelStart: 18,
-  simpleTrickBuffer: 0.34,
-  simpleGrabHold: 0.115,
+  simpleTakeoffTrickBuffer: 0.5,
+  advancedEligibilityBuffer: 0.35,
+  simpleGrabHoldThreshold: 0.18,
+  simpleAutoReleaseLead: 0.16,
+  advancedQuickGrabMinimum: 0.18,
+  // Compatibility aliases for host tuning objects created before the
+  // dedicated trick-intent grammar was introduced.
+  simpleTrickBuffer: 0.5,
+  simpleGrabHold: 0.18,
   // Action is a half-second lip preload: a small carried-speed reward in
   // exchange for deliberately reduced steering while Kaki is tucked.
   tuckPreloadDuration: 0.5,

@@ -31,6 +31,7 @@ import {
 import { AdaptiveQualityProfile } from "./performance-profile.js";
 import { KakiRenderer } from "./renderer.js";
 import { SurfSimulation } from "./simulation.js";
+import { getTrickDefinition } from "./trick-catalog.js";
 import {
   adjustFormControl,
   clearGamepadFocus,
@@ -306,6 +307,8 @@ export class KakiSurfGame {
     this.pausedFrom = reason;
     this.state = "paused";
     this.input.clear?.();
+    this.simulation.clearTrickIntents?.("pause");
+    this.resetTouchTrickFeedback?.();
     this.audio.onEvent?.("uiPause", this.simulation);
     this.audio.setLifecycle?.("paused");
     this.showLayer("pause");
@@ -390,6 +393,23 @@ export class KakiSurfGame {
       travelDirection: this.simulation.player.travelDirection,
       ridingStance: this.simulation.player.ridingStance,
       stanceSwitches: this.simulation.player.stanceSwitches,
+      trickPose: this.simulation.player.trickPose,
+      trickQueue: this.simulation.trickIntents.queue.map((intent) => ({
+        id: intent.id,
+        action: intent.action,
+        order: intent.order,
+        held: intent.held,
+        released: intent.released,
+        queuedBeforeLaunch: intent.queuedBeforeLaunch,
+        remaining: intent.remaining,
+      })),
+      trickSequence: (this.simulation.aerialSession?.manifest.sequence ?? []).map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        order: entry.intentOrder,
+        complete: entry.complete,
+        heldDuration: entry.heldDuration,
+      })),
       playerX: this.simulation.player.state === "airborne"
         ? this.simulation.player.airX
         : this.simulation.player.x,
@@ -550,6 +570,7 @@ export class KakiSurfGame {
     this.simulation.consumeEvents((event) => {
       this.renderer.onEvent(event, this.simulation);
       if (event.type !== "complete") this.audio.onEvent?.(event, this.simulation);
+      this.syncTouchTrickFeedback(event);
       if (event.type === "callout") {
         this.announce(
           event.payload.subtext ? `${event.payload.text}. ${event.payload.subtext}` : event.payload.text,
@@ -937,6 +958,7 @@ export class KakiSurfGame {
         : Number(input.value);
     if (key === "controlMode") {
       this.input.setControlMode?.(this.settings.controlMode);
+      this.simulation.clearTrickIntents?.("mode");
       this.simulation.controlMode = this.settings.controlMode;
       this.host.dataset.controlMode = this.settings.controlMode;
     }
@@ -957,9 +979,99 @@ export class KakiSurfGame {
 
   syncTouchActionState() {
     const simple = this.settings.controlMode !== "advanced";
-    this.host.dataset.controlMode = simple ? "simple" : "advanced";
+    const mode = simple ? "simple" : "advanced";
+    const modeChanged = this.host.dataset.controlMode !== mode;
+    this.host.dataset.controlMode = mode;
     if (this.elements.touchSpecial) {
       this.elements.touchSpecial.hidden = simple;
+    }
+    if (modeChanged) this.resetTouchTrickFeedback();
+  }
+
+  syncTouchTrickFeedback(event) {
+    const payload = event?.payload ?? {};
+    if (["land", "wipeout", "complete"].includes(event.type)) {
+      this.resetTouchTrickFeedback();
+      return;
+    }
+    if (event.type === "stanceSwitch"
+      || (event.type === "maneuver" && ["tubeTuck", "soulArch"].includes(payload.id))) {
+      this.resetTouchTrickFeedback("trick");
+      return;
+    }
+    if (![
+      "trickQueued",
+      "trickStarted",
+      "trickCompleted",
+      "trickRejected",
+      "trickAutoReleased",
+    ].includes(event.type)) return;
+
+    const simple = this.settings.controlMode !== "advanced";
+    const control = simple
+      ? "trick"
+      : touchControlForTrickAction(payload.action);
+    const button = this.elements.touchControls.querySelector?.(
+      `[data-control="${control}"]`,
+    );
+    if (!button) return;
+    const order = Math.max(0, Number(payload.order) || 0);
+    const currentOrder = Math.max(0, Number(button.dataset.intentOrder) || 0);
+
+    if (event.type === "trickQueued") {
+      if (order >= currentOrder) {
+        this.setTouchTrickFeedback(button, "queued", "QUEUED", order);
+      }
+      this.rumble(12, 0.08, 0.04);
+      return;
+    }
+    if (event.type === "trickStarted") {
+      if (order >= currentOrder) {
+        const definition = getTrickDefinition(payload.id);
+        this.setTouchTrickFeedback(
+          button,
+          "active",
+          definition?.comboName ?? "TRICK",
+          order,
+        );
+      }
+      return;
+    }
+    if (event.type === "trickAutoReleased") {
+      if (order >= currentOrder) {
+        this.setTouchTrickFeedback(button, "release", "RELEASE", order);
+      }
+      return;
+    }
+    if (!currentOrder || !order || order >= currentOrder) {
+      this.resetTouchTrickFeedback(control);
+    }
+  }
+
+  setTouchTrickFeedback(button, state, label, order = 0) {
+    button.classList.remove("is-queued", "is-trick-active", "is-release");
+    if (state === "queued") button.classList.add("is-queued");
+    if (state === "active") button.classList.add("is-trick-active");
+    if (state === "release") button.classList.add("is-release");
+    button.dataset.intentOrder = String(order);
+    button.dataset.trickState = state;
+    const status = button.querySelector?.("[data-touch-status]");
+    if (status) status.textContent = label;
+  }
+
+  resetTouchTrickFeedback(control = "") {
+    const buttons = this.elements.touchTrickButtons ?? [];
+    for (const button of buttons) {
+      if (control && button.dataset.control !== control) continue;
+      button.classList.remove("is-queued", "is-trick-active", "is-release");
+      button.dataset.intentOrder = "0";
+      button.dataset.trickState = "idle";
+      const status = button.querySelector?.("[data-touch-status]");
+      if (status) {
+        status.textContent = this.settings.controlMode === "advanced"
+          ? status.dataset.advancedLabel
+          : status.dataset.simpleLabel;
+      }
     }
   }
 
@@ -1909,6 +2021,9 @@ function collectElements(host) {
     replayTutorial: host.querySelector("[data-action=replay-tutorial]"),
     settingsInputs: host.querySelectorAll("[data-setting]"),
     touchControls: host.querySelector(".touch-controls"),
+    touchTrickButtons: host.querySelectorAll(
+      '[data-control="spinLeft"], [data-control="spinRight"], [data-control="trick"], [data-control="special"]',
+    ),
     orientationGate: host.querySelector(".orientation-gate"),
     touchSpecial: host.querySelector('[data-control="special"]'),
     debugPanel: host.querySelector(".debug-panel"),
@@ -1918,11 +2033,19 @@ function collectElements(host) {
   };
 }
 
+function touchControlForTrickAction(action) {
+  if (action === "trick1") return "spinLeft";
+  if (action === "trick2") return "spinRight";
+  if (action === "trick3") return "trick";
+  if (action === "trick4") return "special";
+  return "";
+}
+
 function gameMarkup() {
   return `
     <section class="surf-shell" aria-label="Kaki Surf arcade game">
       <div class="stage-frame">
-        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve with arrows or WASD. Hold Space or A for a half-second tuck preload, hold Shift for Turbo, and use F or X for tricks. Tap Trick on the wave to switch regular and goofy stance; release tricks before landing."></canvas>
+        <canvas width="${LOGICAL_WIDTH}" height="${LOGICAL_HEIGHT}" tabindex="0" aria-label="Kitty Kaki rides a moving wave. Carve with arrows or WASD. Hold Space or A for a half-second tuck preload, hold Shift for Turbo, and use F or X for tricks. Tap Down plus Trick while clearly grounded to switch regular and goofy stance."></canvas>
         <div class="scanlines" aria-hidden="true"></div>
         <nav class="top-controls" aria-label="Game controls" hidden>
           <button type="button" data-action="pause-run" aria-label="Pause surfing">II</button>
@@ -1999,11 +2122,11 @@ function gameMarkup() {
             <span class="touch-stick__label" aria-hidden="true">CARVE · SPIN</span>
           </div>
           <div class="touch-actions">
-            <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" aria-label="Advanced Q Frontside Grab"><b>Q</b><span>FRONT</span></button>
-            <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" aria-label="Advanced E Stalefish Grab"><b>E</b><span>STALE</span></button>
-            <button class="touch-trick" type="button" data-control="trick" aria-label="Context trick or Advanced F Board Varial; tap on the wave to switch stance"><b>TRICK</b><span>VARIAL</span></button>
+            <button class="touch-spin touch-spin--left" type="button" data-control="spinLeft" data-trick-state="idle" data-intent-order="0" aria-label="Advanced Q Frontside Grab"><b>Q</b><span data-touch-status data-simple-label="" data-advanced-label="FRONT">FRONT</span></button>
+            <button class="touch-spin touch-spin--right" type="button" data-control="spinRight" data-trick-state="idle" data-intent-order="0" aria-label="Advanced E Stalefish Grab"><b>E</b><span data-touch-status data-simple-label="" data-advanced-label="STALE">STALE</span></button>
+            <button class="touch-trick" type="button" data-control="trick" data-trick-state="idle" data-intent-order="0" aria-label="Simple Trick tap or hold; Down plus a quick grounded tap switches stance. Advanced F starts Board Varial."><b class="touch-mode-label touch-mode-label--simple">TRICK</b><b class="touch-mode-label touch-mode-label--advanced">F</b><span data-touch-status data-simple-label="TAP / HOLD" data-advanced-label="VARIAL">TAP / HOLD</span></button>
             <button class="touch-turbo" type="button" data-control="turbo" aria-label="Hold Turbo boost; successful landed tricks refill it"><b>TURBO</b><span>HOLD</span></button>
-            <button class="touch-special" type="button" data-control="special" aria-label="Advanced Twist trick; Action or Trick dismounts a ridden animal" hidden><b>T</b><span>TWIST</span></button>
+            <button class="touch-special" type="button" data-control="special" data-trick-state="idle" data-intent-order="0" aria-label="Advanced T Kaki Twist; Action or Trick dismounts a ridden animal" hidden><b>T</b><span data-touch-status data-simple-label="" data-advanced-label="TWIST">TWIST</span></button>
             <button class="touch-action" type="button" data-control="edge" aria-label="Action: hold up to half a second to preload speed with reduced steering, then release to pop"><b>ACTION</b><span>PRELOAD / POP</span></button>
           </div>
         </div>

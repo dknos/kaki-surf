@@ -112,8 +112,11 @@ A riding Tube Tuck enters when the local zone is `critical` or risk is at least 
 | `landingCoyote` | 0.095 s | Time to recover an initially bad contact |
 | `launchCoyote` | 0.11 s | Lip-memory window for a committed release |
 | `simpleAutoLevelStart` | 18 | Downward velocity at which Simple auto-level starts |
-| `simpleTrickBuffer` | 0.34 s | Context Trick request lifetime |
-| `simpleGrabHold` | 0.115 s | Hold threshold that selects a grab |
+| `simpleTakeoffTrickBuffer` | 0.50 s | Dedicated Simple pre-takeoff/aerial intent lifetime |
+| `advancedEligibilityBuffer` | 0.35 s | Advanced `WAIT FOR AIR` / `NEED MORE POP` retry lifetime |
+| `simpleGrabHoldThreshold` | 0.18 s | Simple tap/intentional-hold split |
+| `simpleAutoReleaseLead` | 0.16 s | Predicted contact lead for Simple grab release |
+| `advancedQuickGrabMinimum` | 0.18 s | Minimum readable Q/E entry after a quick release |
 | `perfectLandingCarry` | 4.5 s | Speed and rebound window after a perfect landing |
 | `cleanLandingCarry` | 2.2 s | Reduced speed and rebound window after a clean landing |
 | `wobbleLandingCarry` | 0.18 s | Reduced carry after a wobble |
@@ -151,12 +154,12 @@ Condition profiles change wind, density, traffic lists, dolphin/shark/whale weig
 
 | Trick | Entry | Start gate | Completion gate | Height gate | Base score | Base risk |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Front Rail Grab | 0.075 s | None | Hold through entry | None | 105 | 0.07 |
-| Tail Grab | 0.14 s | None | Hold through entry | None | 172 | 0.16 |
-| Board Varial | 0.46 s | 0.08 s in air | 98.5% entry and 0.44 s total air | 4 px | 292 | 0.34 |
-| Kaki Twist | 0.66 s | 0.28 s in air | 99% entry and 0.78 s total air | 18 px | 470 | 0.62 |
+| Frontside Grab | 0.12 s | None | Hold through entry | None | 105 | 0.07 |
+| Stalefish Grab | 0.16 s | None | Hold through entry | 12 px | 172 | 0.16 |
+| Board Varial | 0.44 s | 0.06 s in air | 98.5% entry and 0.46 s total air | 23 px | 292 | 0.34 |
+| Kaki Twist | 0.72 s | 0.20 s in air | 99% entry and 0.85 s total air | 52 px | 470 | 0.62 |
 
-Board specialty `entryMultiplier` changes the listed entry duration. Front Rail adds 92 points/second of hold up to 0.68 seconds and 24 for holding through the apex. Tail Grab adds 128 points/second up to 0.78 seconds and 52 through the apex. More than 0.2 seconds of descending Tail hold applies a 0.84 scoring factor, while late Tail hold adds risk at 0.72/second. Tail's base trim sensitivity is 1.32 before its board modifier.
+Board specialty `entryMultiplier` changes the listed entry duration and is included in Simple's completion prediction. Frontside adds 92 points/second of hold up to 0.68 seconds and 24 for holding through the apex. Stalefish adds 128 points/second up to 0.78 seconds and 52 through the apex. More than 0.2 seconds of descending Stalefish hold applies a 0.84 scoring factor, while late hold adds risk at 0.72/second. Stalefish's base trim sensitivity is 1.32 before its board modifier.
 
 Discrete board motion is separate from body rotation. Board Varial completes one board-relative turn. Kaki Twist uses a counter-rotation arc and board-specific pose/motion; incomplete board motion can make the landing orientation invalid.
 

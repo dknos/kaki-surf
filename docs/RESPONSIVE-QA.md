@@ -1,6 +1,6 @@
 # Responsive QA
 
-Date: 2026-07-21.
+Date: 2026-07-27.
 
 The responsive browser matrix is separate from the canonical 1280 × 720 renderer gallery. It covers shell layout and lifecycle UI at these CSS viewports:
 
@@ -31,6 +31,19 @@ bash tools/qa/capture-responsive.sh
 
 Use `KAKI_SURF_QA_URL` to point the capture pass at another local static server and `KAKI_SURF_RESPONSIVE_DIR` to redirect evidence outside the repository.
 
+For the focused trick-control acceptance, start Chromium with remote debugging
+on port 9231 while the static build is served on port 9876, then run:
+
+```console
+node tools/qa/accept-trick-controls.mjs
+```
+
+That pass sends real CDP touch events through the production `InputManager`,
+captures Simple and Advanced active-trick frames, measures every action target
+and overlap, and verifies blur plus portrait/landscape queue cleanup. Override
+the defaults with `KAKI_SURF_CDP_URL`, `KAKI_SURF_QA_URL`, and
+`KAKI_SURF_TRICK_QA_DIR`.
+
 ## Touch lifecycle contract
 
 - Touch controls are visible and interactive only while the lifecycle is `running`, the Allow Touch Controls setting is enabled, the settings dialog is closed, the device has a coarse primary pointer or a compact touch viewport, and the viewport is landscape. Fine-pointer desktops stay clear.
@@ -39,11 +52,11 @@ Use `KAKI_SURF_QA_URL` to point the capture pass at another local static server 
 - Page/dialog surfaces use `touch-action: pan-y` while the Canvas and gameplay clusters retain `touch-action: none`; an emulated touch drag at 844 x 390 traversed the full 383 px Settings overflow range.
 - Resuming restores the cluster only when Touch Controls remains enabled.
 - Steering is one 112 px radial analog gate with a 42 px travel radius and a 12% radial dead zone. It reports continuous X/Y values and owns one pointer independently from Action, Trick, and Turbo.
-- At 844 × 390, the Canvas consumes the full dynamic viewport height. The analog deck sits in the left letterbox/edge while 60–76 px Simple actions sit at the right edge; Pause and Exit form one compact top row, with Settings available from Pause.
+- At 844 × 390, the Canvas consumes the full dynamic viewport height. The analog deck sits in the left letterbox/edge. Simple uses a 68 px Trick, 76 px Action, and wide Turbo target; Advanced keeps Q/E/F/T at 52 x 52 px in a stable 2 x 2 block. Pause and Exit form one compact top row, with Settings available from Pause.
 
 ## Current measured pass
 
-A fresh Chrome DevTools Protocol audit applied true mobile device metrics. At 844 × 390, the Canvas measured 693.33 × 389.98 at x=75.34; the 116 × 126 stick deck begins at x=12 and the 164 × 120 Simple action deck ends at x=832. A diagonal DOM pointer drag reported x=0.564/y=-0.705 while Action and Turbo remained held, then releasing only the stick returned X/Y to zero without releasing either action. At 390 × 844, active play becomes the opaque `TURN PHONE / SURF HORIZONTAL` gate and the touch layer stays hidden/inert. The probe reported zero runtime exceptions.
+A fresh Chrome DevTools Protocol audit applied true mobile device metrics. At 844 × 390, Simple measured 68 px Trick, 76 px Action, and 152 × 44 px Turbo targets; Advanced Q/E/F/T each measured 52 × 52 px. Neither layout had any overlap. Real 80 ms Simple and Advanced F touches each traversed `QUEUED` to `VARIAL` and produced exactly one completed manifest entry plus one 12 ms vibration request. Blur and portrait rotation cleared a held pre-takeoff queue, the portrait gate became active, and returning to 844 × 390 resumed with no queued action. The probe reported zero console, runtime, network, or HTTP errors.
 
 The portrait menu and Settings remain scrollable so a player can choose a run before the landscape request. Gameplay itself no longer maintains a second, squeezed portrait control layout.
 

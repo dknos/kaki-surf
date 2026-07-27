@@ -24,7 +24,12 @@ import {
 } from "./motion.js";
 import { ScoreSystem } from "./scoring.js";
 import { SurfSchool } from "./tutorial.js";
-import { AerialTrickSession, normalizeTrickInput } from "./tricks.js";
+import {
+  AerialTrickSession,
+  normalizeTrickInput,
+  TrickIntentBuffer,
+} from "./tricks.js";
+import { getBoardSpecialty, getTrickDefinition } from "./trick-catalog.js";
 import { GameplayWave } from "./wave.js";
 import { WorldSimulation } from "./world.js";
 import { createCameraState, updateCamera } from "./camera.js";
@@ -195,6 +200,7 @@ export class SurfSimulation {
     });
     this.player = createPlayer();
     this.aerialSession = null;
+    this.trickIntents = new TrickIntentBuffer();
     this.lastWipeoutAt = -Infinity;
     this.lastGiantTrickAt = -Infinity;
     this._worldPreviousPlayerY = 128;
@@ -256,6 +262,7 @@ export class SurfSimulation {
     this.started = false;
     this.flowRating = 0;
     this.aerialSession = null;
+    this.trickIntents.reset();
     this.eventCount = 0;
     this.worldTravel = 0;
     this.cameraWorldX = 0;
@@ -880,6 +887,7 @@ export class SurfSimulation {
       player.provisionalTrickName = "";
       this.score.provisionalAerial = null;
       this.score.pendingLaunchPotential = 0;
+      this.clearTrickIntents("mount", false);
       this.aerialSession = null;
       this.setState("riding");
     }
@@ -953,41 +961,102 @@ export class SurfSimulation {
   captureSimpleControls(dt, input) {
     const state = this.player.contextTrick;
     if (this.controlMode !== "simple") {
+      this.trickIntents.clear((intent) => intent.source === "simple", "mode");
       resetContextTrick(state);
       return;
     }
-    const quickGroundTap = input.trickReleased
-      && ["riding", "landing", "wobble"].includes(this.player.state)
-      && !this.player.tubeRide.active
-      && state.held < finiteTuning(this.tuning.simpleGrabHold, TUNING.simpleGrabHold);
-    if (quickGroundTap) {
-      this.toggleRidingStance();
-      resetContextTrick(state);
-      return;
-    }
-    if (input.trickPressed) {
-      state.requestId += 1;
+
+    const bufferDuration = finiteTuning(
+      this.tuning.simpleTakeoffTrickBuffer,
+      TUNING.simpleTakeoffTrickBuffer,
+    );
+    const intent = this.trickIntents.captureAction("trick", input, {
+      duration: bufferDuration,
+      queuedBeforeLaunch: this.player.state !== "airborne",
+      source: "simple",
+    });
+    if (intent) {
+      intent.queuedEmitted = true;
+      state.requestId = intent.order;
+      state.activePressOrder = intent.order;
       state.pending = true;
-      state.buffer = finiteTuning(this.tuning.simpleTrickBuffer, TUNING.simpleTrickBuffer);
+      state.buffer = intent.remaining;
       state.held = 0;
-      state.holding = true;
+      state.holding = Boolean(input.trick);
+      state.released = Boolean(input.trickReleased);
+      state.vertical = intent.y;
+      state.autoReleased = false;
+      this.emit("trickQueued", {
+        id: "",
+        action: "trick",
+        order: intent.order,
+        hint: "QUEUED",
+        context: intent.queuedBeforeLaunch ? "takeoff" : "air",
+      });
+    }
+
+    this.trickIntents.advanceHeld(dt, (queued) => queued.source === "simple");
+    const activeIntent = this.trickIntents.get(state.activePressOrder);
+    if (activeIntent) {
+      state.held = activeIntent.heldDuration;
+      state.holding = activeIntent.held;
+      state.released = activeIntent.released;
+      state.vertical = activeIntent.y;
+      state.buffer = activeIntent.remaining;
+    } else {
+      if (input.trick) {
+        state.holding = true;
+        state.held += dt;
+      }
+      if (input.trickReleased) {
+        state.holding = false;
+        state.released = true;
+      }
+    }
+
+    const holdThreshold = finiteTuning(
+      this.tuning.simpleGrabHoldThreshold,
+      TUNING.simpleGrabHoldThreshold,
+    );
+    const stanceIntent = input.trickReleased
+      ? activeIntent ?? this.trickIntents.latestForAction("trick")
+      : null;
+    const explicitGroundStance = stanceIntent
+      && stanceIntent.queuedBeforeLaunch
+      && this.player.state === "riding"
+      && !this.player.tubeRide.active
+      && stanceIntent.y > 0.32
+      && stanceIntent.heldDuration < holdThreshold;
+    if (explicitGroundStance) {
+      state.consumedId = stanceIntent.order;
+      this.trickIntents.consume(stanceIntent, "stance");
+      state.activePressOrder = 0;
+      state.pending = this.trickIntents.queue.some((queued) => queued.source === "simple");
       state.released = false;
-      state.vertical = input.y;
+      this.toggleRidingStance();
+      return;
     }
-    if (input.trick) {
-      state.holding = true;
-      state.held += dt;
-      state.vertical = input.y;
+
+    if (this.player.state !== "airborne") {
+      const expired = this.trickIntents.advanceTime(
+        dt,
+        (queued) => queued.source === "simple",
+      );
+      for (const expiredIntent of expired) {
+        state.consumedId = expiredIntent.order;
+        this.emit("trickRejected", {
+          id: expiredIntent.id,
+          action: "trick",
+          order: expiredIntent.order,
+          hint: "",
+          context: "takeoff",
+          expired: true,
+        });
+      }
     }
-    if (input.trickReleased) {
-      state.holding = false;
-      state.released = true;
-    }
-    if (state.pending && !state.holding) state.buffer = Math.max(0, state.buffer - dt);
-    if (state.pending && state.buffer <= 0 && this.player.state !== "airborne") {
-      state.pending = false;
-      state.released = false;
-    }
+    state.pending = this.trickIntents.queue.some((queued) => queued.source === "simple");
+    state.buffer = this.trickIntents.queue.find((queued) => queued.source === "simple")
+      ?.remaining ?? 0;
   }
 
   toggleRidingStance() {
@@ -1003,9 +1072,13 @@ export class SurfSimulation {
     return player.ridingStance;
   }
 
+  clearTrickIntents(reason = "lifecycle", resetLocks = true) {
+    this.trickIntents.clear(null, reason, resetLocks);
+    resetContextTrick(this.player.contextTrick);
+  }
+
   updateSimpleAerialTrick(dt, input, context) {
     const state = this.player.contextTrick;
-    const directEvents = [];
     const mapped = {
       x: input.x,
       y: input.y,
@@ -1023,82 +1096,122 @@ export class SurfSimulation {
       trick4Released: false,
     };
 
-    if (state.pending && state.requestId !== state.consumedId) {
-      const wantsHold = state.holding
-        && state.held >= finiteTuning(this.tuning.simpleGrabHold, TUNING.simpleGrabHold);
-      const wantsTap = state.released;
-      let requestedId = "";
-      if (wantsHold) {
-        requestedId = state.vertical > 0.32 ? "tailGrab" : "frontRailGrab";
-      } else if (wantsTap) {
-        requestedId = simpleTapTrickFor(this.aerialSession.manifest);
-      }
-
-      if (requestedId) {
-        let event = this.aerialSession.tryStart(requestedId, context);
-        const shouldFallback = wantsTap
-          && event?.type === "trickRejected"
-          && (state.buffer <= 0 || context.descending);
-        if (shouldFallback) {
-          const fallbackId = simpleFallbackGrabFor(this.aerialSession.manifest);
-          if (fallbackId) {
-            const rejectedId = requestedId;
-            event = this.aerialSession.tryStart(fallbackId, context);
-            if (event?.type === "trickStarted") {
-              requestedId = fallbackId;
-              state.syntheticHold = Math.max(
-                state.syntheticHold,
-                0.16,
-              );
-              const entry = this.aerialSession.manifest.sequence.at(-1);
-              if (entry) entry.fallbackFrom = rejectedId;
-            }
+    const holdThreshold = finiteTuning(
+      this.tuning.simpleGrabHoldThreshold,
+      TUNING.simpleGrabHoldThreshold,
+    );
+    const safetyLead = finiteTuning(
+      this.tuning.simpleAutoReleaseLead,
+      TUNING.simpleAutoReleaseLead,
+    );
+    for (const intent of this.trickIntents.queue) {
+      if (intent.source !== "simple") continue;
+      if (!intent.id) {
+        const wantsHold = intent.heldDuration >= holdThreshold
+          && (intent.held || intent.released);
+        const wantsTap = intent.released && intent.heldDuration < holdThreshold;
+        let id = "";
+        if (wantsHold) {
+          id = intent.y > 0.32 ? "tailGrab" : "frontRailGrab";
+          // captureSimpleControls already counted this fixed step while the
+          // physical button is still held; the session will count it below.
+          intent.creditHoldDuration = Math.max(
+            0,
+            intent.heldDuration - (intent.held ? dt : 0),
+          );
+        } else if (wantsTap) {
+          id = simpleTapTrickFor({
+            manifest: this.aerialSession.manifest,
+            intents: this.trickIntents.queue,
+            boardId: this.board.id,
+            elapsed: this.aerialSession.elapsed,
+            bufferRemaining: intent.remaining,
+            context,
+            safetyLead,
+          });
+          if (id === "frontRailGrab" || id === "tailGrab") {
+            intent.syntheticHoldMinimum = holdThreshold;
+          }
+          if (id && id !== "boardVarial"
+            && !this.aerialSession.manifest.sequence.some((entry) => entry.id === "boardVarial")) {
+            intent.fallbackFrom = "boardVarial";
           }
         }
-
-        if (event?.type === "trickStarted") {
-          state.consumedId = state.requestId;
-          state.pending = false;
-          state.released = false;
-          state.activeAction = actionForSimpleTrick(requestedId);
-          if (wantsHold && (requestedId === "frontRailGrab" || requestedId === "tailGrab")) {
-            const entry = this.aerialSession.manifest.sequence.at(-1);
-            const recognizedHold = Math.max(0, state.held - dt);
-            if (entry) {
-              entry.startTime = Math.max(0, this.aerialSession.elapsed - recognizedHold);
-              entry.heldDuration = recognizedHold;
-              this.aerialSession.manifest.heldDurations[requestedId] = recognizedHold;
-            }
-          }
-          if (wantsTap && (requestedId === "frontRailGrab" || requestedId === "tailGrab")) {
-            state.syntheticHold = Math.max(state.syntheticHold, 0.16);
-          }
-          this.aerialSession.inputLocks[state.activeAction] = true;
-          directEvents.push(event);
-        } else if (event && !shouldFallback && state.buffer <= 0) {
-          state.consumedId = state.requestId;
-          state.pending = false;
-          state.released = false;
-          directEvents.push({ ...event, hint: "FLOAT IT" });
-        }
+        if (!id) break;
+        this.trickIntents.setIdentity(intent, {
+          id,
+          action: actionForSimpleTrick(id),
+        });
       }
+      mapped[intent.action] = intent.held;
+      if (intent.released) mapped[`${intent.action}Released`] = true;
+      // Preserve physical press order. A later Simple tap cannot pass a
+      // temporarily gated earlier tap.
+      break;
     }
 
     if (state.activeAction) {
-      const held = state.holding || state.syntheticHold > 0;
-      mapped[state.activeAction] = held;
-      if (state.syntheticHold > 0) state.syntheticHold = Math.max(0, state.syntheticHold - dt);
-      if (!held) mapped[`${state.activeAction}Released`] = true;
+      mapped[state.activeAction] = state.holding && !state.autoReleased;
+      if (state.released || state.autoReleased) {
+        mapped[`${state.activeAction}Released`] = true;
+      }
     }
 
-    const events = this.aerialSession.update(dt, mapped, context);
+    let autoReleasedEntry = null;
+    const activeGrab = this.aerialSession.active.find((entry) => entry.category === "grab");
+    if (activeGrab
+      && state.holding
+      && !state.released
+      && !state.autoReleased
+      && context.descending
+      && context.remainingAirtime <= safetyLead) {
+      state.autoReleased = true;
+      state.activeAction = activeGrab.action;
+      mapped[activeGrab.action] = false;
+      mapped[`${activeGrab.action}Released`] = true;
+      autoReleasedEntry = activeGrab;
+    }
+
+    const events = this.aerialSession.update(
+      dt,
+      mapped,
+      context,
+      { captureIntents: false },
+    );
+    for (const event of events) {
+      if (event.type === "trickStarted") {
+        state.consumedId = event.order;
+        const definition = getTrickDefinition(event.id);
+        state.activeAction = definition?.hold ? event.action : "";
+        state.released = false;
+        const entry = this.aerialSession.manifest.sequence.find(
+          (candidate) => candidate.intentOrder === event.order,
+        );
+        const history = this.trickIntents.history.find(
+          (candidate) => candidate.order === event.order,
+        );
+        if (entry && history?.fallbackFrom) entry.fallbackFrom = history.fallbackFrom;
+      }
+    }
     if (state.activeAction
       && !this.aerialSession.active.some((entry) => entry.action === state.activeAction)) {
       state.activeAction = "";
       state.holding = false;
       state.syntheticHold = 0;
     }
-    return directEvents.concat(events);
+    if (autoReleasedEntry) {
+      events.push({
+        type: "trickAutoReleased",
+        id: autoReleasedEntry.id,
+        action: autoReleasedEntry.action,
+        order: autoReleasedEntry.intentOrder,
+        hint: "RELEASE",
+      });
+    }
+    state.pending = this.trickIntents.queue.some((intent) => intent.source === "simple");
+    state.buffer = this.trickIntents.queue.find((intent) => intent.source === "simple")
+      ?.remaining ?? 0;
+    return events;
   }
 
   updateRiding(dt, input) {
@@ -1519,6 +1632,15 @@ export class SurfSimulation {
     const potential = Math.max(0, -player.airVY - 70);
     this.aerialSession = new AerialTrickSession({
       boardId: this.board.id,
+      intentBuffer: this.trickIntents,
+      eligibilityBuffer: finiteTuning(
+        this.tuning.advancedEligibilityBuffer,
+        TUNING.advancedEligibilityBuffer,
+      ),
+      quickGrabMinimum: finiteTuning(
+        this.tuning.advancedQuickGrabMinimum,
+        TUNING.advancedQuickGrabMinimum,
+      ),
       launchData: {
         potential,
         launchStrength: launchEnergy,
@@ -1598,7 +1720,18 @@ export class SurfSimulation {
       player.directionIntent = Math.sign(input.x);
     }
     if (!this.aerialSession) {
-      this.aerialSession = new AerialTrickSession({ boardId: this.board.id });
+      this.aerialSession = new AerialTrickSession({
+        boardId: this.board.id,
+        intentBuffer: this.trickIntents,
+        eligibilityBuffer: finiteTuning(
+          this.tuning.advancedEligibilityBuffer,
+          TUNING.advancedEligibilityBuffer,
+        ),
+        quickGrabMinimum: finiteTuning(
+          this.tuning.advancedQuickGrabMinimum,
+          TUNING.advancedQuickGrabMinimum,
+        ),
+      });
       player.trickManifest = this.aerialSession.manifest;
     }
     let airControl = this.tuning.airControl * this.board.airControl;
@@ -1614,12 +1747,31 @@ export class SurfSimulation {
     player.bodyAngle += player.angularVelocity * dt;
     player.rotationAccum += player.angularVelocity * dt;
 
+    const predictedSurfaceY = this.wave.ridingY(player.airX, player.landingFace);
+    const remainingAirtime = estimateRemainingAirtime({
+      airY: player.airY,
+      verticalVelocity: player.airVY,
+      gravity: this.tuning.gravity,
+      contactY: predictedSurfaceY - 1,
+    });
+    const predictedMaxHeight = estimateMaximumFlightHeight({
+      launchY: player.launchY,
+      airY: player.airY,
+      verticalVelocity: player.airVY,
+      gravity: this.tuning.gravity,
+      maxHeight: player.maxAirHeight,
+    });
     const trickContext = {
       angularVelocity: player.angularVelocity,
       horizontalInput: input.x,
       rotationDirection: Math.sign(player.angularVelocity || input.x) || 1,
       rotationAccumulated: player.rotationAccum,
       maxHeight: player.maxAirHeight,
+      predictedMaxHeight,
+      remainingAirtime,
+      verticalVelocity: player.airVY,
+      gravity: this.tuning.gravity,
+      flightHeight: player.launchY - player.airY,
       apex,
       descending: player.airVY > 12,
     };
@@ -1629,7 +1781,10 @@ export class SurfSimulation {
     for (const event of trickEvents) {
       this.emit(event.type, {
         id: event.id,
+        action: event.action,
+        order: event.order,
         hint: event.hint,
+        expired: event.expired,
         context: "air",
       });
       if (event.type === "trickRejected" && event.hint) {
@@ -1754,8 +1909,8 @@ export class SurfSimulation {
   resolveLanding(dt, surfaceY, input = EMPTY_INPUT) {
     const player = this.player;
     const heldTrick = this.controlMode === "simple"
-      ? input.trick
-      : input.trick1 || input.trick2 || input.trick3 || input.trick4;
+      ? input.trick && !player.contextTrick.autoReleased
+      : input.trick1 || input.trick2;
     if (heldTrick) {
       this.triggerWipeout("RELEASE THE TRICK!", "heldTrickLanding");
       return;
@@ -2207,8 +2362,8 @@ export class SurfSimulation {
   updateSimpleRidingManeuver(dt, input, potential) {
     const committedHold = input.trick
       && this.player.contextTrick.held >= finiteTuning(
-        this.tuning.simpleGrabHold,
-        TUNING.simpleGrabHold,
+        this.tuning.simpleGrabHoldThreshold,
+        TUNING.simpleGrabHoldThreshold,
       );
     const tubeScale = this.updateTubeRide(dt, {
       held: committedHold,
@@ -2284,8 +2439,15 @@ export class SurfSimulation {
       // Context Trick belongs to the tube once it starts; it must not be
       // replayed as an aerial request when the same hold is released.
       const context = player.contextTrick;
-      context.consumedId = context.requestId;
-      context.pending = false;
+      const intent = this.trickIntents.get(context.activePressOrder)
+        ?? this.trickIntents.latestForAction("trick");
+      if (intent?.source === "simple") {
+        context.consumedId = intent.order;
+        this.trickIntents.consume(intent, "tube");
+      }
+      context.pending = this.trickIntents.queue.some(
+        (queued) => queued.source === "simple",
+      );
       context.released = false;
       context.activeAction = "";
       context.syntheticHold = 0;
@@ -2598,6 +2760,7 @@ export class SurfSimulation {
     resetCarveArcState(player);
     resetContextTrick(player.contextTrick);
     if (this.aerialSession) this.aerialSession.wipeout();
+    else this.trickIntents.clear(null, "wipeout");
     player.provisionalScore = 0;
     player.provisionalTrickName = "";
     player.landingQuality = "";
@@ -2661,6 +2824,7 @@ export class SurfSimulation {
 
   finishRun(reason) {
     if (this.player.tubeRide.active) this.endTubeRide("complete", { silent: true });
+    this.clearTrickIntents("complete");
     this.complete = true;
     this.flowRating = Math.round(clamp(this.score.flowPeak, 0, 1) * 100);
     const rank = this.score.rank();
@@ -3181,6 +3345,7 @@ function createContextTrick() {
   return {
     requestId: 0,
     consumedId: 0,
+    activePressOrder: 0,
     pending: false,
     buffer: 0,
     held: 0,
@@ -3189,6 +3354,7 @@ function createContextTrick() {
     vertical: 0,
     activeAction: "",
     syntheticHold: 0,
+    autoReleased: false,
   };
 }
 
@@ -3196,6 +3362,7 @@ function resetContextTrick(state) {
   if (!state) return;
   state.requestId = 0;
   state.consumedId = 0;
+  state.activePressOrder = 0;
   state.pending = false;
   state.buffer = 0;
   state.held = 0;
@@ -3204,6 +3371,7 @@ function resetContextTrick(state) {
   state.vertical = 0;
   state.activeAction = "";
   state.syntheticHold = 0;
+  state.autoReleased = false;
 }
 
 function isTubeRideEligible(potential, player, tuning = TUNING, holding = false) {
@@ -3256,19 +3424,86 @@ function resetTubeRide(tube) {
   tube.wasReady = false;
 }
 
-function simpleTapTrickFor(manifest) {
+function simpleTapTrickFor({
+  manifest,
+  intents = [],
+  boardId,
+  elapsed = 0,
+  bufferRemaining = 0,
+  context = {},
+  safetyLead = 0,
+} = {}) {
   const ids = new Set((manifest?.sequence ?? []).map((entry) => entry.id));
-  if (!ids.has("boardVarial")) return "boardVarial";
-  if (!ids.has("frontRailGrab")) return "frontRailGrab";
-  if (!ids.has("tailGrab")) return "tailGrab";
-  return "kakiTwist";
+  for (const intent of intents) {
+    if (intent.source === "simple" && intent.id) ids.add(intent.id);
+  }
+  for (const id of ["boardVarial", "frontRailGrab", "tailGrab", "kakiTwist"]) {
+    if (ids.has(id)) continue;
+    if (simpleTrickCanComplete({
+      id,
+      boardId,
+      elapsed,
+      bufferRemaining,
+      context,
+      safetyLead,
+    })) return id;
+  }
+  return "";
 }
 
-function simpleFallbackGrabFor(manifest) {
-  const ids = new Set((manifest?.sequence ?? []).map((entry) => entry.id));
-  if (!ids.has("frontRailGrab")) return "frontRailGrab";
-  if (!ids.has("tailGrab")) return "tailGrab";
-  return "";
+function simpleTrickCanComplete({
+  id,
+  boardId,
+  elapsed,
+  bufferRemaining,
+  context,
+  safetyLead,
+}) {
+  const definition = getTrickDefinition(id);
+  if (!definition) return false;
+  const predictedHeight = Math.max(
+    Number(context.maxHeight) || 0,
+    Number(context.predictedMaxHeight) || 0,
+  );
+  if (predictedHeight + 1e-9 < definition.minHeight) return false;
+
+  const heightDelay = timeUntilFlightHeight(definition.minHeight, context);
+  const startDelay = Math.max(
+    0,
+    definition.minStartAirtime - elapsed,
+    heightDelay,
+  );
+  if (!Number.isFinite(startDelay) || startDelay > bufferRemaining + 1e-9) return false;
+
+  const specialty = getBoardSpecialty(definition, boardId);
+  const visibleDuration = definition.entryDuration
+    * specialty.entryMultiplier
+    * (definition.completionThreshold ?? 1);
+  const requiredAfterStart = Math.max(
+    visibleDuration,
+    definition.minAirtime - (elapsed + startDelay),
+  );
+  const usableAirtime = Math.max(
+    0,
+    (Number(context.remainingAirtime) || 0) - safetyLead - startDelay,
+  );
+  return usableAirtime + 1e-9 >= requiredAfterStart;
+}
+
+function timeUntilFlightHeight(height, context = {}) {
+  const required = Math.max(0, Number(height) || 0);
+  if ((Number(context.maxHeight) || 0) >= required) return 0;
+  if ((Number(context.predictedMaxHeight) || 0) + 1e-9 < required) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const currentHeight = Number(context.flightHeight) || 0;
+  if (currentHeight >= required) return 0;
+  const velocity = Number(context.verticalVelocity) || 0;
+  const gravity = Math.max(0.001, Number(context.gravity) || TUNING.gravity);
+  if (velocity >= 0) return Number.POSITIVE_INFINITY;
+  const discriminant = velocity * velocity - 2 * gravity * (required - currentHeight);
+  if (discriminant < 0) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (-velocity - Math.sqrt(discriminant)) / gravity);
 }
 
 function actionForSimpleTrick(id) {
@@ -3332,6 +3567,37 @@ function boardHalfLength(board) {
   if (board?.id === "moonLog") return 22;
   if (board?.id === "mangoFish") return 16;
   return 17;
+}
+
+export function estimateRemainingAirtime({
+  airY = 0,
+  verticalVelocity = 0,
+  gravity = TUNING.gravity,
+  contactY = 0,
+} = {}) {
+  const y = Number(airY);
+  const velocity = Number(verticalVelocity);
+  const acceleration = Math.max(0.001, Number(gravity) || TUNING.gravity);
+  const contact = Number(contactY);
+  if (![y, velocity, contact].every(Number.isFinite)) return 0;
+  if (y >= contact && velocity >= 0) return 0;
+  const discriminant = velocity * velocity + 2 * acceleration * (contact - y);
+  if (discriminant < 0) return 0;
+  return Math.max(0, (-velocity + Math.sqrt(discriminant)) / acceleration);
+}
+
+export function estimateMaximumFlightHeight({
+  launchY = 0,
+  airY = 0,
+  verticalVelocity = 0,
+  gravity = TUNING.gravity,
+  maxHeight = 0,
+} = {}) {
+  const currentHeight = (Number(launchY) || 0) - (Number(airY) || 0);
+  const velocity = Number(verticalVelocity) || 0;
+  const acceleration = Math.max(0.001, Number(gravity) || TUNING.gravity);
+  const remainingRise = velocity < 0 ? velocity * velocity / (2 * acceleration) : 0;
+  return Math.max(0, Number(maxHeight) || 0, currentHeight + remainingRise);
 }
 
 export { EMPTY_INPUT };

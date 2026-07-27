@@ -59,11 +59,11 @@ const step = {
 };
 ```
 
-The un-suffixed field is held state. `Pressed` and `Released` are one-shot edges; the built-in `InputManager` retains those edges for 120 ms or until consumed. An external adapter may produce the contract directly but must preserve the same semantics and clear all fields on pause, restart, blur, and unmount.
+The un-suffixed field is held state. `Pressed` and `Released` are one-shot edges; the built-in `InputManager` retains those edges for 120 ms or until consumed. Trick edges include numeric `trickPressOrder` / `trickNPressOrder` metadata so presses received between fixed steps retain physical order. An external adapter may omit order metadata for deterministic catalog-order fallback, but must preserve edge semantics and clear all fields on pause, restart, blur, and unmount.
 
 `normalizeTrickInput(input, target)` also accepts `action` as an alias for `edge` and the migration fields `style`, `stylePressed`, and `styleReleased` as aliases for `trick1`. It preserves both mode contracts; `SurfSimulation` decides which actions are active from `controlMode`.
 
-Simple Controls are the default. They activate `edge`, `turbo`, `trick`, `special`, `spinLeft`, and `spinRight`. A quick grounded Trick tap switches regular/goofy stance; a deliberate pocket hold owns Tube Tuck. An aerial Trick press is buffered and mapped to an eligible manifest entry: hold for a grab, tap for the next discrete/variety option, and use an unused grab as a fallback when a large move misses its gate. Optional spin impulses coexist with ordinary horizontal body-spin input. Late descent receives board-specific auto-level toward the nearest regular or opposite-facing landing tangent. Any trick still held at board contact causes a wipeout.
+Simple Controls are the default. They activate only `edge`, `turbo`, and contextual `trick`; direct `special`, spin-button, and trick-slot fields remain false. Down plus a quick grounded Trick tap switches regular/goofy stance. A neutral/up pre-lip tap enters the 0.50-second takeoff buffer and never changes stance on expiry. A deliberate pocket hold owns Tube Tuck. In air, a 0.18-second hold selects a directional grab, while a tap selects the first completable unused ID in `boardVarial`, `frontRailGrab`, `tailGrab`, `kakiTwist` order. Completion prediction uses fixed-step flight state, vertical velocity, gravity, contact height, catalog gates, and board entry multipliers. The final 0.16 seconds of predicted descent automatically releases a Simple grab before board-specific auto-level.
 
 Advanced Controls activate `edge`, the common `turbo` action, and `trick1` through `trick4`, preserving the original direct catalog mapping:
 
@@ -71,10 +71,10 @@ The built-in physical mapping is:
 
 | Action | Keyboard | Standard gamepad | Touch cluster |
 | --- | --- | --- | --- |
-| `trick1` | Q, legacy X/C | X or left bumper | Left / Frontside |
-| `trick2` | E | Y or right bumper | Top / Stalefish |
-| `trick3` | F | B | Bottom / Varial |
-| `trick4` | T | Left trigger or right-stick press | Right / Twist |
+| `trick1` | Q, legacy X/C | X or left bumper | Q / Frontside |
+| `trick2` | E | Y or right bumper | E / Stalefish |
+| `trick3` | F | B | F / Varial |
+| `trick4` | T | Left trigger or right-stick press | T / Twist |
 
 ## Advanced context switch on the wave
 
@@ -94,9 +94,9 @@ Invalid inputs emit `trickRejected` with the action, move ID, hint, and `context
 | Action | ID | Category | Input model | Core gates and identity |
 | --- | --- | --- | --- | --- |
 | Q / `trick1` | `frontRailGrab` | `grab` | Hold | Frontside Grab; 0.12 s entry; lowest risk; duration and apex bonus |
-| E / `trick2` | `tailGrab` | `grab` | Hold | Stalefish Grab; 0.20 s entry; 12 px height; trim multiplier; late-hold risk |
-| F / `trick3` | `boardVarial` | `board` | Discrete | Start after 0.08 s; 28 px height; 0.58 s total air; one board-relative turn |
-| T / `trick4` | `kakiTwist` | `signature` | Discrete | Start after 0.34 s; 70 px height; 1.08 s total air; body/board counter-rotation |
+| E / `trick2` | `tailGrab` | `grab` | Hold | Stalefish Grab; 0.16 s entry; 12 px height; trim multiplier; late-hold risk |
+| F / `trick3` | `boardVarial` | `board` | Discrete | Start after 0.06 s; 23 px height; 0.46 s total air; one board-relative turn |
+| T / `trick4` | `kakiTwist` | `signature` | Discrete | Start after 0.20 s; 52 px height; 0.85 s total air; body/board counter-rotation |
 
 Every catalog definition includes identity/display fields and the following tuning fields as applicable:
 
@@ -147,7 +147,7 @@ const landedManifest = tricks.finalizeLanding({
 
 `primeInput` locks actions already held at takeoff so a riding input does not accidentally start an aerial trick. The action must return to neutral before it can create a new start.
 
-`update` returns zero or more `{ type, id, hint }` records. Types are `trickStarted`, `trickCompleted`, and `trickRejected`. Rejections are intentional gameplay language:
+`TrickIntentBuffer` is shared across the lip/air boundary. Each ordered record retains action/ID, input direction, held/released state, remaining fixed-step lifetime, pre-launch origin, and one consumed outcome. `update` returns zero or more semantic records: `trickQueued`, `trickStarted`, `trickCompleted`, `trickRejected`, and, through Simple simulation policy, `trickAutoReleased`.
 
 Those exact semantic event names pass through the simulation to both renderer and audio; the presentation layer does not maintain a second trick-state vocabulary.
 
@@ -156,7 +156,7 @@ Those exact semantic event names pass through the simulation to both renderer an
 - `NEED MORE POP` below its height gate;
 - `HOLD IT` when a grab is released before completing entry.
 
-Starting a grab finishes any other active grab. Finished entries remain in sequence order and a different trick can start immediately when its gates allow. Discrete input locks prevent held keys or keyboard repeat from farming more than one entry.
+`WAIT FOR AIR` and `NEED MORE POP` are transient: the request stays queued for 0.35 seconds in Advanced and retries without another press. Only final expiry emits one restrained rejection. Duplicate IDs, `CHAIN ANOTHER`, invalid actions, landing, wipeout, and completion consume or clear immediately. Starting a grab finishes any other active grab. Q/E quick releases synthesize only the remainder of a 0.18-second readable entry; F/T continue after release. Input locks and consumed intent records keep one physical edge to at most one manifest entry.
 
 Call `finalizeLanding` once on contact, or `wipeout` once when the launch is lost. Both make the session final; later `update` calls are inert.
 

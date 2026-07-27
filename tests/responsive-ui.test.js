@@ -212,14 +212,88 @@ test("short landscape uses a continuous stick, large actions, and dynamic viewpo
   assert.match(STYLES, /\.touch-stick__gate\s*\{[\s\S]*?width:\s*112px;[\s\S]*?height:\s*112px;/);
   assert.match(STYLES, /\.touch-stick__knob\s*\{[\s\S]*?--stick-x/);
   assert.match(STYLES, /width:\s*min\(100dvw,\s*177\.7778dvh\)/);
-  assert.match(STYLES, /Keep the mobile deck last[\s\S]*?\.touch-actions[\s\S]*?width:\s*164px;[\s\S]*?height:\s*120px;/);
+  assert.match(STYLES, /Keep the mobile deck last[\s\S]*?\.touch-actions[\s\S]*?width:\s*244px;[\s\S]*?height:\s*124px;/);
+  assert.match(STYLES, /Keep the mobile deck last[\s\S]*?\.touch-trick[\s\S]*?width:\s*68px;[\s\S]*?height:\s*68px;/);
   assert.match(STYLES, /Keep the mobile deck last[\s\S]*?\[data-control="edge"\][\s\S]*?width:\s*76px;[\s\S]*?height:\s*76px;/);
+  assert.match(STYLES, /data-control-mode="advanced"[\s\S]*?\.touch-spin[\s\S]*?width:\s*52px;[\s\S]*?height:\s*52px;/);
+  assert.match(STYLES, /\.touch-controls button\.is-queued[\s\S]*?animation:\s*trick-intent-pulse/);
+  assert.match(STYLES, /\.touch-controls button\.is-trick-active/);
+  assert.match(STYLES, /\.touch-controls button\.is-release/);
+});
+
+test("simulation trick events persist queued, active, and release states until resolution", () => {
+  const button = feedbackButton("trick");
+  const game = {
+    settings: { controlMode: "simple" },
+    host: { dataset: { controlMode: "simple" } },
+    elements: {
+      touchControls: { querySelector: () => button },
+      touchTrickButtons: [button],
+      touchSpecial: null,
+    },
+    rumbleCalls: 0,
+    rumble() {
+      this.rumbleCalls += 1;
+    },
+    setTouchTrickFeedback: KakiSurfGame.prototype.setTouchTrickFeedback,
+    resetTouchTrickFeedback: KakiSurfGame.prototype.resetTouchTrickFeedback,
+  };
+
+  KakiSurfGame.prototype.syncTouchTrickFeedback.call(game, {
+    type: "trickQueued",
+    payload: { action: "trick", order: 4 },
+  });
+  assert.equal(button.dataset.trickState, "queued");
+  assert.equal(button.status.textContent, "QUEUED");
+  assert.equal(game.rumbleCalls, 1);
+
+  KakiSurfGame.prototype.syncTouchActionState.call(game);
+  assert.equal(button.dataset.trickState, "queued", "an ordinary render sync cannot erase feedback");
+
+  KakiSurfGame.prototype.syncTouchTrickFeedback.call(game, {
+    type: "trickStarted",
+    payload: { id: "frontRailGrab", action: "trick1", order: 4 },
+  });
+  assert.equal(button.dataset.trickState, "active");
+  assert.equal(button.status.textContent, "FRONTSIDE GRAB");
+
+  KakiSurfGame.prototype.syncTouchTrickFeedback.call(game, {
+    type: "trickAutoReleased",
+    payload: { id: "frontRailGrab", action: "trick1", order: 4 },
+  });
+  assert.equal(button.dataset.trickState, "release");
+  assert.equal(button.status.textContent, "RELEASE");
+
+  KakiSurfGame.prototype.syncTouchTrickFeedback.call(game, {
+    type: "trickCompleted",
+    payload: { id: "frontRailGrab", action: "trick1", order: 4 },
+  });
+  assert.equal(button.dataset.trickState, "idle");
+  assert.equal(button.status.textContent, "TAP / HOLD");
 });
 
 test("settings dialog has a programmatic accessible name", () => {
   assert.match(GAME_SOURCE, /<dialog class="settings-dialog" aria-labelledby="settings-title">/);
   assert.match(GAME_SOURCE, /<h2 id="settings-title">SETTINGS<\/h2>/);
 });
+
+function feedbackButton(control) {
+  const classes = new Set();
+  const status = {
+    dataset: { simpleLabel: "TAP / HOLD", advancedLabel: "VARIAL" },
+    textContent: "TAP / HOLD",
+  };
+  return {
+    dataset: { control, trickState: "idle", intentOrder: "0" },
+    status,
+    classList: {
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      contains: (name) => classes.has(name),
+    },
+    querySelector: (selector) => selector === "[data-touch-status]" ? status : null,
+  };
+}
 
 test("settings dialog includes the creator and inspiration credits", () => {
   assert.match(GAME_SOURCE, /<section class="credits-section" aria-labelledby="credits-heading">/);

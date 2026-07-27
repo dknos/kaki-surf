@@ -117,6 +117,10 @@ test("real aerial events use the names consumed by renderer and audio", () => {
   }
   simulation.update(FIXED_STEP, { trick1Released: true });
   trickEvents.push(...drain(simulation));
+  for (let step = 0; step < 12; step += 1) {
+    simulation.update(FIXED_STEP, {});
+    trickEvents.push(...drain(simulation));
+  }
   const completed = trickEvents.find((event) => event.type === "trickCompleted");
   assert.equal(completed?.payload.id, "frontRailGrab");
 

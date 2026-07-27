@@ -153,22 +153,24 @@ test("one aerial sequences different tricks without repeated-key farming", () =>
 
 test("Kaki Twist enforces meaningful airtime/height and exposes counter-rotation", () => {
   const session = new AerialTrickSession({ boardId: "moonLog" });
-  const rejected = session.update(1 / 120, {
+  const queued = session.update(1 / 120, {
     trick4: true,
     trick4Pressed: true,
   }, context({ maxHeight: 2 }));
-  assert.equal(rejected[0].type, "trickRejected");
-  assert.match(rejected[0].hint, /AIR|POP/);
+  assert.equal(queued[0].type, "trickQueued");
+  assert.equal(queued.some((event) => event.type === "trickRejected"), false);
 
-  session.update(1 / 120, {}, context({ maxHeight: 80 }));
-  runFor(session, 0.36, {}, context({ maxHeight: 80 }));
-  session.update(1 / 120, { trick4: true, trick4Pressed: true }, context({ maxHeight: 80 }));
-  runFor(session, 0.3, {}, context({ maxHeight: 84 }));
+  const eligibilityEvents = runFor(session, 0.28, {}, context({ maxHeight: 80 }));
+  assert.equal(
+    eligibilityEvents.filter((event) => event.type === "trickStarted").length,
+    1,
+    "the original press begins once both gates are legal",
+  );
   assert.equal(session.manifest.trickPose, "kakiTwist");
   assert.notEqual(session.manifest.boardRelativeRotation, 0);
   assert.notEqual(session.manifest.bodyPose, 0);
   assert.notEqual(Math.sign(session.manifest.boardRelativeRotation), Math.sign(session.manifest.bodyPose));
-  runFor(session, 0.82, {}, context({ maxHeight: 88 }));
+  runFor(session, 0.8, {}, context({ maxHeight: 88 }));
   assert.equal(session.manifest.sequence.at(-1).complete, true);
 });
 

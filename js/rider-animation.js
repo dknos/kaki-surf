@@ -260,10 +260,10 @@ const TRICK_TIMELINES = Object.freeze({
   ]),
   tailGrab: timeline([
     [0, POSES.rise, "windup"],
-    [0.24, makePose({ crouch: 2, lean: 3, headX: -1, leftPaw: [-7, -12], rightPaw: [0, -10], legSpread: 5, tailX: -14, tailY: -14, expression: "focus" }), "windup"],
-    [0.48, makePose({ crouch: 4, lean: 2, headY: 2, headX: -2, leftPaw: [-7, -9], rightPaw: [-8, -4], legSpread: 3, tailX: -15, tailY: -12, expression: "focus" }), "reach"],
-    [0.58, makePose({ crouch: 5, lean: 1, headY: 3, headX: -2, leftPaw: [-6, -8], rightPaw: [-8, -3], legSpread: 3, squash: 1, tailX: -16, tailY: -10, expression: "bright" }), "hold"],
-    [1, makePose({ crouch: 2, headY: 1, headX: 1, leftPaw: [-13, -14], rightPaw: [5, -12], legSpread: 7, tailY: -15, expression: "focus" }), "release"],
+    [0.24, makePose({ crouch: 2, lean: 3, headX: -1, leftPaw: [-7, -12], rightPaw: [1, -10], legSpread: 5, tailX: -14, tailY: -14, expression: "focus" }), "windup"],
+    [0.48, makePose({ crouch: 4, lean: 2, headY: 2, headX: -2, leftPaw: [-7, -9], rightPaw: [-6, -4], legSpread: 3, tailX: -15, tailY: -12, expression: "focus" }), "reach"],
+    [0.58, makePose({ crouch: 5, lean: 1, headY: 3, headX: -2, leftPaw: [-6, -8], rightPaw: [-6, -3], legSpread: 3, squash: 1, tailX: -16, tailY: -10, expression: "bright" }), "hold"],
+    [1, makePose({ crouch: 2, headY: 1, headX: 1, leftPaw: [-13, -14], rightPaw: [4, -12], legSpread: 7, tailY: -15, expression: "focus" }), "release"],
   ]),
   boardVarial: timeline([
     [0, makePose({ stretch: 3, headY: -2, leftPaw: [-12, -16], rightPaw: [9, -17], legSpread: 6, expression: "bright" }), "pop"],
