@@ -54,7 +54,7 @@ Fifteen families are loaded at runtime and remain optional. Missing or invalid a
 | `carrier` | `carrier-atlas.png` | 384 x 100 | Haze, festival carrier, lights, radar, crew, airshow, wake | Layered festival-fleet silhouette |
 | `uiOrnaments` | `ui-ornaments-atlas.png` | 320 x 104 | Crest, board emblems, controls, ribbon, badge, medal | Existing Canvas/CSS panels and glyphs |
 | `soderSnek` | `soder-snek-atlas.png` | 512 x 448 | Complete 56-pose Soder rider timeline | Code-authored Soder renderer |
-| `simplyTerrell` | `simply-terrell-atlas.png` | 512 x 448 | Complete 56-pose comedian-surfer timeline with microphone | Code-authored SimplyTerrell renderer |
+| `simplyTerrell` | `simply-terrell-atlas.png` | 512 x 448 | Complete 56-pose comedian-surfer timeline with balanced arms | Code-authored SimplyTerrell renderer |
 
 The flexible-board concept cells are source references; live board deformation remains code-driven so physics state, landing angle, and sprite alignment stay coherent. The renderer can use top/rail/underside art without treating a baked bent pose as collision truth.
 

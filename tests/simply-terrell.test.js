@@ -37,7 +37,7 @@ test("SimplyTerrell follows canonical rider state and trick animation", () => {
   assert.equal(resolveSimplyTerrellFrame({ state: "complete", resultWon: true }), "victory");
 });
 
-test("SimplyTerrell fallback keeps an opaque neck, locs, tracksuit, skin, and two readable hands", () => {
+test("SimplyTerrell fallback keeps a short opaque neck, flat collar, and hands outside the torso", () => {
   const direct = new CommandContext();
   const dispatched = new CommandContext();
   const player = {
@@ -65,7 +65,7 @@ test("SimplyTerrell fallback keeps an opaque neck, locs, tracksuit, skin, and tw
     direct.commands.filter(([command, , , width, height]) => (
       command === "fillRect" && width >= 3 && height >= 4
     )).length >= 12,
-    "full biped, opaque neck, locs, stage jacket, and hands",
+    "full biped, short opaque neck, flat collar, stage jacket, and separated hands",
   );
   assert.deepEqual(direct.scales[0], [1, 1]);
   assert.ok(SIMPLY_TERRELL_VISUAL_BOUNDS.left > -32);

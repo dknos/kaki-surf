@@ -1,6 +1,6 @@
 # Kaki Surf
 
-Kaki Surf is a standalone, no-bundler Canvas arcade surfing game with selectable Kaki, Soder Snek, and SimplyTerrell riders. Endless Surf is the primary survival run, with the original 78-second Score Attack preserved as a separate mode. It runs at a fixed 384 x 216 logical resolution with a 1/120-second simulation step and deploys unchanged to a static host.
+Kaki Surf is a standalone, no-bundler Canvas arcade surfing game with selectable KittyKaki, Soder Snek, and SimplyTerrell riders. Endless Surf is the primary survival run, with the original 78-second Score Attack preserved as a separate mode. It runs at a fixed 384 x 216 logical resolution with a 1/120-second simulation step and deploys unchanged to a static host.
 
 **[Play Kaki Surf on GitHub Pages](https://dknos.github.io/kaki-surf/)**
 

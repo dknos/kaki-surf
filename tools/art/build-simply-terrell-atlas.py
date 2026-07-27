@@ -108,7 +108,7 @@ def draw_frame(name: str, index: int) -> Image.Image:
     hip_y = body_top + 19
     foot_y = 58
     head_x = 32 + round(lean * 0.65)
-    head_top = max(7, body_top - 21)
+    head_top = max(7, body_top - 18)
 
     # Legs and independent board-contact shoes.
     left_foot = (21 + max(0, lean), foot_y)
@@ -122,24 +122,26 @@ def draw_frame(name: str, index: int) -> Image.Image:
         draw.rectangle((foot_x - 3, y - 2, foot_x + 4, y - 1), fill=P["shoe"])
         draw.point((foot_x + 4, y - 2), fill=P["white"])
 
-    # Gesture arm behind torso; the open hand is the stand-up silhouette cue.
+    # Lead arm stays visibly away from the torso in a balanced surf posture.
     shoulder_left = (body_x - 8, body_top + 4)
     gesture = specification["gesture"]
     gesture_end = {
-        "high": (max(9, body_x - 14), max(8, body_top - 12)),
-        "wide": (max(12, body_x - 20), body_top + 3),
-        "low": (max(10, body_x - 14), min(53, body_top + 17)),
-        "talk": (max(10, body_x - 16), body_top + 8),
-        "rest": (max(12, body_x - 12), body_top + 13),
+        "high": (max(9, body_x - 17), max(8, body_top - 10)),
+        "wide": (max(9, body_x - 22), body_top + 2),
+        "low": (max(9, body_x - 20), min(53, body_top + 14)),
+        "talk": (max(9, body_x - 20), body_top + 5),
+        "rest": (max(9, body_x - 20), body_top + 8),
     }[gesture]
-    elbow = (body_x - 12, round((body_top + 4 + gesture_end[1]) / 2) + 2)
+    if body_x - gesture_end[0] < 16:
+        raise SystemExit(f"{name}: lead hand is too close to torso")
+    elbow = (body_x - 14, round((body_top + 4 + gesture_end[1]) / 2) + 1)
     line(draw, [shoulder_left, elbow, gesture_end], P["ink"], P["navy"], 8, 5)
     draw.rectangle((gesture_end[0] - 2, gesture_end[1] - 2,
                     gesture_end[0] + 2, gesture_end[1] + 2), fill=P["skin_dark"])
     draw.rectangle((gesture_end[0] - 1, gesture_end[1] - 1,
                     gesture_end[0] + 2, gesture_end[1] + 1), fill=P["skin"])
-    draw.rectangle((gesture_end[0] + 1, gesture_end[1] + 1,
-                    gesture_end[0] + 3, gesture_end[1] + 2), fill=P["skin"])
+    draw.rectangle((gesture_end[0] + 1, gesture_end[1],
+                    gesture_end[0] + 3, gesture_end[1] + 1), fill=P["skin"])
 
     # Loose navy tracksuit torso with gray shoulder panels and red shirt peek.
     draw.polygon([
@@ -158,16 +160,12 @@ def draw_frame(name: str, index: int) -> Image.Image:
         (body_x + 3, body_top + 1), (body_x + 8, body_top + 1),
         (body_x + 9, body_top + 6), (body_x + 6, body_top + 7),
     ], fill=P["shoulder"])
-    draw.polygon([
-        (body_x - 3, body_top + 1), (body_x + 3, body_top + 1),
-        (body_x, body_top + 7),
-    ], fill=P["red"])
     draw.line((body_x, body_top + 6, body_x, hip_y - 2), fill=P["silver_dark"], width=1)
 
-    # Relaxed second arm stays clear of the face and balances the gesture.
+    # Trail arm reaches the opposite side for an unmistakable surfer balance.
     shoulder_right = (body_x + 8, body_top + 4)
-    resting_hand = (body_x + 12, body_top + 16)
-    resting_elbow = (body_x + 13, body_top + 10)
+    resting_hand = (body_x + 19, body_top + 9)
+    resting_elbow = (body_x + 14, body_top + 6)
     line(draw, [shoulder_right, resting_elbow, resting_hand],
          P["ink"], P["navy"], 8, 5)
     draw.rectangle((resting_hand[0] - 2, resting_hand[1] - 2,
@@ -189,9 +187,9 @@ def draw_frame(name: str, index: int) -> Image.Image:
         )
         draw.point((head_x + offset + bend, head_top + 8 + loc_index), fill=P["loc_highlight"])
 
-    # Opaque neck bridge closes the center gap between the head and collar.
+    # Short opaque neck bridge closes the head-to-jacket gap.
     draw.rectangle(
-        (head_x - 3, head_top + 15, head_x + 3, body_top + 1),
+        (head_x - 2, head_top + 15, head_x + 2, body_top),
         fill=P["skin_dark"],
     )
 
@@ -205,6 +203,9 @@ def draw_frame(name: str, index: int) -> Image.Image:
     draw.rectangle((head_x - 3, head_top + 14, head_x + 3, head_top + 14), fill=P["white"])
     draw.rectangle((head_x - 2, head_top + 15, head_x + 2, head_top + 15), fill=P["mouth"])
     draw.rectangle((head_x - 1, head_top + 16, head_x + 1, head_top + 16), fill=P["skin_light"])
+
+    # Flat crew-neck band preserves the red undershirt without a dangling point.
+    draw.rectangle((body_x - 4, body_top, body_x + 4, body_top + 1), fill=P["red"])
 
     if any(term in name for term in ("turbo", "Cooking", "victory")):
         draw.rectangle((55, 14 + (index % 3) * 5, 57, 16 + (index % 3) * 5), fill=P["spark"])
@@ -231,6 +232,14 @@ def validate_cell(
     for y in range(head_top + 15, body_top + 1):
         if cell.getpixel((head_x, y))[3] != 255:
             raise SystemExit(f"{name}: transparent head-to-collar gap at {head_x},{y}")
+    red_pixels = [
+        (x, y)
+        for y in range(CELL)
+        for x in range(CELL)
+        if cell.getpixel((x, y)) == P["red"]
+    ]
+    if not red_pixels or max(y for _, y in red_pixels) - min(y for _, y in red_pixels) > 1:
+        raise SystemExit(f"{name}: red undershirt must remain a flat crew-neck band")
     if len(colors) > 20:
         raise SystemExit(f"{name}: palette grew to {len(colors)} colors")
     for position in range(CELL):

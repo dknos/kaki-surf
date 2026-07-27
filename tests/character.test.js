@@ -35,7 +35,11 @@ test("character catalog exposes every surfer through one cosmetic contract", () 
     CHARACTER_CATALOG.soderSnek.menuDescription,
     "SODER SNEK — Coiled style, elastic poses, tremendous tongue control.",
   );
+  assert.equal(CHARACTER_CATALOG.kaki.displayName, "KITTYKAKI");
+  assert.match(CHARACTER_CATALOG.kaki.menuDescription, /^KITTYKAKI —/);
   assert.match(CHARACTER_CATALOG.simplyTerrell.menuDescription, /LA stand-up flow/);
+  assert.doesNotMatch(CHARACTER_CATALOG.simplyTerrell.menuDescription, /mic|microphone/i);
+  assert.equal(characterMoveName("simplyTerrell", "snap"), "OPENING BIT");
 });
 
 test("character IDs normalize safely and custom move names remain display-only", () => {

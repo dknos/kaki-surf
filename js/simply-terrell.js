@@ -71,7 +71,7 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   const bodyX = lean;
   const bodyY = -27 + crouch - stretch;
   const headX = Math.round(lean * 0.65);
-  const headY = bodyY - 23;
+  const headY = bodyY - 20;
 
   // Two independent board-contact legs and shoes.
   ctx.fillStyle = ink;
@@ -97,18 +97,33 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillStyle = shoulder;
   ctx.fillRect(bodyX - 10, bodyY, 5, 5);
   ctx.fillRect(bodyX + 6, bodyY, 5, 5);
-  ctx.fillStyle = red;
-  ctx.fillRect(bodyX - 2, bodyY, 5, 4);
-
-  // Free gesturing arm.
+  // Lead arm stays clearly outside the torso in a balanced surf posture.
   const gestureUp = /victory|Star|Release|Cooking/i.test(frame);
   const gestureOut = /Snap|Cutback|wobble|wipeout|Spiral/i.test(frame);
-  const handX = bodyX - (gestureOut ? 16 : 12);
-  const handY = bodyY + (gestureUp ? -8 : gestureOut ? 6 : 11);
+  const handX = bodyX - (gestureOut ? 22 : gestureUp ? 17 : 20);
+  const handY = bodyY + (gestureUp ? -10 : gestureOut ? 2 : 8);
+  const elbowX = bodyX - 14;
+  const elbowY = Math.round((bodyY + 4 + handY) / 2);
   ctx.fillStyle = ink;
-  ctx.fillRect(Math.min(bodyX - 10, handX), Math.min(bodyY + 3, handY), 8, Math.abs(handY - bodyY - 3) + 7);
+  ctx.fillRect(
+    Math.min(handX + 2, elbowX),
+    Math.min(handY, elbowY) - 3,
+    Math.abs(elbowX - handX) + 4,
+    Math.abs(elbowY - handY) + 7,
+  );
+  ctx.fillRect(
+    Math.min(elbowX, bodyX - 8) - 3,
+    Math.min(elbowY, bodyY + 3),
+    Math.abs(bodyX - 8 - elbowX) + 7,
+    Math.abs(bodyY + 3 - elbowY) + 5,
+  );
   ctx.fillStyle = navy;
-  ctx.fillRect(Math.min(bodyX - 9, handX + 1), Math.min(bodyY + 4, handY + 1), 6, Math.abs(handY - bodyY - 3) + 5);
+  ctx.fillRect(
+    Math.min(handX + 2, elbowX) + 1,
+    Math.min(handY, elbowY) - 2,
+    Math.abs(elbowX - handX) + 2,
+    Math.abs(elbowY - handY) + 5,
+  );
   ctx.fillStyle = ink;
   ctx.fillRect(handX - 1, handY - 1, 6, 6);
   ctx.fillStyle = skin;
@@ -116,15 +131,15 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillStyle = skinLight;
   ctx.fillRect(handX + 1, handY, 2, 1);
 
-  // Relaxed second arm stays clear of the face.
+  // Trail arm reaches the opposite side for a readable balance pose.
   ctx.fillStyle = ink;
-  ctx.fillRect(bodyX + 8, bodyY + 3, 7, 15);
+  ctx.fillRect(bodyX + 8, bodyY + 2, 14, 11);
   ctx.fillStyle = navy;
-  ctx.fillRect(bodyX + 9, bodyY + 4, 5, 13);
+  ctx.fillRect(bodyX + 9, bodyY + 4, 12, 7);
   ctx.fillStyle = ink;
-  ctx.fillRect(bodyX + 10, bodyY + 14, 6, 6);
+  ctx.fillRect(bodyX + 18, bodyY + 7, 6, 6);
   ctx.fillStyle = skin;
-  ctx.fillRect(bodyX + 11, bodyY + 15, 4, 4);
+  ctx.fillRect(bodyX + 19, bodyY + 8, 4, 4);
 
   // Loc silhouette, face, and warm comedian expression.
   ctx.fillStyle = locs;
@@ -136,7 +151,7 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillRect(headX - 11, headY, 3, 18);
   ctx.fillRect(headX + 8, headY - 1, 3, 20);
   ctx.fillStyle = "#693725";
-  ctx.fillRect(headX - 3, headY + 15, 7, bodyY - headY - 13);
+  ctx.fillRect(headX - 2, headY + 15, 5, bodyY - headY - 14);
   ctx.fillStyle = skin;
   ctx.fillRect(headX - 8, headY + 2, 16, 15);
   ctx.fillStyle = skinLight;
@@ -151,6 +166,8 @@ function drawSimplyTerrellFallback(ctx, frame, palette) {
   ctx.fillRect(headX - 1, headY + 14, 3, 1);
   ctx.fillStyle = skinLight;
   ctx.fillRect(headX, headY + 15, 1, 1);
+  ctx.fillStyle = red;
+  ctx.fillRect(bodyX - 4, bodyY, 9, 2);
 }
 
 function snapAngle(angle = 0) {

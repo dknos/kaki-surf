@@ -1958,7 +1958,7 @@ function gameMarkup() {
           </div>
           <dl class="menu-stats">
             <div><dt data-stat="best-label">ENDLESS BEST</dt><dd data-stat="best">0</dd></div>
-            <div><dt>RIDER</dt><dd data-stat="character">KAKI</dd></div>
+            <div><dt>RIDER</dt><dd data-stat="character">KITTYKAKI</dd></div>
             <div><dt>BOARD</dt><dd data-stat="board">FOAM PUFF</dd></div>
             <div><dt>BREAK</dt><dd data-stat="condition">GOLDEN</dd></div>
             <div><dt>RIDES</dt><dd data-stat="runs">0</dd></div>

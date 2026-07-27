@@ -2,8 +2,8 @@ const CHARACTER_IDS = Object.freeze(["kaki", "soderSnek", "simplyTerrell"]);
 
 const kaki = Object.freeze({
   id: "kaki",
-  displayName: "KAKI",
-  menuDescription: "KAKI — Plush precision, fearless airs, maximum flow.",
+  displayName: "KITTYKAKI",
+  menuDescription: "KITTYKAKI — Plush precision, fearless airs, maximum flow.",
   portraitFrame: "kakiPortrait",
   riderRendererId: "kaki",
   paletteAccents: Object.freeze({
@@ -48,7 +48,7 @@ const soderSnek = Object.freeze({
 const simplyTerrell = Object.freeze({
   id: "simplyTerrell",
   displayName: "SIMPLYTERRELL",
-  menuDescription: "SIMPLYTERRELL — LA stand-up flow, mic in hand, ready for the set.",
+  menuDescription: "SIMPLYTERRELL — LA stand-up flow, balanced stance, ready for the set.",
   portraitFrame: "simplyTerrellPortrait",
   riderRendererId: "simplyTerrell",
   paletteAccents: Object.freeze({
@@ -57,7 +57,7 @@ const simplyTerrell = Object.freeze({
     trail: "#7f8cbf",
   }),
   moveNameOverrides: Object.freeze({
-    snap: "MIC CHECK",
+    snap: "OPENING BIT",
     cutback: "CROWD WORK",
     frontRailGrab: "ONE-LINER GRAB",
     tailGrab: "ENCORE GRAB",
