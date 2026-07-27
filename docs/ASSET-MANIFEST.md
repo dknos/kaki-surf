@@ -1,6 +1,6 @@
 # Asset manifest and provenance
 
-Kaki Surf ships local, static presentation assets only. The runtime contains six condition backgrounds and 15 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
+Kaki Surf ships local, static presentation assets only. The runtime contains eight condition backgrounds and 16 transparent atlas families. It makes no image-generation, model-hosting, asset-CDN, analytics, or other remote API request.
 
 Gameplay truth remains code-owned. Raster art does not define wave collision, rider motion, wildlife phases, pickup reachability, scoring, or UI state; it renders simulation state and has an independent local fallback.
 
@@ -28,15 +28,15 @@ all layers --> 384 x 216 Canvas --> nearest-neighbor CSS scaling
 
 | Family | Files | Dimensions | Fallback |
 | --- | --- | --- | --- |
-| Gameplay aerial panoramas | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-aerial.png` | 1536 x 640 each | Condition-specific Canvas coast/cloud/space bands |
+| Gameplay aerial panoramas | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak,kakiLand}-aerial.png` | 1536 x 640 each | Condition-specific Canvas coast/cloud/space bands |
 | Preserved coast sources | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-strip.png` | 384 x 80 each | Original lower-art references retained for comparison |
-| Menu art | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-menu.png` | 768 x 432 each | CSS color treatment and readable menu shell |
+| Menu art | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak,kakiLand}-menu.png` | 768 x 432 each | CSS color treatment and readable menu shell |
 
-The lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. The vertical masters are rebuilt from one reviewed continuous source per condition through `tools/art/build-aerial-panoramas.py`; the rejected Grok/Vertex splice, repair prompts, and selection decisions are documented in [Vertical aerial source selection](./art-source/aerial/README.md).
+The first three lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. Kaki-Land's menu, continuous source, and decor atlas are deterministically cleaned from reviewed local Grok masters by `tools/art/build-kaki-land-assets.py`. All four vertical masters are rebuilt from one reviewed continuous source per condition through `tools/art/build-aerial-panoramas.py`; selection and rejection decisions are documented in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
 
 ## Generated runtime atlases
 
-Fifteen families are loaded at runtime and remain optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family. The continuous side-break and six-cell travelling-break outputs remain in the offline build for provenance, but browser review rejected both as active MVP silhouettes and they are absent from `js/asset-manifest.js`.
+Sixteen families are loaded at runtime and remain optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family. The continuous side-break and six-cell travelling-break outputs remain in the offline build for provenance, but browser review rejected both as active MVP silhouettes and they are absent from `js/asset-manifest.js`.
 
 | Family key | Runtime file | Dimensions | Frame responsibility | Local fallback |
 | --- | --- | ---: | --- | --- |
@@ -53,6 +53,7 @@ Fifteen families are loaded at runtime and remain optional. Missing or invalid a
 | `boards` | `boards-atlas.png` | 256 x 72 | Top, rail, flex concept, underside for three boards | Existing inspectable board renderer |
 | `carrier` | `carrier-atlas.png` | 384 x 100 | Haze, festival carrier, lights, radar, crew, airshow, wake | Layered festival-fleet silhouette |
 | `uiOrnaments` | `ui-ornaments-atlas.png` | 320 x 104 | Crest, board emblems, controls, ribbon, badge, medal | Existing Canvas/CSS panels and glyphs |
+| `kakiLandDecor` | `kaki-land-decor-atlas.png` | 256 x 144 | Fictional artist functions, cloud station, Approval, and Last Relay reaction frames | Code-authored artists, station, stamp, and signal shrine |
 | `soderSnek` | `soder-snek-atlas.png` | 512 x 448 | Complete 56-pose Soder rider timeline | Code-authored Soder renderer |
 | `simplyTerrell` | `simply-terrell-atlas.png` | 512 x 448 | Complete 56-pose comedian-surfer timeline with balanced arms | Code-authored SimplyTerrell renderer |
 
@@ -70,7 +71,7 @@ deterministic rebuild command are recorded in
 | `js/sprites.js` | Kitty poses, board deformation, signed facing, wake, and atlas-aware board drawing |
 | `js/wave-visuals.js` | Ride surface, face bands, fast-line guidance, curl geometry, foam, wave-atlas accents, and monotonic presentation clocks including the wave-time-driven fall clock |
 | `js/hero-wave-visuals.js` | Long side-view face, fixed-grid gravity columns, persistent contrail foam, passed-sky/backwater window, rideable tube presentation, collision-aligned edge, board spray, and impact churn |
-| `js/world-visuals.js` | Traffic layers, wildlife phases, powerups, carrier/airshow, and their procedural fallbacks |
+| `js/world-visuals.js` | Traffic layers, wildlife phases, powerups, carrier/airshow, Webring Relay gates/station/mural, and their procedural fallbacks |
 | `js/asset-drawing.js` | Shared atlas-frame drawing with anchor, scale, direction, alpha, and transform controls |
 | `js/renderer.js` | Layer composition, interpolation, HUD, particles, callouts, access presentation, and state-driven VFX |
 | `js/pixel-font.js` | Compact Canvas glyph data and text drawing |
@@ -78,6 +79,20 @@ deterministic rebuild command are recorded in
 | `js/game.js` and `styles.css` | Menu, touch controls, settings, results, responsive shell, and nearest-neighbor stage |
 
 ## Offline source and deterministic conversion
+
+Kaki-Land's checked-in palette-controlled art is rebuilt independently:
+
+```console
+python3 tools/art/build-kaki-land-assets.py
+python3 tools/art/build-aerial-panoramas.py --condition kakiLand
+```
+
+The first command creates the continuous source, menu art, and decor atlas from
+the preserved reviewed Grok masters, then applies two-pixel cleanup, a 64-color
+panorama cap, chroma extraction, and the canonical Relay face grid. The shared
+panorama build then fixes the 1536 x 640 contract, y=502 ocean anchor,
+continuity, and compression. The rejected Vertex/Nano exploration is
+reference-only and never enters these outputs.
 
 The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`. The retired continuous side-break source is 1280 x 720, the retired travelling-break sheet is 384 x 216, the active wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, other studies, and remaining selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. Source sheets are documentation assets and are never loaded by the browser. `tools/art/build-grok-assets.py`:
 

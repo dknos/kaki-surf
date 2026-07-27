@@ -1,6 +1,6 @@
 export const LOGICAL_WIDTH = 384;
 export const LOGICAL_HEIGHT = 216;
-export const GAME_VERSION = "2.7.1";
+export const GAME_VERSION = "2.8.0";
 export const FIXED_STEP = 1 / 120;
 export const MAX_FRAME_DELTA = 0.1;
 
@@ -206,6 +206,88 @@ export const WAVE_STYLES = Object.freeze({
       apertureRadiusY: Object.freeze([14, 62]),
       lipDrop: Object.freeze([8, 38]),
       shoulderReach: Object.freeze([76, 212]),
+    }),
+    projection: Object.freeze({
+      horizonY: 79,
+      depthShear: 50,
+      fanShear: 14,
+      depthDrop: 10,
+      fanDrop: 8,
+    }),
+  }),
+  signalBreak: Object.freeze({
+    id: "signalBreak",
+    // Kaki-Land owns its handling profile, while the production hero-barrel
+    // compositor remains the single visual/collision source of truth.
+    renderer: "heroBarrel",
+    bounds: Object.freeze({
+      ridingX: Object.freeze([50, 350]),
+      airX: Object.freeze([50, 352]),
+      cameraX: Object.freeze([74, 316]),
+    }),
+    surface: Object.freeze({
+      // A broad, readable wall with low-frequency shape changes gives carried
+      // momentum and chained aerials room to breathe without flattening the
+      // water into a decorative rainbow ramp.
+      crestBase: 78,
+      broadAmplitude: 2.6,
+      broadXFrequency: 0.0095,
+      broadTravelFrequency: 0.0016,
+      detailAmplitude: 0.42,
+      detailXFrequency: 0.027,
+      detailTimeFrequency: 0.31,
+      faceDepthBase: 118,
+      faceDepthAmplitude: 3.5,
+      faceDepthXFrequency: 0.013,
+      faceEaseLinear: 0.82,
+      faceEaseQuadratic: 0.18,
+    }),
+    power: Object.freeze({
+      // The maintained signal route is wider than Twilight's hero line, but
+      // sits lower on the wall so later-set pressure remains consequential.
+      baseFace: 0.555,
+      broadAmplitude: 0.018,
+      broadXFrequency: 0.012,
+      broadTravelFrequency: 0.0004,
+      pulseAmplitude: 0.006,
+      pulseXFrequency: 0.004,
+      pulseTimeFrequency: 0.068,
+      pressureShift: 0.034,
+      minFace: 0.505,
+      maxFace: 0.615,
+    }),
+    threat: Object.freeze({
+      initialCurlX: -66,
+      proximityNearGap: 10,
+      proximityFarGap: 100,
+      temporalPressureScale: 0.88,
+      contactOrigin: true,
+      openingSpeed: 52,
+      maxSpeed: 70,
+      maxRelief: 0.44,
+    }),
+    pocket: Object.freeze({
+      nearOffset: 0,
+      span: 116,
+      contactOffset: 96,
+      contactOrigin: true,
+    }),
+    barrel: Object.freeze({
+      stageNames: Object.freeze(["gather", "pitch", "open", "deep", "hero", "collapse"]),
+      stageThresholds: Object.freeze([0.22, 0.44, 0.68, 0.88, 0.98]),
+      growStart: 0.08,
+      growEnd: 0.9,
+      apertureStart: 0.24,
+      apertureFull: 0.58,
+      closeStart: 0.86,
+      closeEnd: 1,
+      closedAperture: 0.34,
+      outerRadiusX: Object.freeze([56, 158]),
+      outerRadiusY: Object.freeze([34, 114]),
+      apertureRadiusX: Object.freeze([19, 78]),
+      apertureRadiusY: Object.freeze([15, 64]),
+      lipDrop: Object.freeze([8, 38]),
+      shoulderReach: Object.freeze([80, 216]),
     }),
     projection: Object.freeze({
       horizonY: 79,
@@ -468,7 +550,29 @@ export const CONDITIONS = {
     musicMode: "storm",
     waveStyle: "classic",
   },
+  kakiLand: {
+    id: "kakiLand",
+    name: "Kaki-Land",
+    shortName: "KAKI-LAND",
+    breakName: "The Last Guestbook Break",
+    tagline: "The guestbook is still taking drawings.",
+    musicMode: "kakiLand",
+    waveStyle: "signalBreak",
+  },
 };
+
+/** Canonical condition registry used by loaders and every runtime resolver. */
+export const CONDITION_IDS = Object.freeze(Object.keys(CONDITIONS));
+
+export function resolveConditionId(value, fallback = "goldenCoast") {
+  const candidate = typeof value === "string" ? value : value?.id;
+  if (Object.hasOwn(CONDITIONS, candidate)) return candidate;
+  return Object.hasOwn(CONDITIONS, fallback) ? fallback : CONDITION_IDS[0];
+}
+
+export function resolveCondition(value, fallback = "goldenCoast") {
+  return CONDITIONS[resolveConditionId(value, fallback)];
+}
 
 export const SCORE = {
   ridePerSecond: 20,
@@ -669,5 +773,33 @@ export const PALETTES = {
     face: "#ead6c2",
     cheek: "#e78e91",
     white: "#f3f2dc",
+  },
+  kakiLand: {
+    // Semantic Kaki palette: water stays blue/mint, gold remains interaction,
+    // and coral is reserved for genuine danger. Rainbow route colors are
+    // authored separately and never replace the collision-readable face.
+    ink: "#17152f",
+    deepInk: "#090c25",
+    skyTop: "#242052",
+    sky: "#4a4d91",
+    sun: "#ffe8ac",
+    haze: "#eee1c4",
+    distant: "#655b9a",
+    waterDeep: "#102d69",
+    water: "#155f91",
+    waterLight: "#3ccfc4",
+    crest: "#85e6c8",
+    foam: "#fff0cf",
+    foamShade: "#a9d8c7",
+    danger: "#ef665f",
+    gold: "#ffd166",
+    violet: "#9b7dd4",
+    plushDark: "#173b6b",
+    plush: "#2a82aa",
+    plushLight: "#76d4d2",
+    hoodie: "#151329",
+    face: "#f2ddc6",
+    cheek: "#e993a2",
+    white: "#fff6df",
   },
 };

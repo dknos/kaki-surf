@@ -8,13 +8,14 @@ different provider images across altitude bands and then pasted the original
 moved beyond that strip, the browser exposed hard rectangular joins, duplicate
 horizons, and mismatched coast scale.
 
-Version 2.0.1 uses one reviewed continuous source per condition:
+The current build uses one reviewed continuous source per condition:
 
-| Condition | Continuous production source | Source lock |
+| Condition | Continuous production source | Exploration/reference |
 | --- | --- | --- |
 | Golden Coast | `imagegen/golden-continuous.png` | `nano/golden-2.png` |
 | Twilight Glass | `imagegen/twilight-continuous.png` | `nano/twilight-2.png` |
 | Stormbreak | `imagegen/storm-continuous.png` | `nano/storm-1.png` |
+| Kaki-Land | `imagegen/kaki-land-continuous.png` | `nano/kaki-land-1.png` (rejected runtime reference) |
 
 Each repair source was generated as an edit of the strongest coherent Nano
 candidate after the Grok/Nano composites were compared in-game. The production
@@ -22,13 +23,17 @@ step now performs only a continuous vertical reframe, palette reduction, and
 sharpening. It does not paste the old coast strip, splice providers, blur a
 section boundary, or weld the outer columns into a grey band. The authored
 horizon is placed at master y=500, which is screen y=76 for normal riding.
+Kaki-Land keeps its independently authored ocean anchor at master y=502 and
+uses no provider pixels in its selected continuous source.
 
 The exact repair prompt set is checked in beside the sources in
-[`imagegen/README.md`](./imagegen/README.md).
+[`imagegen/README.md`](./imagegen/README.md). Kaki-Land's complete generation,
+rejection, privacy, hash, and deterministic-build record is in
+[`KAKI-LAND.md`](./KAKI-LAND.md).
 
 ## Original competing candidates
 
-The browser never calls either generator. These are reviewed offline candidates; `tools/art/build-aerial-panoramas.py` is the deterministic production step that publishes the three 1536 x 640 indexed PNGs in `assets/backgrounds`.
+The browser never calls either generator. These are reviewed offline candidates; `tools/art/build-aerial-panoramas.py` is the deterministic production step that publishes the four 1536 x 640 indexed PNGs in `assets/backgrounds`.
 
 ## Candidate matrix
 
@@ -37,6 +42,7 @@ The browser never calls either generator. These are reviewed offline candidates;
 | Golden Coast | `grok/golden-1.jpg`, `grok/golden-2.jpg` | `nano/golden-1.png`, `nano/golden-2.png` | Grok 1 space crown and shooting-star spectacle; Nano 2 cloud, coast, and horizon continuity |
 | Twilight Glass | `grok/twilight-1.jpg`, `grok/twilight-2.jpg` | `nano/twilight-1.png`, `nano/twilight-2.png` | Grok 2 upper aurora/moon/nebula; Nano 2 violet cloud and coast continuity |
 | Stormbreak | `grok/storm-1.png`, `grok/storm-2.png` | `nano/storm-1.png`, `nano/storm-2.png` | Grok 2 stars and above-storm crown; Nano 1 storm interior, coast, and ocean continuity |
+| Kaki-Land | `grok/kaki-land-network-master.png` | `nano/kaki-land-1.png` | Vertex composition rejected; reviewed 20:9 Grok network master selected after a constrained humanoid-removal edit |
 
 These candidates remain checked in as the provider comparison record. They are
 not directly spliced into the repaired runtime masters.
@@ -70,12 +76,14 @@ Generated through Vertex AI with `gemini-2.5-flash-image`, two fixed-seed candid
 - Golden Coast: preserve the attached coastline, horizon height, peach haze, palms, palette, chunky clusters, and deep-navy outlines; outpaint upward into peach-and-cream clouds, sun rays, cobalt atmosphere, curved gold rim, sparse stars, and a tiny satellite.
 - Twilight Glass: preserve the attached violet coast and luminous cold-water horizon; outpaint upward into moonlit violet clouds, indigo atmosphere, lavender haze, aurora, bright stars, an off-center moon, nebula, and a tiny satellite.
 - Stormbreak: preserve the attached dark storm coast, silver horizon, rain palette, and silhouettes; outpaint upward through thunderhead interiors and clean lightning, above glowing cold cloud tops, then into blue-black stars and a tiny meteor.
+- Kaki-Land: explore an original handmade cloud-homepage network, repaired rainbow web rings, fictional artist stations, tiled stars, and a distant nonhuman signal guardian. The candidate was reference-only; see [`KAKI-LAND.md`](./KAKI-LAND.md).
 
 ## Rebuild
 
 ```console
 python3 tools/art/generate-nano-aerial.py --reference path/to/reference.png --output path/to/candidate.png --prompt "..."
+python3 tools/art/build-kaki-land-assets.py
 python3 tools/art/build-aerial-panoramas.py
 ```
 
-The first command is an authoring operation that requires an authenticated Vertex project. The second is local and deterministic once the twelve checked-in candidates exist.
+The first command is an authoring operation that requires an authenticated Vertex project. The Kaki-Land asset builder and panorama builder are local and deterministic once the selected sources are checked in.

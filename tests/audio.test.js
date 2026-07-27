@@ -220,6 +220,34 @@ test("banner traffic, carrier phases, Fleet Airshow, and landing grades stay eve
   assert.ok(calls.some((call) => call.method === "noiseBurst" && call.filter === "lowpass"));
 });
 
+test("Kaki-Land Relay uses restrained packet, stylus, stamp, and Signal Held cues", () => {
+  const { audio, calls } = createAudioProbe();
+
+  audio.onEvent({ type: "webringRelayPhase", payload: { reason: "available" } });
+  assert.deepEqual(
+    calls.filter((call) => call.method === "tone").map((call) => [call.start, call.type]),
+    [[330, "square"], [587, "sine"]],
+  );
+
+  calls.length = 0;
+  audio.onEvent({ type: "foamGateCleared", payload: { reason: "webringRelay", value: 2 } });
+  assert.ok(calls.some((call) => call.method === "noiseTick" && call.frequency === 2100));
+  assert.ok(calls.some((call) => call.method === "tone" && call.type === "square"));
+  assert.ok(calls.some((call) => call.method === "tone" && call.type === "sine"));
+
+  calls.length = 0;
+  audio.onEvent({ type: "webringRelayCompleted", payload: { value: 3 } });
+  assert.ok(calls.some((call) => call.method === "noiseBurst" && call.filter === "bandpass"));
+  assert.ok(calls.some((call) => call.method === "tone" && call.start === 880 && call.end === 1320));
+
+  calls.length = 0;
+  audio.onEvent({ type: "signalHeldSave", payload: { reason: "shark" } });
+  assert.deepEqual(
+    calls.filter((call) => call.method === "tone").map((call) => [call.start, call.end]),
+    [[659, 880]],
+  );
+});
+
 test("tube success and failure use distinct rising and low impact cues", () => {
   const { audio, calls } = createAudioProbe();
 

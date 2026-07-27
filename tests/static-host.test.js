@@ -6,7 +6,12 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { GAME_VERSION, LOGICAL_HEIGHT, LOGICAL_WIDTH } from "../js/config.js";
+import {
+  CONDITION_IDS,
+  GAME_VERSION,
+  LOGICAL_HEIGHT,
+  LOGICAL_WIDTH,
+} from "../js/config.js";
 import { GENERATED_ASSET_MANIFEST } from "../js/asset-manifest.js";
 import { createKakiSurf } from "../js/integration-adapter.js";
 
@@ -165,7 +170,7 @@ test("every generated production atlas is local, dimension-checked, and compact"
     "twilightHeroWave",
     "waveBreaker", "waveProgression",
     "dolphin", "shark", "whale", "birds", "boats", "airTraffic", "powerups", "boards", "carrier",
-    "uiOrnaments", "soderSnek", "simplyTerrell",
+    "uiOrnaments", "kakiLandDecor", "soderSnek", "simplyTerrell",
   ];
   assert.deepEqual(Object.keys(GENERATED_ASSET_MANIFEST), requiredFamilies);
 
@@ -208,7 +213,7 @@ test("every generated production atlas is local, dimension-checked, and compact"
 
 test("condition aerial panoramas are tall local masters with unique art direction", () => {
   const hashes = new Set();
-  for (const conditionId of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+  for (const conditionId of CONDITION_IDS) {
     const file = path.join(ROOT, "assets", "backgrounds", `${conditionId}-aerial.png`);
     assert.ok(isFile(file), `${conditionId} aerial panorama should be checked in locally`);
     const bytes = readFileSync(file);
@@ -218,7 +223,7 @@ test("condition aerial panoramas are tall local masters with unique art directio
     assert.ok(bytes.byteLength < 512 * 1024, `${conditionId} panorama stays compact for Pages`);
     hashes.add(createHash("sha256").update(bytes).digest("hex"));
   }
-  assert.equal(hashes.size, 3, "each condition keeps a distinct vertical world");
+  assert.equal(hashes.size, CONDITION_IDS.length, "each condition keeps a distinct vertical world");
 
   const continuityCheck = spawnSync(
     "python3",
@@ -232,9 +237,18 @@ test("condition aerial panoramas are tall local masters with unique art directio
   );
 
   const loaderSource = read(path.join(ROOT, "js", "asset-loader.js"));
+  assert.match(loaderSource, /import \{ CONDITION_IDS \} from "\.\/config\.js"/);
+  assert.doesNotMatch(loaderSource, /"goldenCoast",\s*"twilightGlass",\s*"stormbreak"/);
   assert.match(loaderSource, /`\$\{conditionId\}-aerial\.png`/);
   assert.match(loaderSource, /BACKGROUND_WIDTH = 1536/);
   assert.match(loaderSource, /BACKGROUND_HEIGHT = 640/);
+
+  const buildSource = read(path.join(ROOT, "tools", "art", "build-aerial-panoramas.py"));
+  assert.match(
+    buildSource,
+    /Spec\("kaki-land", "kakiLand", "kaki-land-continuous\.png", 502 \/ 640, 64, 502\)/,
+    "Kaki-Land retains its single authored source horizon at y=502",
+  );
 });
 
 function read(file) {

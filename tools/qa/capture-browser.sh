@@ -13,6 +13,14 @@ scenes=(
   heroGather-twilightGlass heroPitch-twilightGlass heroOpen-twilightGlass
   heroDeep-twilightGlass heroMax-twilightGlass heroCollapse-twilightGlass
   heroTube-twilightGlass heroAir-twilightGlass maxSpeed turboBoost
+  menu-kakiLand results-kakiLand initialRide-kakiLand artists-kakiLand rainbowSeam-kakiLand
+  leftTravel-kakiLand rightTravel-kakiLand cutback-kakiLand turbo-kakiLand
+  smallAir-kakiLand mediumAir-kakiLand hugeAir-kakiLand aerialCloud-kakiLand
+  aerialUpper-kakiLand aerialSpace-kakiLand lastRelay-kakiLand relayStart-kakiLand
+  relayStartLeft-kakiLand relayGate1-kakiLand relayGate2-kakiLand relayGate3-kakiLand
+  relayComplete-kakiLand dolphin-kakiLand shark-kakiLand wipeout-kakiLand recovery-kakiLand
+  lateEndless-kakiLand scoreFinal-kakiLand relayHighContrast-kakiLand
+  relayReduced-kakiLand relayMobile-kakiLand
   pumpCompression pumpRelease powerLine smallAir launch hugeAir clockwiseSpin counterSpin
   aerialCoast-goldenCoast aerialCloud-goldenCoast aerialUpper-goldenCoast aerialSpace-goldenCoast aerialReentry-goldenCoast
   aerialCoast-twilightGlass aerialCloud-twilightGlass aerialUpper-twilightGlass aerialSpace-twilightGlass aerialReentry-twilightGlass
@@ -28,9 +36,10 @@ scenes=(
   jetSki rescueCraft speedboatRace jetSkiRace mangoRush moonPop starFoam
   powerupMiss planeDrop aircraftDrop mangoExpired moonConsumed starSave carrierHaze
   carrierArrival carrierDeck carrierLaunch fleetAirshow touch touchAdvanced highContrast
-  reducedMotion reducedFlash goldenCoast twilightGlass stormbreak foamPuff-goldenCoast foamPuff-twilightGlass
-  foamPuff-stormbreak mangoFish-goldenCoast mangoFish-twilightGlass
-  mangoFish-stormbreak moonLog-goldenCoast moonLog-twilightGlass moonLog-stormbreak
+  reducedMotion reducedFlash goldenCoast twilightGlass stormbreak kakiLand
+  foamPuff-goldenCoast foamPuff-twilightGlass foamPuff-stormbreak foamPuff-kakiLand
+  mangoFish-goldenCoast mangoFish-twilightGlass mangoFish-stormbreak mangoFish-kakiLand
+  moonLog-goldenCoast moonLog-twilightGlass moonLog-stormbreak moonLog-kakiLand
 )
 
 mkdir -p "$capture_dir"

@@ -73,6 +73,11 @@ export const GENERATED_ASSET_MANIFEST = Object.freeze({
     "titleCrest", "foamPuffEmblem", "mangoFishEmblem", "moonLogEmblem",
     "simpleControlsGlyph", "blankRibbon", "wildlifeSpecialBadge", "resultsMedallion",
   ]),
+  kakiLandDecor: atlas("kaki-land-decor-atlas.png", 4, 3, 64, 48, [
+    "quietRepair", "alarmFixer", "reactionCard", "signalKeeper",
+    "collector", "guestbookGull", "buttonMenace", "approvalStamp",
+    "lastRelayNotice", "lastRelayDeform", "lastRelaySettle", "cloudStation",
+  ], { anchor: [0.5, 0.88] }),
   soderSnek: atlas("soder-snek-atlas.png", 8, 7, 64, 64, [
     "neutralRide", "regularRide", "goofyRide", "highLineCarve",
     "downFaceCarve", "deepCompression", "pumpRelease", "snekSnap",

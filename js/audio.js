@@ -1,9 +1,11 @@
 import { clamp } from "./math.js";
+import { resolveConditionId } from "./config.js";
 
 const MUSIC_PATTERNS = Object.freeze({
   goldenCoast: [0, 7, 12, 7, 3, 10, 15, 10, 5, 12, 17, 12, 3, 10, 14, 10],
   twilightGlass: [0, 5, 10, 14, 7, 12, 17, 12, 3, 10, 15, 19, 7, 14, 17, 12],
   stormbreak: [0, 3, 7, 10, 0, 5, 8, 12, -2, 3, 7, 10, 0, 7, 10, 15],
+  kakiLand: [0, 7, 14, 21, 4, 11, 16, 23, 2, 9, 14, 19, 7, 14, 18, 23],
 });
 
 const TRICK_CUES = Object.freeze({
@@ -103,6 +105,7 @@ export class SurfAudio {
       airborne: false,
       combo: 1,
       finalSeconds: false,
+      presentationPhase: 0,
     };
   }
 
@@ -232,9 +235,13 @@ export class SurfAudio {
     const timed = simulation.mode?.timed !== false;
     const seconds = timed ? Math.ceil(simulation.timeRemaining ?? 99) : Number.POSITIVE_INFINITY;
     const now = this.context.currentTime;
-    this.conditionId = conditionIdFor(simulation, this.settings);
+    this.conditionId = audioConditionIdFor(simulation, this.settings);
 
-    const conditionFilter = this.conditionId === "stormbreak" ? 360 : this.conditionId === "twilightGlass" ? 180 : 0;
+    const conditionFilter = this.conditionId === "stormbreak"
+      ? 360
+      : this.conditionId === "twilightGlass"
+        ? 180
+        : this.conditionId === "kakiLand" ? 90 : 0;
     const openWaveFrequency = 560 + speed * 4.5 + risk * 1180 + potential * 310 + conditionFilter;
     const altitudeFilter = 1 - smoothAudioStep(0.16, 0.92, aerialAltitude) * 0.78;
     setParamTarget(
@@ -321,6 +328,11 @@ export class SurfAudio {
     reactive.airborne = airborne;
     reactive.combo = combo;
     reactive.finalSeconds = seconds <= 10;
+    reactive.presentationPhase = clamp(
+      Number(simulation.world?.presentationPhase ?? simulation.world?.context?.presentationPhase) || 0,
+      0,
+      2,
+    );
     if (!Number.isFinite(this.nextBeat) || this.nextBeat < now - MUSIC_RESYNC_GAP) this.resyncMusicClock(now);
     let scheduled = 0;
     while (this.nextBeat < now + MUSIC_LOOKAHEAD && scheduled < MAX_BEATS_PER_UPDATE) {
@@ -334,22 +346,53 @@ export class SurfAudio {
   scheduleBeat(time, reactive) {
     const pattern = MUSIC_PATTERNS[this.conditionId] ?? MUSIC_PATTERNS.goldenCoast;
     const step = this.beatIndex % pattern.length;
-    const root = this.conditionId === "twilightGlass" ? 98 : this.conditionId === "stormbreak" ? 82.4 : 110;
+    const root = this.conditionId === "twilightGlass"
+      ? 98
+      : this.conditionId === "stormbreak"
+        ? 82.4
+        : this.conditionId === "kakiLand" ? 104 : 110;
     const frequency = root * Math.pow(2, pattern[step] / 12);
     const leadType = this.conditionId === "twilightGlass" ? "sine" : this.conditionId === "stormbreak" ? "sawtooth" : "square";
     if (step % 2 === 0 || reactive.combo > 2.2 || reactive.airborne) this.tone(time, frequency, reactive.airborne ? 0.1 : 0.07, leadType, 0.038 + reactive.speedTier * 0.003, this.musicGain);
     if (step % 4 === 0) {
-      const bass = this.conditionId === "stormbreak" ? 41.2 : 55;
-      this.tone(time, bass, 0.06 + reactive.risk * 0.025, "triangle", 0.075, this.musicGain, bass * 0.64);
+      const bass = this.conditionId === "stormbreak" ? 41.2 : this.conditionId === "kakiLand" ? 52 : 55;
+      this.tone(
+        time,
+        bass,
+        0.06 + reactive.risk * 0.025,
+        this.conditionId === "kakiLand" ? "sine" : "triangle",
+        this.conditionId === "kakiLand" ? 0.052 : 0.075,
+        this.musicGain,
+        bass * (this.conditionId === "kakiLand" ? 1 : 0.64),
+      );
     }
-    if (step % 2 === 1 && (!reactive.airborne || reactive.combo > 3)) this.noiseTick(time, this.conditionId === "stormbreak" ? 0.025 : 0.016, 0.012 + reactive.speedTier * 0.003);
+    if (step % 2 === 1
+      && (!reactive.airborne || reactive.combo > 3)
+      && (this.conditionId !== "kakiLand" || step % 4 === 3)) {
+      this.noiseTick(
+        time,
+        this.conditionId === "stormbreak" ? 0.025 : 0.016,
+        0.012 + reactive.speedTier * 0.003,
+      );
+    }
     if (this.conditionId === "twilightGlass" && step % 8 === 6) this.tone(time, frequency * 2, 0.16, "sine", 0.023, this.musicGain, frequency * 1.5);
+    if (this.conditionId === "kakiLand") {
+      if (step % 8 === 4) {
+        this.tone(time, frequency * 1.5, 0.18, "sine", 0.026, this.musicGain, frequency * 1.6818);
+      }
+      if (reactive.presentationPhase >= 1 && step % 8 === 6) {
+        this.tone(time, frequency * 2.2449, 0.22, "sine", 0.018, this.musicGain, frequency * 2);
+      }
+      if (reactive.presentationPhase >= 2 && step % 4 === 2) {
+        this.tone(time, frequency * 1.6818, 0.24, "sine", 0.016, this.musicGain, frequency * 2.2449);
+      }
+    }
     this.beatIndex += 1;
   }
 
   onEvent(event, simulation = null) {
     if (!this.started || !this.context || this.destroyed) return;
-    if (simulation) this.conditionId = conditionIdFor(simulation, this.settings);
+    if (simulation) this.conditionId = audioConditionIdFor(simulation, this.settings);
     const type = typeof event === "string" ? event : event?.type;
     const payload = typeof event === "string"
       ? EMPTY_EVENT_PAYLOAD
@@ -534,10 +577,42 @@ export class SurfAudio {
         this.chirp(now, 523, 1568, 0.18, 0.1);
         break;
       case "foamGateCleared":
-        this.tone(now, 784 + Math.min(3, Number(payload.value ?? 1)) * 110, 0.1, "sine", 0.075, this.effectsGain, 1175);
+        if (payload.reason === "webringRelay") {
+          this.tone(now, 392 + Math.min(3, Number(payload.value ?? 1)) * 66, 0.085, "square", 0.052, this.effectsGain, 587);
+          this.tone(now + 0.035, 784, 0.13, "sine", 0.04, this.effectsGain, 1175);
+          this.noiseTick(now + 0.018, 0.025, 0.018, this.effectsGain, 2100);
+        } else {
+          this.tone(now, 784 + Math.min(3, Number(payload.value ?? 1)) * 110, 0.1, "sine", 0.075, this.effectsGain, 1175);
+        }
         break;
       case "foamGateSeriesCompleted":
-        this.chirp(now, 523, 1760, 0.22, 0.12);
+        if (payload.reason === "webringRelay") {
+          this.tone(now, 523, 0.2, "square", 0.065, this.effectsGain, 659);
+          this.tone(now + 0.06, 880, 0.28, "sine", 0.075, this.effectsGain, 1175);
+        } else {
+          this.chirp(now, 523, 1760, 0.22, 0.12);
+        }
+        break;
+      case "webringRelayPhase":
+        if (payload.reason === "available") {
+          this.tone(now, 330, 0.11, "square", 0.045, this.effectsGain, 440);
+          this.tone(now + 0.08, 587, 0.2, "sine", 0.035, this.effectsGain, 659);
+        }
+        break;
+      case "webringRelayLink":
+        this.noiseTick(now, 0.028, 0.02, this.effectsGain, 2300);
+        break;
+      case "webringRelayCompleted":
+        this.noiseBurst(now, 0.055, 0.026, "bandpass", 1450, 920);
+        this.tone(now + 0.025, 523, 0.12, "square", 0.065, this.effectsGain, 659);
+        this.tone(now + 0.08, 880, 0.3, "sine", 0.08, this.effectsGain, 1320);
+        break;
+      case "signalHeldAwarded":
+        this.tone(now, 659, 0.16, "sine", 0.035, this.effectsGain, 880);
+        break;
+      case "signalHeldConsumed":
+      case "signalHeldSave":
+        this.tone(now, 659, 0.18, "sine", 0.075, this.effectsGain, 880);
         break;
       case "powerupPhase":
         this.playPowerupPhase(now, payload);
@@ -1063,9 +1138,9 @@ function setParamValue(param, value) {
   else param.value = value;
 }
 
-function conditionIdFor(simulation, settings) {
+export function audioConditionIdFor(simulation, settings) {
   const candidate = simulation?.condition?.id ?? simulation?.condition ?? settings?.condition ?? "goldenCoast";
-  return candidate === "twilightGlass" || candidate === "stormbreak" ? candidate : "goldenCoast";
+  return resolveConditionId(candidate);
 }
 
 function normalizeCueId(id) {

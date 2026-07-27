@@ -174,7 +174,7 @@ export function drawHeroBackWater(ctx, simulation, palette, settings, presentati
   // structural crest provide depth without any scrolling rails or hard bands.
   ctx.fillStyle = palette.waterDeep;
   ctx.fillRect(0, HORIZON_Y - 1, LOGICAL_WIDTH, LOGICAL_HEIGHT - HORIZON_Y + 1);
-  drawCanonicalFaceStructure(ctx, simulation.wave, palette, settings, clock);
+  drawCanonicalFaceStructure(ctx, simulation, palette, settings, clock);
   ctx.save();
   // Sparse diagonal depth flecks slide left and fall down-face. They do not
   // change direction when the rider reverses and stay subordinate to the
@@ -196,7 +196,8 @@ export function drawHeroBackWater(ctx, simulation, palette, settings, presentati
   ctx.restore();
 }
 
-function drawCanonicalFaceStructure(ctx, wave, p, settings, clock) {
+function drawCanonicalFaceStructure(ctx, simulation, p, settings, clock) {
+  const wave = simulation.wave;
   const highContrast = Boolean(settings?.highContrast);
   ctx.save();
 
@@ -237,6 +238,16 @@ function drawCanonicalFaceStructure(ctx, wave, p, settings, clock) {
     }
   }
 
+  if (wave?.profileId === "signalBreak") {
+    drawSignalBreakSeam(
+      ctx,
+      wave,
+      p,
+      settings,
+      simulation?.world?.presentationPhase ?? simulation?.world?.context?.presentationPhase ?? 0,
+    );
+  }
+
   // The power seam is visible as denser flecks in moving water, not a rule.
   ctx.fillStyle = p.crest;
   ctx.globalAlpha = highContrast ? 0.76 : 0.34;
@@ -248,6 +259,51 @@ function drawCanonicalFaceStructure(ctx, wave, p, settings, clock) {
     const y = Math.round(wave.ridingY(x, face));
     ctx.fillRect(x, y - 1, 3 + index % 4, 1);
     if (index % 3 === 0) ctx.fillRect(x + 2, y - 3, 2, 1);
+  }
+  ctx.restore();
+}
+
+function drawSignalBreakSeam(ctx, wave, p, settings, presentationPhase) {
+  const highContrast = Boolean(settings?.highContrast);
+  const colors = highContrast
+    ? [p.ink, p.white, p.gold, p.white, p.ink]
+    : ["#8879d9", "#5b8ee8", "#45c7d1", "#69d18b", "#f1c75b"];
+  const bandCount = clamp(Math.floor(Number(presentationPhase) || 0) + 3, 3, 5);
+  const start = Math.max(-4, canonicalContactX(wave) + 4);
+  const sampleStep = mobileQuality(settings) ? 8 : 6;
+  ctx.save();
+  ctx.globalAlpha = highContrast ? 0.96 : 0.76;
+  if (highContrast) {
+    ctx.strokeStyle = p.ink;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    for (let x = start; x <= LOGICAL_WIDTH + sampleStep; x += sampleStep) {
+      const face = wave.powerFaceAt(x);
+      const y = wave.ridingY(x, face);
+      if (x === start) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  for (let band = 0; band < bandCount; band += 1) {
+    ctx.strokeStyle = colors[band];
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = start; x <= LOGICAL_WIDTH + sampleStep; x += sampleStep) {
+      const face = wave.powerFaceAt(x);
+      const y = wave.ridingY(x, face) + band - (bandCount - 1) * 0.5;
+      if (x === start) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  // Tiny gold repair stitches explain the route without turning it into UI.
+  ctx.fillStyle = p.gold;
+  for (let x = start + 46; x < LOGICAL_WIDTH; x += 94) {
+    const face = wave.powerFaceAt(x);
+    const y = Math.round(wave.ridingY(x, face));
+    ctx.fillRect(Math.round(x - 2), y - 4, 5, 1);
+    ctx.fillRect(Math.round(x), y - 5, 1, 8);
   }
   ctx.restore();
 }
@@ -712,7 +768,8 @@ function mobileQuality(settings) {
 function canonicalContactX(wave) {
   const queried = Number(wave?.contactX?.());
   if (Number.isFinite(queried)) return queried;
-  const offset = wave?.profileId === "heroBarrel" ? 96 : 13;
+  const offset = Number(wave?.profile?.pocket?.contactOffset)
+    || (wave?.profileId === "heroBarrel" || wave?.profileId === "signalBreak" ? 96 : 13);
   return Number(wave?.curlX ?? 48) + offset;
 }
 

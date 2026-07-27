@@ -1,10 +1,5 @@
 import { GENERATED_ASSET_MANIFEST } from "./asset-manifest.js";
-
-const CONDITION_IDS = Object.freeze([
-  "goldenCoast",
-  "twilightGlass",
-  "stormbreak",
-]);
+import { CONDITION_IDS } from "./config.js";
 
 const BACKGROUND_WIDTH = 1536;
 const BACKGROUND_HEIGHT = 640;

@@ -2,7 +2,7 @@
 
 Date: 2026-07-27.
 
-This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 143 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, all four aerial tiers plus re-entry in all three conditions, and whale takeoff/apex/return.
+This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 178 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, four-condition comparison, Kaki-Land’s complete Webring Relay sequence and access modes, and whale takeoff/apex/return.
 
 ## Automated gate
 
@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **323/323 tests pass** and **41 JavaScript modules pass syntax checking**.
+Current result: **352/352 tests pass** and **41 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
@@ -27,7 +27,8 @@ Current result: **323/323 tests pass** and **41 JavaScript modules pass syntax c
 | Powerups | Mango Rush, Moon Pop, Star Foam, miss, expiration, consumption, protected event, plane drop | Unique silhouettes and temporary callouts; no persistent powerup meter; consumption and harmless misses remain visible | Pass |
 | Ambient world | Calm/busy/reverse traffic, all bird/boat/aircraft families, scatter, Feather Thread, couriers, races, live banners | Parallax separation without traffic ping-pong, stable facing, breaker-aware occlusion, readable reactive text, and watercraft grounded in waterline bands | Pass |
 | Set piece | Carrier haze, arrival, deck activity, launch, Fleet Airshow and foam gates | Whimsical/nonmilitary identity, horizon scale, airshow hierarchy, no gameplay collision | Pass |
-| Conditions | Every board in Golden Coast, Twilight Glass, and Stormbreak; condition-specific traffic | Correct local strip, palette and readable player/world contrast | Pass |
+| Conditions | Every board in Golden Coast, Twilight Glass, Stormbreak, and Kaki-Land; condition-specific traffic | Correct panorama, palette, wave profile, readable player/world contrast, and no fallback normalization | Pass |
+| Webring Relay | Start in both directions, links 1–3, completed mural, Approval, results, High Contrast, Reduced Motion, forced Mobile | Reachable simulation-owned rings; artist response survives quality/access reductions; no warning competition | Pass |
 | Access | Simple keyboard/gamepad/touch, Advanced controls, mobile landscape gate, Settings, High Contrast, Reduced Motion, Reduced Flash | Touch uses continuous analog X/Y with independent actions; mobile start requests fullscreen landscape; portrait falls back to a rotate gate; Advanced deliberately restores Q/E/F/T | Pass |
 | Performance | Auto, Full, Mobile, sustained slow-frame adaptation | Auto resolves Mobile on compact touch hardware; only presentation density changes; physics, input, collision, scoring, and saves remain shared | Pass |
 | Audio lifecycle | Running, pause, visibility, resume, results, record, rapid retry, mute | No missed-beat catch-up, stale board/wind bed, stacked completion fanfare, invalid gain, or unbounded major-event peak | Pass |
@@ -52,6 +53,7 @@ Current result: **323/323 tests pass** and **41 JavaScript modules pass syntax c
 - Verify Surf School waits for drop, climb, cutback, lip, trick, and landing actions.
 - Verify Reduced Motion removes stage shake and foreground-cloud occlusion while retaining exceptional-air rider visibility without changing seeded spawns or collisions; Reduced Flash suppresses flashes without removing state cues.
 - Verify High Contrast remains readable when raster backgrounds or generated families fall back.
+- In Kaki-Land, verify the three Webring Relay gates follow the active travel direction, the station remains outside the action lane, each fragment reaches the mural, and the compact Approval stamp remains visible in Full, Mobile, High Contrast, and Reduced Motion.
 - In every condition, verify the broad broken crest, diagonal gravity front, long face, and impact churn read as one connected break; new column heads must fall top-to-bottom while older foam tiles remain fixed and the registered edge advances left-to-right, independent of rider reversal.
 - Verify the passed-left region restores real level sky/backwater rather than a white slab, the rear whitewater fades without a vertical source seam, and no boats, aircraft, carrier art, or horizontal rail intrudes into the wave composition.
 - Hold Simple Trick in the critical pocket, confirm Tube Tuck/Soul Arch scores continuously with reduced steering authority, then confirm release or leaving the pocket clears the pose.
@@ -59,7 +61,7 @@ Current result: **323/323 tests pass** and **41 JavaScript modules pass syntax c
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 143 identifiers. Every gallery capture is 1280 x 720; rebuild the assembled contact sheet deterministically with:
+The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 178 identifiers. Every gallery capture is 1280 x 720; rebuild the assembled contact sheet deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py
@@ -68,6 +70,8 @@ python3 tools/qa/build-contact-sheet.py
 Future scene changes must update `js/qa-gallery.js`, `tools/qa/capture-browser.sh`, and `tools/qa/build-contact-sheet.py` together so captions, counts, and files cannot drift. The canonical capture script now keeps one Chromium/CDP session alive for the full matrix, checks page/runtime/network errors, and avoids the screenshot-mode shutdown hang seen in this environment.
 
 The vertical-camera temporal evidence is rebuilt with `node tools/qa/accept-world-camera.mjs` while a CDP Chromium instance and local static server are running. It uses real keyboard input for ordinary-right, maximum-right, ordinary-left, and Reduced-Motion maximum launches; captures riding, lip, launch at 0/100/250 ms, apex, descent, re-entry, touchdown, and 300 ms after landing; and records logical-canvas stage, HUD, horizon, rider, and backdrop anchors in `docs/images/qa-world-camera/metrics.json`. The separate `capture-chase.mjs` evidence continues to prove horizontal break/camera behavior.
+
+The Kaki-Land real-keyboard chase is checked in under `docs/images/qa-kaki-land-chase`. It began in an ordinary Endless run with zero wipeouts, advanced the break from x20.71 to x108.06 during the protected opening, sent it offscreen at x-59.04 during the right-going lead, committed a left reversal with the camera still forward, and showed the break pursue back to x20.01.
 
 The final temporal pass measured zero stage/HUD/horizon displacement for ordinary-right and both maximum runs. Ordinary-left retained one logical pixel of intentional default impact shake, with no camera-derived displacement. A maximum-right camera signal reached 98.09 pixels—the retired world transform would have dropped the whole stage by that amount—but the actual stage stayed at zero. Ordinary-right used no rider offset or backdrop transition. Maximum and Reduced-Motion maximum kept the qualified board anchor at y=68, reported zero excess screen motion beyond the physical path, returned rider framing to zero before touchdown, and reached the visually coastal backdrop before contact. The stateful atmospheric controller peaked at 7.42 source pixels per rendered frame under capture load and returned to zero by 300 ms after landing.
 

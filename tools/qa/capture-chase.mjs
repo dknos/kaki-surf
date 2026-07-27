@@ -1,10 +1,17 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { CONDITION_IDS, resolveConditionId } from "../../js/config.js";
+
 const cdpHost = process.env.KAKI_SURF_CDP_URL ?? "http://127.0.0.1:9227";
 const baseUrl = process.env.KAKI_SURF_QA_URL ?? "http://127.0.0.1:9876/index.html";
 const outputDir = process.env.KAKI_SURF_CHASE_DIR
   ?? path.resolve("docs/images/qa-chase");
+const requestedCondition = process.env.KAKI_SURF_CHASE_CONDITION ?? "twilightGlass";
+const conditionId = resolveConditionId(requestedCondition);
+if (!CONDITION_IDS.includes(requestedCondition)) {
+  throw new Error(`Unknown chase condition ${requestedCondition}`);
+}
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const captureUrl = new URL(baseUrl);
 captureUrl.searchParams.set("capture", "chase");
@@ -131,7 +138,15 @@ await call("Emulation.setDeviceMetricsOverride", {
 await call("Page.navigate", { url: captureUrl.toString() });
 await waitForReady();
 await call("Page.bringToFront");
-await evaluate("(() => { globalThis.kakiSurf.start({ immediate: true, board: 'mangoFish', condition: 'twilightGlass', mode: 'endless' }); return true; })()");
+await evaluate(`(() => {
+  globalThis.kakiSurf.start({
+    immediate: true,
+    board: "mangoFish",
+    condition: ${JSON.stringify(conditionId)},
+    mode: "endless",
+  });
+  return true;
+})()`);
 await waitForSnapshot((snapshot) => snapshot.lifecycle === "running", 5_000, "run start");
 
 const openingStart = await waitForSnapshot(
@@ -172,7 +187,7 @@ const returning = await waitForSnapshot(
 await capture("03-barrel-pursuit-return");
 await key("ArrowLeft", false);
 
-const metrics = { openingStart, openingMove, lead, cutback, return: returning };
+const metrics = { condition: conditionId, openingStart, openingMove, lead, cutback, return: returning };
 if (!(openingMove.breakX > openingStart.breakX + 8 && openingMove.wipeouts === 0)) {
   throw new Error(`Barrel froze during the protected opening: ${JSON.stringify(metrics)}`);
 }

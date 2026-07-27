@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BOARDS, FIXED_STEP } from "../js/config.js";
+import { BOARDS, CONDITION_IDS, FIXED_STEP } from "../js/config.js";
 import { persistentHudContract } from "../js/hud-contract.js";
 import {
   deriveCanonicalMotion,
@@ -238,7 +238,7 @@ test("foreground water masks the whale below its canonical contact before drawin
 });
 
 test("production scheduling disables whales until the repaired contract is deliberately enabled", () => {
-  for (const condition of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+  for (const condition of CONDITION_IDS) {
     assert.equal(conditionWorldProfile(condition).wildlifeWeights.whale, 0);
   }
 });

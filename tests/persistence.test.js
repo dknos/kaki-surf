@@ -90,6 +90,32 @@ test("v1 payloads with an explicit valid control mode preserve that choice", () 
   }
 });
 
+test("Kaki-Land selection persists additively without rewriting existing profile values", () => {
+  const saved = createDefaultSave();
+  Object.assign(saved, {
+    bestScore: 9876,
+    bestFlow: 82,
+    totalRuns: 17,
+    selectedBoard: "moonLog",
+    selectedCondition: "kakiLand",
+    tutorialSeen: true,
+  });
+  saved.settings.controlMode = "advanced";
+  saved.settings.reducedMotion = true;
+  const storage = new MemoryStorage();
+
+  assert.equal(writeSave(saved, storage), true);
+  const loaded = loadSave(storage);
+  assert.equal(loaded.selectedCondition, "kakiLand");
+  assert.equal(loaded.bestScore, 9876);
+  assert.equal(loaded.bestFlow, 82);
+  assert.equal(loaded.totalRuns, 17);
+  assert.equal(loaded.selectedBoard, "moonLog");
+  assert.equal(loaded.tutorialSeen, true);
+  assert.equal(loaded.settings.controlMode, "advanced");
+  assert.equal(loaded.settings.reducedMotion, true);
+});
+
 test("malformed, old, and future-version saves each fall back to a fresh profile", () => {
   const cases = [
     ["malformed JSON", "{ definitely-not-json"],

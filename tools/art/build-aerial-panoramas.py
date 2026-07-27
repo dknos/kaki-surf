@@ -23,12 +23,14 @@ class Spec:
     source: str
     horizon_ratio: float
     colors: int
+    horizon_y: int = HORIZON_Y
 
 
 SPECS = (
     Spec("golden", "goldenCoast", "golden-continuous.png", 0.868, 72),
     Spec("twilight", "twilightGlass", "twilight-continuous.png", 0.906, 72),
     Spec("storm", "stormbreak", "storm-continuous.png", 0.878, 64),
+    Spec("kaki-land", "kakiLand", "kaki-land-continuous.png", 502 / 640, 64, 502),
 )
 
 
@@ -39,6 +41,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=ROOT / "docs/art-source/aerial/imagegen",
     )
+    parser.add_argument(
+        "--condition",
+        choices=[spec.asset_id for spec in SPECS],
+        help="build or validate one canonical condition",
+    )
     parser.add_argument("--output-dir", type=Path, default=ROOT / "assets/backgrounds")
     parser.add_argument(
         "--check",
@@ -48,7 +55,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def reframe_vertical_world(source: Image.Image, horizon_ratio: float) -> Image.Image:
+def reframe_vertical_world(
+    source: Image.Image,
+    horizon_ratio: float,
+    horizon_y: int = HORIZON_Y,
+) -> Image.Image:
     """Place the single authored horizon at the normal-riding camera shelf.
 
     The upper world is compressed more than the ocean floor so normal play sees
@@ -60,16 +71,16 @@ def reframe_vertical_world(source: Image.Image, horizon_ratio: float) -> Image.I
     wide = source.resize((SIZE[0], proportional_height), Image.Resampling.LANCZOS)
     horizon = max(1, min(wide.height - 1, round(wide.height * horizon_ratio)))
     sky = wide.crop((0, 0, SIZE[0], horizon)).resize(
-        (SIZE[0], HORIZON_Y),
+        (SIZE[0], horizon_y),
         Image.Resampling.LANCZOS,
     )
     water = wide.crop((0, horizon, SIZE[0], wide.height)).resize(
-        (SIZE[0], SIZE[1] - HORIZON_Y),
+        (SIZE[0], SIZE[1] - horizon_y),
         Image.Resampling.LANCZOS,
     )
     result = Image.new("RGB", SIZE)
     result.paste(sky, (0, 0))
-    result.paste(water, (0, HORIZON_Y))
+    result.paste(water, (0, horizon_y))
     return result
 
 
@@ -103,10 +114,20 @@ def validate_runtime(output: Path) -> None:
     ordinary_high = interior[max(0, round(len(interior) * 0.95) - 1)]
     for boundary in (576, 960):
         boundary_jump = adjacent_column_difference(image, boundary - 1, boundary)
-        if boundary_jump > ordinary_high * 1.8 + 3:
+        local = sorted(
+            adjacent_column_difference(image, x - 1, x)
+            for x in range(max(1, boundary - 8), min(image.width, boundary + 9))
+            if x != boundary
+        )
+        local_high = local[max(0, round(len(local) * 0.9) - 1)]
+        # A deliberate two-pixel cluster or homepage-grid edge repeats on a
+        # neighboring column. A pasted plate remains an isolated full-height
+        # jump, which is the actual defect this check guards.
+        allowed = max(ordinary_high * 1.8 + 3, local_high * 1.8 + 3)
+        if boundary_jump > allowed:
             raise RuntimeError(
                 f"{output} has a pasted vertical plate at x={boundary}: "
-                f"{boundary_jump:.2f} > {ordinary_high:.2f}"
+                f"{boundary_jump:.2f} > {allowed:.2f}"
             )
 
 
@@ -114,7 +135,7 @@ def build(spec: Spec, args: argparse.Namespace) -> Path:
     source_path = args.source_dir / spec.source
     with Image.open(source_path) as opened:
         source = opened.convert("RGB")
-    master = reframe_vertical_world(source, spec.horizon_ratio)
+    master = reframe_vertical_world(source, spec.horizon_ratio, spec.horizon_y)
     master = master.filter(ImageFilter.UnsharpMask(radius=0.38, percent=80, threshold=5))
     runtime = master.quantize(
         colors=spec.colors,
@@ -130,7 +151,11 @@ def build(spec: Spec, args: argparse.Namespace) -> Path:
 
 def main() -> int:
     args = parse_args()
-    for spec in SPECS:
+    selected_specs = tuple(
+        spec for spec in SPECS
+        if args.condition is None or spec.asset_id == args.condition
+    )
+    for spec in selected_specs:
         output = args.output_dir / f"{spec.asset_id}-aerial.png"
         if not args.check:
             output = build(spec, args)

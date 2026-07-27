@@ -1,0 +1,53 @@
+{
+  "condition": "kakiLand",
+  "openingStart": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 0.7416666666666665,
+    "wipeouts": 0,
+    "travelDirection": 1,
+    "playerX": 201.25617559854763,
+    "cameraWorldX": 10.946175149679599,
+    "breakX": 20.70920448375508
+  },
+  "openingMove": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 3.0083333333333253,
+    "wipeouts": 0,
+    "travelDirection": 1,
+    "playerX": 235.94563468301266,
+    "cameraWorldX": 10.946180182094434,
+    "breakX": 108.06481981790556
+  },
+  "lead": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 12.691666666666586,
+    "wipeouts": 0,
+    "travelDirection": 1,
+    "playerX": 303.42960584090196,
+    "cameraWorldX": 343.34250202479217,
+    "breakX": -59.04481958460633
+  },
+  "cutback": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 15.67499999999975,
+    "wipeouts": 0,
+    "travelDirection": -1,
+    "playerX": 198.65860315825574,
+    "cameraWorldX": 346.034609746119,
+    "breakX": -50.0899423236653
+  },
+  "return": {
+    "lifecycle": "running",
+    "state": "riding",
+    "elapsed": 20.024999999999505,
+    "wipeouts": 0,
+    "travelDirection": -1,
+    "playerX": 81.3358114464234,
+    "cameraWorldX": 302.0753498127918,
+    "breakX": 20.013873135194046
+  }
+}

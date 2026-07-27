@@ -4,7 +4,7 @@ Environment art and modular sprite sheets are produced offline and checked into 
 
 ## Generated environment sources
 
-All three source images were created with the built-in image-generation tool at 1672 x 941 RGB. Golden Coast is the composition master. Twilight Glass and Stormbreak use the Golden Coast image as a reference so the coast, pier, lifeguard tower, palms, and horizon remain spatially consistent.
+The original three source images were created with the built-in image-generation tool at 1672 x 941 RGB. Golden Coast is the composition master. Twilight Glass and Stormbreak use the Golden Coast image as a reference so the coast, pier, lifeguard tower, palms, and horizon remain spatially consistent. Kaki-Land is an additive fourth art contract: a rejected Vertex/Nano exploration is retained for provenance, then reviewed Grok panorama and decor masters are cleaned deterministically by `tools/art/build-kaki-land-assets.py`.
 
 | Condition | Source role | Source filename | SHA-256 |
 | --- | --- | --- | --- |
@@ -84,14 +84,15 @@ The case-sensitive output names intentionally match the condition IDs used by th
 | `assets/backgrounds/goldenCoast-menu.png` | Golden Coast menu backdrop | 768 x 432 |
 | `assets/backgrounds/twilightGlass-menu.png` | Twilight Glass menu backdrop | 768 x 432 |
 | `assets/backgrounds/stormbreak-menu.png` | Stormbreak menu backdrop | 768 x 432 |
+| `assets/backgrounds/kakiLand-menu.png` | Kaki-Land menu and card art | 768 x 432 |
 
 The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. The live gameplay wave remains a separate layer and stays readable over the scenic strip.
 
 ## Vertical aerial panorama build
 
-The sky-to-space extension keeps six reviewed Grok candidates and six reference-controlled Vertex/Nano candidates as the comparison matrix. After live continuity review, each runtime master was rebuilt from one continuous edit source rather than a provider splice. The repair decisions, prompts, and filenames are recorded in [Vertical aerial source selection](./art-source/aerial/README.md).
+The sky-to-space extension keeps the original Grok and reference-controlled Vertex/Nano comparison matrix. After live continuity review, each runtime master was rebuilt from one continuous source rather than a provider splice. Kaki-Land adds one rejected Vertex/Nano exploration plus reviewed Grok network and decor masters; a constrained edit removes the humanoid draft before deterministic native cleanup. The repair decisions, prompts, filenames, and hashes are recorded in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
 
-`tools/art/build-aerial-panoramas.py` reframes each single continuous source so its authored horizon lands at the normal-riding camera shelf, sharpens restrainedly, and quantizes to a compact 64- or 72-color indexed PNG. Its `--check` mode guards the old pasted-strip boundaries and static-host budget without rewriting assets.
+`tools/art/build-aerial-panoramas.py` reframes each single continuous source so its authored horizon lands at the normal-riding camera shelf, sharpens restrainedly, and quantizes to a compact indexed PNG. Kaki-Land declares a 64-color output and its verified source horizon at y=502. The `--check` mode guards isolated pasted-strip boundaries, deliberate two-pixel clusters, and the static-host budget without rewriting assets.
 
 ```console
 python3 tools/art/build-aerial-panoramas.py
@@ -102,6 +103,7 @@ python3 tools/art/build-aerial-panoramas.py
 | `assets/backgrounds/goldenCoast-aerial.png` | Peach cloud towers, cobalt atmosphere, gold rim, playful stars/satellite | 1536 x 640 |
 | `assets/backgrounds/twilightGlass-aerial.png` | Violet cloud tops, indigo atmosphere, aurora, moon and nebula | 1536 x 640 |
 | `assets/backgrounds/stormbreak-aerial.png` | Storm interior, lightning, glowing thunderhead tops, cold stars | 1536 x 640 |
+| `assets/backgrounds/kakiLand-aerial.png` | Cloud homepage network, symbol mosaics, repaired rings, tiled stars, and The Last Relay | 1536 x 640 |
 
 The renderer preserves signed horizontal camera parallax and treats each master as one continuous vertical scene. The world camera pans the surf stage upward on large airs while the panorama source crop moves by the exact inverse amount, keeping the authored ocean anchor constant. There are no independent shelves, altitude swaps, blend masks, or second panorama passes. The wave, collision, rider, and world traffic remain code-driven layers; the panorama never defines a gameplay surface.
 
