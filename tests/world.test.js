@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { CONDITION_IDS } from "../js/config.js";
 import {
   POWERUP_CATALOG,
   TRAFFIC_CATALOG,
@@ -337,6 +338,11 @@ test("condition traffic permissions encode the curated passive coast bands", () 
       mid: ["tugboat", "rescueCraft", "helicopter"],
       wildlifeWeights: { dolphin: 0.48, shark: 0.52, whale: 0 },
     },
+    kakiLand: {
+      far: ["cloudArtist", "signalKeeper", "guestbookGull"],
+      mid: ["cloudArtist", "guestbookGull", "buttonMenace"],
+      wildlifeWeights: { dolphin: 0.7, shark: 0.3, whale: 0 },
+    },
   };
   for (const [condition, layers] of Object.entries(expected)) {
     const profile = conditionWorldProfile(condition);
@@ -404,7 +410,7 @@ test("the passive dolphin breach uses one continuous water anchor before interac
 });
 
 test("production wildlife restores dolphins and sharks without whales or overlap", () => {
-  for (const condition of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+  for (const condition of CONDITION_IDS) {
     const world = new WorldSimulation({ seed: 0xd011000 + condition.length, condition });
     const seen = new Set();
     for (let step = 0; step < 240 * 120; step += 1) {
@@ -454,7 +460,7 @@ test("dolphins and sharks cannot overlap one interactive encounter", () => {
 });
 
 test("ambient watercraft stay capped at two per depth region and birds remain above water", () => {
-  for (const condition of ["goldenCoast", "twilightGlass", "stormbreak"]) {
+  for (const condition of CONDITION_IDS) {
     const world = new WorldSimulation({ seed: 0x51ce000 + condition.length, condition });
     for (let step = 0; step < 90 * 120; step += 1) {
       world.update(STEP, context({ waterlineY: 79 }));

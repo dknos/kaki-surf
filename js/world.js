@@ -9,6 +9,7 @@ import {
   POWERUP_CATALOG,
   RACE_PHASES,
   TRAFFIC_CATALOG,
+  WEBRING_RELAY_CONFIG,
   WILDLIFE_CATALOG,
   WORLD_LAYER_CONFIG,
   WORLD_LAYER_ORDER,
@@ -43,6 +44,7 @@ const STREAM_SALTS = Object.freeze({
   race: 0x7ace4b01,
   aircraftDrop: 0xa17d20f5,
   gate: 0xf0a64a7e,
+  webringRelay: 0x7e1a9b42,
 });
 
 const WILDLIFE_KINDS = Object.freeze(["dolphin", "shark", "whale"]);
@@ -69,6 +71,8 @@ export class WorldSimulation {
       { length: WORLD_LIMITS.foamGateCapacity },
       (_, index) => createFoamGate(index),
     );
+    this.webringRelay = createWebringRelayState();
+    this.signalHeld = createSignalHeldState();
     this.events = Array.from({ length: WORLD_LIMITS.eventCapacity }, createSignalRecord);
     this.interactions = Array.from({ length: WORLD_LIMITS.interactionCapacity }, createSignalRecord);
     this.context = createStepContext();
@@ -109,6 +113,8 @@ export class WorldSimulation {
     resetAircraftDropState(this.aircraftDrop);
     resetFoamGateSeries(this.foamGateSeries);
     for (const gate of this.foamGates) resetFoamGate(gate);
+    resetWebringRelayState(this.webringRelay);
+    resetSignalHeldState(this.signalHeld);
     resetModifiers(this.modifiers);
 
     this.nextWildlifeCandidate = 8 + this.streams.wildlife() * 7;
@@ -117,6 +123,8 @@ export class WorldSimulation {
     this.nextCourierCandidate = 18 + this.streams.courier() * 16;
     this.nextRaceCandidate = 22 + this.streams.race() * 18;
     this.nextAircraftDropCandidate = 34 + this.streams.aircraftDrop() * 24;
+    this.nextWebringRelayCandidate = 48 + this.streams.webringRelay() * 24;
+    this.presentationPhase = 0;
 
     if (qa) this.applyQaOverride(qa);
     return this;
@@ -127,6 +135,7 @@ export class WorldSimulation {
     if (!(seconds > 0)) return this;
     copyStepContext(this.context, context, this.lastCameraWorldX);
     this.lastCameraWorldX = this.context.cameraWorldX;
+    this.presentationPhase = this.context.presentationPhase;
     this.elapsed += seconds;
 
     if (this.qaQuiet) {
@@ -145,10 +154,12 @@ export class WorldSimulation {
     this.updateRace(seconds);
     this.updateAircraftDrop(seconds);
     this.updateFoamGates(seconds);
+    this.updateWebringRelay(seconds);
     if (this.profile.ambientTraffic !== false) this.updateAmbientScheduler();
     this.updateInteractiveSchedulers();
     if (this.profile.specialEvents === true && this.profile.specialTraffic !== false) this.updateSpecialSchedulers();
     if (this.profile.specialEvents === true && this.profile.carrierEnabled === true) this.updateCarrierScheduler();
+    if (this.conditionId === "kakiLand") this.updateWebringRelayScheduler();
     this.refreshModifiers();
     return this;
   }
@@ -306,6 +317,14 @@ export class WorldSimulation {
     return this.startFoamGates(owner, options, true);
   }
 
+  requestWebringRelay(options = {}) {
+    return this.startWebringRelay(options, false);
+  }
+
+  forceWebringRelay(options = {}) {
+    return this.startWebringRelay(options, true);
+  }
+
   forceCarrier(options = {}) {
     if (this.carrier.active && !options.restart) return null;
     if (this.carrier.hasAppeared && !options.restart) return null;
@@ -381,6 +400,21 @@ export class WorldSimulation {
     return true;
   }
 
+  consumeFlowProtection(reason = "used") {
+    if (this.bonuses.starFoam.active && this.bonuses.starFoam.charges > 0) {
+      return this.consumePowerup("starFoam", reason);
+    }
+    if (!this.signalHeld.active || this.signalHeld.charges <= 0) return false;
+    this.signalHeld.charges -= 1;
+    if (this.signalHeld.charges <= 0) {
+      this.signalHeld.active = false;
+      this.signalHeld.remaining = 0;
+    }
+    this.emitInteraction("signalHeldConsumed", this.signalHeld, { reason });
+    this.refreshModifiers();
+    return true;
+  }
+
   consumeEvents(callback) {
     for (let index = 0; index < this.eventCount; index += 1) {
       callback(this.events[index]);
@@ -441,6 +475,7 @@ export class WorldSimulation {
         courier: this.nextCourierCandidate,
         race: this.nextRaceCandidate,
         aircraftDrop: this.nextAircraftDropCandidate,
+        webringRelay: this.nextWebringRelayCandidate,
         interactiveQuietUntil: this.interactiveQuietUntil,
       },
       traffic: Object.fromEntries(WORLD_LAYER_ORDER.map((layer) => [
@@ -456,6 +491,9 @@ export class WorldSimulation {
       aircraftDrop: snapshotAircraftDrop(this.aircraftDrop),
       foamGateSeries: snapshotFoamGateSeries(this.foamGateSeries),
       foamGates: this.foamGates.map(snapshotEntity),
+      webringRelay: snapshotWebringRelay(this.webringRelay),
+      signalHeld: snapshotSignalHeld(this.signalHeld),
+      presentationPhase: this.presentationPhase,
       modifiers: { ...this.modifiers },
       queuedEvents: this.eventCount,
       queuedInteractions: this.interactionCount,
@@ -503,6 +541,10 @@ export class WorldSimulation {
     if (qa.foamGates) {
       const descriptor = typeof qa.foamGates === "object" ? qa.foamGates : {};
       this.forceFoamGates(descriptor.owner, descriptor);
+    }
+    if (qa.webringRelay) {
+      const descriptor = typeof qa.webringRelay === "object" ? qa.webringRelay : {};
+      this.forceWebringRelay(descriptor);
     }
   }
 
@@ -1061,9 +1103,161 @@ export class WorldSimulation {
     this.aircraftDrop.phaseTime = 0;
   }
 
+  startWebringRelay(options, force) {
+    if (!force && this.conditionId !== "kakiLand") return null;
+    if (this.webringRelay.active || this.foamGateSeries.active) return null;
+    if (!force && (
+      this.hasActiveInteractive()
+      || this.elapsed < this.interactiveQuietUntil
+      || this.context.criticalHazardTelegraph
+      || ["entry", "wipeout", "complete"].includes(this.context.player.state)
+    )) return null;
+
+    const direction = signOr(options.direction, this.context.direction);
+    const eventSeed = (
+      Number.isFinite(options.eventSeed)
+        ? options.eventSeed
+        : this.streams.webringRelay() * 0xffffffff
+    ) >>> 0;
+    const playerScreenX = projectWorldX(
+      this.context.player.x,
+      this.context.cameraWorldX,
+      1,
+      WORLD_LIMITS.centerX,
+    );
+    const curlScreenX = Number.isFinite(this.context.curlWorldX)
+      ? projectWorldX(
+        this.context.curlWorldX,
+        this.context.cameraWorldX,
+        1,
+        WORLD_LIMITS.centerX,
+      )
+      : -48;
+    const spread = WEBRING_RELAY_CONFIG.gateSpacing
+      * (WEBRING_RELAY_CONFIG.gateCount - 1);
+    const desiredFirstX = finite(
+      options.screenX,
+      playerScreenX + direction * WEBRING_RELAY_CONFIG.baseDistance,
+    );
+    const firstX = direction > 0
+      ? clamp(
+        Math.max(desiredFirstX, curlScreenX + 46),
+        38,
+        346 - spread,
+      )
+      : clamp(
+        Math.max(desiredFirstX, curlScreenX + 46 + spread),
+        38 + spread,
+        346,
+      );
+    const stationScreenX = clamp(
+      finite(options.stationScreenX, direction > 0 ? 322 : 62),
+      42,
+      342,
+    );
+
+    resetWebringRelayState(this.webringRelay, false);
+    this.webringRelay.active = true;
+    this.webringRelay.hasAppeared = true;
+    this.webringRelay.phase = "gates";
+    this.webringRelay.direction = direction;
+    this.webringRelay.eventSeed = eventSeed;
+    this.webringRelay.stationWorldX = worldXForScreenX(
+      stationScreenX,
+      this.context.cameraWorldX,
+      WEBRING_RELAY_CONFIG.stationParallax,
+      WORLD_LIMITS.centerX,
+    );
+    this.webringRelay.stationY = clamp(
+      finite(options.stationY, WEBRING_RELAY_CONFIG.stationY),
+      38,
+      72,
+    );
+    this.webringRelay.worldX = this.webringRelay.stationWorldX;
+    this.webringRelay.y = this.webringRelay.stationY;
+    this.nextWebringRelayCandidate = Number.POSITIVE_INFINITY;
+
+    const series = this.startFoamGates("webringRelay", {
+      count: WEBRING_RELAY_CONFIG.gateCount,
+      radius: WEBRING_RELAY_CONFIG.gateRadius,
+      direction,
+      screenX: firstX,
+      spacing: WEBRING_RELAY_CONFIG.gateSpacing,
+      y: clamp(finite(options.y, this.context.player.y), 70, 172),
+      eventSeed: eventSeed ^ 0x7eb71a9,
+    }, true);
+    if (!series) {
+      resetWebringRelayState(this.webringRelay, false);
+      this.scheduleNextWebringRelay(WEBRING_RELAY_CONFIG.retryDelay);
+      return null;
+    }
+    this.interactiveQuietUntil = Math.max(this.interactiveQuietUntil, this.elapsed + 4);
+    this.emitEvent("webringRelayPhase", this.webringRelay, {
+      reason: "available",
+      value: WEBRING_RELAY_CONFIG.gateCount,
+    });
+    return this.webringRelay;
+  }
+
+  updateWebringRelay(dt) {
+    const relay = this.webringRelay;
+    if (!relay.active) return;
+    relay.phaseTime += dt;
+    if (relay.fragment0Age >= 0) relay.fragment0Age += dt;
+    if (relay.fragment1Age >= 0) relay.fragment1Age += dt;
+    if (relay.fragment2Age >= 0) relay.fragment2Age += dt;
+    if (relay.phase === "approval" && relay.phaseTime >= WEBRING_RELAY_CONFIG.approvalFor) {
+      relay.active = false;
+      relay.phase = "settled";
+      relay.phaseTime = 0;
+      relay.approval = false;
+      this.scheduleNextWebringRelay();
+      this.emitEvent("webringRelayPhase", relay, { reason: "settled", value: relay.links });
+    } else if (relay.phase === "missed" && relay.phaseTime >= WEBRING_RELAY_CONFIG.missedFor) {
+      relay.active = false;
+      relay.phase = "dormant";
+      relay.phaseTime = 0;
+      this.scheduleNextWebringRelay();
+    }
+  }
+
+  updateWebringRelayScheduler() {
+    if (this.elapsed + 1e-9 < this.nextWebringRelayCandidate) return;
+    if (
+      this.hasActiveInteractive()
+      || this.elapsed < this.interactiveQuietUntil
+      || this.context.criticalHazardTelegraph
+      || ["entry", "wipeout", "complete"].includes(this.context.player.state)
+    ) {
+      this.nextWebringRelayCandidate = this.elapsed + WEBRING_RELAY_CONFIG.retryDelay;
+      return;
+    }
+    const random = this.streams.webringRelay;
+    const packet = {
+      direction: this.context.direction,
+      stationScreenX: this.context.direction > 0 ? 322 : 62,
+      stationY: 68 + random() * 4,
+      eventSeed: random() * 0xffffffff,
+    };
+    if (!this.startWebringRelay(packet, false)) {
+      this.nextWebringRelayCandidate = this.elapsed + WEBRING_RELAY_CONFIG.retryDelay;
+    }
+  }
+
+  scheduleNextWebringRelay(delay = Number.NaN) {
+    if (Number.isFinite(delay)) {
+      this.nextWebringRelayCandidate = this.elapsed + Math.max(0, delay);
+      return;
+    }
+    const interval = WEBRING_RELAY_CONFIG.interval;
+    this.nextWebringRelayCandidate = this.elapsed
+      + interval[0]
+      + this.streams.webringRelay() * (interval[1] - interval[0]);
+  }
+
   startFoamGates(owner, options, force) {
     const normalizedOwner = owner === "fleetAirshow" ? "airshow" : owner;
-    if (normalizedOwner !== "dolphin" && normalizedOwner !== "airshow") return null;
+    if (!["dolphin", "airshow", "webringRelay"].includes(normalizedOwner)) return null;
     if (this.foamGateSeries.active) return null;
     if (!force) {
       const validDolphin = normalizedOwner === "dolphin"
@@ -1162,6 +1356,16 @@ export class WorldSimulation {
           reason: this.foamGateSeries.owner,
           value: this.foamGateSeries.cleared,
         });
+        if (this.foamGateSeries.owner === "webringRelay" && this.webringRelay.active) {
+          this.webringRelay.links = this.foamGateSeries.cleared;
+          if (this.webringRelay.links === 1) this.webringRelay.fragment0Age = 0;
+          else if (this.webringRelay.links === 2) this.webringRelay.fragment1Age = 0;
+          else if (this.webringRelay.links === 3) this.webringRelay.fragment2Age = 0;
+          this.emitEvent("webringRelayLink", this.webringRelay, {
+            reason: "fragment",
+            value: this.webringRelay.links,
+          });
+        }
         continue;
       }
 
@@ -1198,6 +1402,24 @@ export class WorldSimulation {
         value: this.foamGateSeries.cleared,
       });
     }
+    if (owner === "webringRelay" && this.webringRelay.active) {
+      this.webringRelay.links = this.foamGateSeries.cleared;
+      this.webringRelay.phase = success ? "approval" : "missed";
+      this.webringRelay.phaseTime = 0;
+      this.webringRelay.muralComplete = success;
+      this.webringRelay.approval = success;
+      if (success) {
+        this.activateSignalHeld();
+        this.emitInteraction("webringRelayCompleted", this.webringRelay, {
+          reason: "galleryComplete",
+          value: this.webringRelay.links,
+        });
+      }
+      this.emitEvent("webringRelayPhase", this.webringRelay, {
+        reason: success ? "galleryComplete" : "incomplete",
+        value: this.webringRelay.links,
+      });
+    }
     if (owner === "airshow" && this.carrier.active && this.carrier.phase === "airshow") {
       this.completeAirshow(success);
     }
@@ -1216,6 +1438,15 @@ export class WorldSimulation {
     this.foamGateSeries.phase = "cancelled";
     this.foamGateSeries.phaseTime = 0;
     this.emitEvent("foamGateSeriesPhase", this.foamGateSeries, { reason });
+    if (this.foamGateSeries.owner === "webringRelay" && this.webringRelay.active) {
+      this.webringRelay.phase = "missed";
+      this.webringRelay.phaseTime = 0;
+      this.webringRelay.approval = false;
+      this.emitEvent("webringRelayPhase", this.webringRelay, {
+        reason,
+        value: this.webringRelay.links,
+      });
+    }
     return true;
   }
 
@@ -1808,6 +2039,18 @@ export class WorldSimulation {
     this.refreshModifiers();
   }
 
+  activateSignalHeld() {
+    this.signalHeld.active = true;
+    this.signalHeld.remaining = POWERUP_CATALOG.starFoam.activeFor;
+    this.signalHeld.charges = 1;
+    this.signalHeld.collectedAt = this.elapsed;
+    this.emitInteraction("signalHeldAwarded", this.signalHeld, {
+      reason: "webringRelay",
+      value: 1,
+    });
+    this.refreshModifiers();
+  }
+
   updateBonuses(dt) {
     for (const bonus of Object.values(this.bonuses)) {
       if (!bonus.active) continue;
@@ -1818,6 +2061,14 @@ export class WorldSimulation {
         this.emitEvent("powerupExpired", bonus);
       }
     }
+    if (this.signalHeld.active) {
+      this.signalHeld.remaining = Math.max(0, this.signalHeld.remaining - dt);
+      if (this.signalHeld.remaining <= 0) {
+        this.signalHeld.active = false;
+        this.signalHeld.charges = 0;
+        this.emitEvent("signalHeldExpired", this.signalHeld, { reason: "expired" });
+      }
+    }
   }
 
   refreshModifiers() {
@@ -1826,10 +2077,14 @@ export class WorldSimulation {
     const star = this.bonuses.starFoam;
     this.modifiers.uphillLossScale = mango.active ? POWERUP_CATALOG.mangoRush.effect.uphillLossScale : 1;
     this.modifiers.launchScale = moon.active && moon.charges > 0 ? POWERUP_CATALOG.moonPop.effect.launchScale : 1;
-    this.modifiers.protectsFlow = Boolean(star.active && star.charges > 0);
+    this.modifiers.protectsFlow = Boolean(
+      (star.active && star.charges > 0)
+      || (this.signalHeld.active && this.signalHeld.charges > 0),
+    );
     this.modifiers.mangoRushRemaining = mango.remaining;
     this.modifiers.moonPopCharges = moon.charges;
     this.modifiers.starFoamCharges = star.charges;
+    this.modifiers.signalHeldCharges = this.signalHeld.charges;
   }
 
   updateCarrier(dt) {
@@ -1877,7 +2132,8 @@ export class WorldSimulation {
       || this.courier.active
       || this.aircraftDrop.active
       || this.race.active
-      || this.foamGateSeries.active;
+      || this.foamGateSeries.active
+      || this.webringRelay.active;
   }
 
   prepareCollision(entity) {
@@ -2377,6 +2633,72 @@ function createFoamGate(index) {
   };
 }
 
+function createWebringRelayState() {
+  return {
+    id: "webring-relay-0",
+    kind: "webringRelay",
+    active: false,
+    hasAppeared: false,
+    phase: "dormant",
+    phaseTime: 0,
+    direction: 1,
+    stationWorldX: 0,
+    stationY: WEBRING_RELAY_CONFIG.stationY,
+    worldX: 0,
+    y: WEBRING_RELAY_CONFIG.stationY,
+    links: 0,
+    fragment0Age: -1,
+    fragment1Age: -1,
+    fragment2Age: -1,
+    muralComplete: false,
+    approval: false,
+    eventSeed: 0,
+    message: "",
+  };
+}
+
+function resetWebringRelayState(state, resetHistory = true) {
+  state.active = false;
+  if (resetHistory) state.hasAppeared = false;
+  state.phase = "dormant";
+  state.phaseTime = 0;
+  state.direction = 1;
+  state.stationWorldX = 0;
+  state.stationY = WEBRING_RELAY_CONFIG.stationY;
+  state.worldX = 0;
+  state.y = WEBRING_RELAY_CONFIG.stationY;
+  state.links = 0;
+  state.fragment0Age = -1;
+  state.fragment1Age = -1;
+  state.fragment2Age = -1;
+  state.muralComplete = false;
+  state.approval = false;
+  state.eventSeed = 0;
+  state.message = "";
+}
+
+function createSignalHeldState() {
+  return {
+    id: "signal-held-0",
+    kind: "signalHeld",
+    active: false,
+    remaining: 0,
+    charges: 0,
+    collectedAt: -Infinity,
+    phase: "dormant",
+    message: "",
+  };
+}
+
+function resetSignalHeldState(state) {
+  state.active = false;
+  state.remaining = 0;
+  state.charges = 0;
+  state.collectedAt = -Infinity;
+  state.phase = "dormant";
+  state.message = "";
+}
+
 function resetFoamGate(gate) {
   gate.active = false;
   gate.collidable = false;
@@ -2426,6 +2748,8 @@ function createStepContext() {
     waterlineY: 79,
     curlWorldX: NaN,
     curlApproaching: false,
+    criticalHazardTelegraph: false,
+    presentationPhase: 0,
   };
 }
 
@@ -2477,6 +2801,8 @@ function copyStepContext(target, source, previousCameraFallback) {
       ? context.curlScreenX
       : Number.isFinite(context.curlX) ? context.curlX : NaN;
   target.curlApproaching = Boolean(context.curlApproaching || context.incomingCurl);
+  target.criticalHazardTelegraph = Boolean(context.criticalHazardTelegraph);
+  target.presentationPhase = clamp(Math.floor(finite(context.presentationPhase)), 0, 2);
 }
 
 function createModifiers() {
@@ -2487,6 +2813,7 @@ function createModifiers() {
     mangoRushRemaining: 0,
     moonPopCharges: 0,
     starFoamCharges: 0,
+    signalHeldCharges: 0,
   };
 }
 
@@ -2497,6 +2824,7 @@ function resetModifiers(modifiers) {
   modifiers.mangoRushRemaining = 0;
   modifiers.moonPopCharges = 0;
   modifiers.starFoamCharges = 0;
+  modifiers.signalHeldCharges = 0;
 }
 
 function createSignalRecord() {
@@ -2663,6 +2991,34 @@ function snapshotFoamGateSeries(state) {
     count: state.count,
     cleared: state.cleared,
     eventSeed: state.eventSeed,
+  };
+}
+
+function snapshotWebringRelay(state) {
+  return {
+    active: state.active,
+    hasAppeared: state.hasAppeared,
+    phase: state.phase,
+    phaseTime: state.phaseTime,
+    direction: state.direction,
+    stationWorldX: state.stationWorldX,
+    stationY: state.stationY,
+    links: state.links,
+    fragment0Age: state.fragment0Age,
+    fragment1Age: state.fragment1Age,
+    fragment2Age: state.fragment2Age,
+    muralComplete: state.muralComplete,
+    approval: state.approval,
+    eventSeed: state.eventSeed,
+  };
+}
+
+function snapshotSignalHeld(state) {
+  return {
+    active: state.active,
+    remaining: state.remaining,
+    charges: state.charges,
+    collectedAt: state.collectedAt,
   };
 }
 

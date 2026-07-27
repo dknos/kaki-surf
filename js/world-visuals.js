@@ -23,6 +23,9 @@ const TRAFFIC_FRAMES = Object.freeze({
   seaplane: ["airTraffic", "seaplane"],
   helicopter: ["airTraffic", "helicopter"],
   bannerPlane: ["airTraffic", "bannerPlane"],
+  signalKeeper: ["kakiLandDecor", "signalKeeper"],
+  guestbookGull: ["kakiLandDecor", "guestbookGull"],
+  buttonMenace: ["kakiLandDecor", "buttonMenace"],
 });
 
 const POWERUP_HALO = Object.freeze({
@@ -156,6 +159,10 @@ export function drawWorldFoamGates(ctx, simulation, assets, palette, alpha = 1, 
     const y = lerp(gate.previousY, gate.y, alpha);
     const pulse = settings.reducedMotion ? 0 : Math.sin((gate.phaseTime ?? 0) * 7 + (gate.eventSeed & 7)) * 0.08;
     const scale = clamp((gate.radius ?? 12) / 10 + pulse, 0.88, 1.72);
+    if (gate.payload === "webringRelay") {
+      drawWebringGate(ctx, x, y, gate.radius ?? 12, gate.phaseTime ?? 0, palette, settings);
+      return;
+    }
     if (settings.highContrast) {
       ctx.save();
       ctx.globalAlpha = 0.7;
@@ -173,6 +180,92 @@ export function drawWorldFoamGates(ctx, simulation, assets, palette, alpha = 1, 
     });
     if (!drawn) drawFoamGateFallback(ctx, x, y, gate.radius ?? 12, palette);
   });
+}
+
+/** Background station and fragment handoff for the deterministic Relay event. */
+export function drawWebringRelay(ctx, simulation, assets, palette, alpha = 1, settings = {}) {
+  const world = simulation?.world;
+  const relay = world?.webringRelay;
+  if (!relay?.hasAppeared || relay.phase === "dormant") return;
+  const camera = interpolatedCamera(world, alpha);
+  const stationX = projectWorldX(
+    relay.stationWorldX,
+    camera,
+    WORLD_LAYER_CONFIG.mid.parallax,
+  );
+  const stationY = relay.stationY;
+  if (stationX < -84 || stationX > 468) return;
+
+  ctx.save();
+  ctx.globalAlpha = relay.phase === "missed" ? 0.58 : 0.94;
+  const stationDrawn = drawAtlasFrame(
+    ctx,
+    assets,
+    "kakiLandDecor",
+    relay.muralComplete ? "reactionCard" : "cloudStation",
+    stationX,
+    stationY,
+    {
+      flipX: relay.direction < 0,
+      scale: settings.qualityProfile === "mobile" ? 0.72 : 0.86,
+      alpha: settings.highContrast ? 1 : 0.94,
+    },
+  );
+  if (!stationDrawn) drawRelayStationFallback(ctx, stationX, stationY, palette, relay);
+
+  const fragmentColors = settings.highContrast
+    ? [palette.white, palette.gold, palette.foam]
+    : [palette.waterLight, palette.violet, palette.gold];
+  const fragmentAges = [relay.fragment0Age, relay.fragment1Age, relay.fragment2Age];
+  for (let index = 0; index < fragmentAges.length; index += 1) {
+    const age = Number(fragmentAges[index]);
+    if (!(age >= 0)) continue;
+    const gate = world.foamGates?.[index];
+    const gateX = gate
+      ? projectWorldX(lerp(gate.previousWorldX, gate.worldX, alpha), camera, 1)
+      : stationX - relay.direction * (62 + index * 28);
+    const gateY = gate ? lerp(gate.previousY, gate.y, alpha) : stationY + 50;
+    const mobile = settings.qualityProfile === "mobile";
+    const travel = settings.reducedMotion || mobile ? 1 : smoothstep(0, 0.82, age);
+    const x = lerp(gateX, stationX + (index - 1) * 7, travel);
+    const y = lerp(gateY, stationY - 11 + (index & 1) * 4, travel);
+    ctx.fillStyle = palette.ink;
+    ctx.fillRect(Math.round(x - 3), Math.round(y - 2), 7, 6);
+    ctx.fillStyle = fragmentColors[index];
+    ctx.fillRect(Math.round(x - 2), Math.round(y - 1), 5, 4);
+    ctx.fillStyle = palette.foam;
+    ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+  }
+
+  // The assembled mural stays readable after particle travel has finished.
+  for (let index = 0; index < Math.min(3, relay.links); index += 1) {
+    ctx.fillStyle = palette.ink;
+    ctx.fillRect(
+      Math.round(stationX - 11 + index * 7),
+      Math.round(stationY - 22),
+      6,
+      6,
+    );
+    ctx.fillStyle = fragmentColors[index];
+    ctx.fillRect(
+      Math.round(stationX - 10 + index * 7),
+      Math.round(stationY - 21),
+      4,
+      4,
+    );
+  }
+
+  if (relay.approval) {
+    const stampX = stationX + relay.direction * 30;
+    const stampY = stationY - 27;
+    const settle = settings.reducedMotion ? 0 : Math.sin(relay.phaseTime * 5) * 1.5;
+    const drawn = drawAtlasFrame(ctx, assets, "kakiLandDecor", "approvalStamp", stampX, stampY + settle, {
+      scale: 0.52,
+      alpha: 1,
+    });
+    if (!drawn) drawApprovalStampFallback(ctx, stampX, stampY + settle, palette);
+  }
+  ctx.restore();
 }
 
 export function drawCarrierEvent(ctx, simulation, assets, palette, settings = {}) {
@@ -420,6 +513,10 @@ function trafficFrame(entity) {
   if (entity.activity === "courier" || String(entity.phase).startsWith("courier")) {
     return entity.kind === "pelican" ? PELICAN_COURIER_FRAME : GULL_COURIER_FRAME;
   }
+  if (entity.kind === "cloudArtist") {
+    const frames = ["quietRepair", "alarmFixer", "reactionCard", "collector"];
+    return ["kakiLandDecor", frames[(entity.eventSeed >>> 3) % frames.length]];
+  }
   return TRAFFIC_FRAMES[entity.kind];
 }
 
@@ -543,7 +640,14 @@ function drawTrafficFallback(ctx, entity, x, y, palette, layer, alpha = 1) {
   ctx.fillStyle = palette.ink;
   const size = layer === "far" ? 2 : 3;
   const kind = String(entity.kind).toLowerCase();
-  if (kind.includes("flock") || kind === "pelican") {
+  if (kind === "cloudartist" || kind === "signalkeeper" || kind === "buttonmenace") {
+    ctx.fillStyle = palette.foam;
+    ctx.fillRect(Math.round(x - size * 5), Math.round(y + 2), size * 10, size * 2);
+    ctx.fillStyle = palette.ink;
+    ctx.fillRect(Math.round(x - 3), Math.round(y - 5), 9, 7);
+    ctx.fillStyle = kind === "signalkeeper" ? palette.gold : palette.waterLight;
+    ctx.fillRect(Math.round(x - 1), Math.round(y - 3), 5, 3);
+  } else if (kind.includes("flock") || kind === "pelican" || kind === "guestbookgull") {
     ctx.fillRect(Math.round(x - size * 2), Math.round(y), size * 2, 1);
     ctx.fillRect(Math.round(x), Math.round(y - 1), size * 2, 1);
     ctx.fillRect(Math.round(x - 1), Math.round(y), 2, 1);
@@ -663,6 +767,59 @@ function drawFoamGateFallback(ctx, x, y, radius, palette) {
   ctx.arc(Math.round(x), Math.round(y), Math.max(5, radius - 3), 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
+}
+
+function drawWebringGate(ctx, x, y, radius, time, palette, settings) {
+  const rainbow = settings.highContrast
+    ? [palette.ink, palette.white, palette.gold, palette.white, palette.ink]
+    : ["#8879d9", "#5b8ee8", "#45c7d1", "#69d18b", "#f1c75b"];
+  const settle = settings.reducedMotion ? 0 : Math.sin(time * 4.2) * 0.6;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y + settle));
+  if (settings.highContrast) {
+    ctx.strokeStyle = palette.ink;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius + 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (let index = 0; index < rainbow.length; index += 1) {
+    ctx.strokeStyle = rainbow[index];
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(5, radius + 2 - index * 1.5), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = palette.gold;
+  ctx.fillRect(radius - 1, -3, 5, 6);
+  ctx.fillStyle = palette.ink;
+  ctx.fillRect(radius + 1, -4, 1, 8);
+  ctx.restore();
+}
+
+function drawRelayStationFallback(ctx, x, y, palette, relay) {
+  ctx.fillStyle = palette.foamShade;
+  ctx.fillRect(Math.round(x - 24), Math.round(y + 4), 48, 8);
+  ctx.fillStyle = palette.foam;
+  ctx.fillRect(Math.round(x - 29), Math.round(y), 58, 8);
+  ctx.fillStyle = palette.ink;
+  ctx.fillRect(Math.round(x - 8), Math.round(y - 17), 17, 14);
+  ctx.fillStyle = palette.waterLight;
+  ctx.fillRect(Math.round(x - 5), Math.round(y - 14), 11, 7);
+  ctx.fillStyle = relay.muralComplete ? palette.gold : palette.violet;
+  ctx.fillRect(Math.round(x + 13), Math.round(y - 10), 5, 7);
+}
+
+function drawApprovalStampFallback(ctx, x, y, palette) {
+  ctx.fillStyle = palette.ink;
+  ctx.fillRect(Math.round(x - 9), Math.round(y - 7), 18, 14);
+  ctx.fillStyle = palette.foam;
+  ctx.fillRect(Math.round(x - 7), Math.round(y - 5), 14, 10);
+  ctx.strokeStyle = palette.gold;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(Math.round(x), Math.round(y), 4, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 function drawCarrierFallback(ctx, carrier, x, y, palette) {

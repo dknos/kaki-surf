@@ -1,6 +1,6 @@
 # Continuous aerial repair prompts
 
-These three project-bound sources were produced with the built-in image
+The original three project-bound sources were produced with the built-in image
 generation edit workflow. Each named Nano image was the edit target and style
 lock. The shared requirements were: one vertically continuous scene, exactly
 one coastline and horizon, compatible left/right border content, a safe flight
@@ -29,3 +29,14 @@ Preserve the dark storm coast, palms, lifeguard tower, pier, steel-teal ocean,
 rain-dark palette, chunky clusters, and deep-navy outlines. Extend upward
 through enormous thunderheads with sparse clean lightning, above cold glowing
 cloud tops into blue-black atmosphere, then sparse stars and one small meteor.
+
+## Kaki-Land
+
+`kaki-land-continuous.png` is emitted by
+`tools/art/build-kaki-land-assets.py` from the selected local Grok network
+master. The deterministic conversion maps the continuous scene to the live
+camera range, enforces a two-pixel grid and 64-color cap, and retains one
+y=502 ocean anchor. The Last Relay remains a separate reactive atlas layer
+rather than a baked second guardian. See
+[`../KAKI-LAND.md`](../KAKI-LAND.md) for exact sessions, prompts, hashes,
+rejections, and the privacy record.

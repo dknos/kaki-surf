@@ -1177,6 +1177,11 @@ test("condition installs its canonical wave profile before reset-derived geometr
   assert.equal(simulation.condition, CONDITIONS.stormbreak);
   assert.equal(simulation.wave.profileId, "classic");
   assert.equal(simulation.wave.profile, WAVE_STYLES.classic);
+  simulation.reset({ condition: "kakiLand" });
+  assert.equal(simulation.condition, CONDITIONS.kakiLand);
+  assert.equal(simulation.wave.profileId, "signalBreak");
+  assert.equal(simulation.wave.profile, WAVE_STYLES.signalBreak);
+  assert.equal(simulation.wave.contactX(), 30);
   simulation.reset({ condition: "goldenCoast" });
   assert.equal(simulation.wave.profileId, "classic");
 });
@@ -1430,7 +1435,7 @@ test("a misaligned landing wipes out, respawns, and reset provides a clean resta
 });
 
 test("wave motion stays monotonic through a crash and the protected recovery lane", () => {
-  for (const condition of [CONDITIONS.goldenCoast, CONDITIONS.twilightGlass]) {
+  for (const condition of [CONDITIONS.goldenCoast, CONDITIONS.twilightGlass, CONDITIONS.kakiLand]) {
     const simulation = beginRiding(BOARDS.foamPuff, { condition });
     const player = simulation.player;
     simulation.wave.time = 24;
@@ -1466,6 +1471,37 @@ test("wave motion stays monotonic through a crash and the protected recovery lan
     assert.ok(minimumRecoveryGap >= TUNING.curlRespawnSafeGap - 0.1,
       `${condition.id} moving entry lane preserved only ${minimumRecoveryGap} px`);
   }
+});
+
+test("Kaki-Land wave pursuit remains monotonic through a real aerial handoff", () => {
+  const simulation = beginRiding(BOARDS.mangoFish, { condition: CONDITIONS.kakiLand });
+  const player = simulation.player;
+  Object.assign(player, {
+    state: "lip",
+    stateTime: 0.1,
+    face: 0.02,
+    previousFace: 0.02,
+    faceVelocity: -0.85,
+    speed: 104,
+    charge: 0.85,
+  });
+  simulation.wave.time = 24;
+  simulation.update(FIXED_STEP, {});
+  assert.equal(player.state, "airborne");
+
+  let previousCurl = simulation.wave.curlX;
+  let airborneSteps = 0;
+  while (player.state === "airborne" && airborneSteps < 480) {
+    simulation.update(FIXED_STEP, {});
+    assert.ok(
+      simulation.wave.curlX > previousCurl,
+      `signal break stalled in air: ${previousCurl} -> ${simulation.wave.curlX}`,
+    );
+    previousCurl = simulation.wave.curlX;
+    airborneSteps += 1;
+  }
+  assert.ok(airborneSteps > 20, "the contract exercised a visible aerial, not a one-step state stub");
+  assert.notEqual(player.state, "airborne", "the aerial returned to the wave lifecycle");
 });
 
 test("Endless Surf replaces the clock with deterministic escalating sets and capped stakes", () => {

@@ -590,6 +590,8 @@ export class KakiSurfGame {
       if (event.type === "dolphinMounted" || event.type === "whaleMounted") this.rumble(72, 0.22, 0.48);
       if (event.type === "powerupCollected") this.rumble(45, 0.18, 0.28);
       if (event.type === "sharkCollision") this.rumble(92, 0.42, 0.58);
+      if (event.type === "webringRelayLink") this.rumble(34, 0.1, 0.18);
+      if (event.type === "webringRelayCompleted") this.rumble(58, 0.2, 0.34);
       if (event.type === "wildlifePhase" && ["telegraph", "distant", "blow"].includes(event.payload.phase)) {
         const cue = event.payload.kind === "shark" ? "Shark fin ahead." : event.payload.kind === "whale" ? "Whale event ahead." : "Dolphin opportunity ahead.";
         this.announce(cue, { urgent: event.payload.kind === "shark" });
@@ -691,6 +693,9 @@ export class KakiSurfGame {
     if (highlights.switchBonuses > 0) rows.push(["Switch", String(highlights.switchBonuses)]);
     if (highlights.animalBonuses > 0) rows.push(["Animal", String(highlights.animalBonuses)]);
     if (highlights.nearMisses > 0) rows.push(["Near Miss", String(highlights.nearMisses)]);
+    if (highlights.relayLinks > 0) rows.push(["Relay Links", String(highlights.relayLinks)]);
+    if (highlights.galleryComplete > 0) rows.push(["Gallery Complete", "YES"]);
+    if (highlights.signalHeld > 0) rows.push(["Signal Held", String(highlights.signalHeld)]);
     if (highlights.longestTube > 0) {
       rows.push([
         "Best Tube",
@@ -1250,19 +1255,19 @@ export class KakiSurfGame {
       waveReadAssist: "full",
     });
 
-    if (["menu", "settingsSimple", "settingsAdvanced"].includes(scene)) {
+    if (["menu", "menu-kakiLand", "settingsSimple", "settingsAdvanced"].includes(scene)) {
       this.selectedBoard = "foamPuff";
-      this.selectedCondition = "goldenCoast";
+      this.selectedCondition = scene === "menu-kakiLand" ? "kakiLand" : "goldenCoast";
       this.selectedMode = DEFAULT_RUN_MODE_ID;
       this.host.dataset.condition = this.selectedCondition;
       this.buildBoardCards();
       this.buildModeCards();
       this.buildConditionCards();
       this.updateMenuStats();
-      this.simulation.condition = CONDITIONS.goldenCoast;
+      this.simulation.condition = CONDITIONS[this.selectedCondition];
       this.state = "menu";
       this.showLayer("menu");
-      if (scene !== "menu") {
+      if (scene === "settingsSimple" || scene === "settingsAdvanced") {
         this.settings.controlMode = scene === "settingsAdvanced" ? "advanced" : "simple";
         this.input.setControlMode?.(this.settings.controlMode);
         this.simulation.controlMode = this.settings.controlMode;
@@ -1273,8 +1278,8 @@ export class KakiSurfGame {
       return;
     }
 
-    if (scene === "results") {
-      this.selectedCondition = "goldenCoast";
+    if (scene === "results" || scene === "results-kakiLand") {
+      this.selectedCondition = scene === "results-kakiLand" ? "kakiLand" : "goldenCoast";
       this.selectedMode = "endless";
       this.host.dataset.condition = this.selectedCondition;
       this.state = "results";
@@ -1303,6 +1308,9 @@ export class KakiSurfGame {
           switchBonuses: 2,
           animalBonuses: 1,
           nearMisses: 2,
+          relayLinks: scene === "results-kakiLand" ? 3 : 0,
+          galleryComplete: scene === "results-kakiLand" ? 1 : 0,
+          signalHeld: scene === "results-kakiLand" ? 1 : 0,
         },
       }, true);
       this.showLayer("results");
@@ -1358,14 +1366,15 @@ export class KakiSurfGame {
       ?? "goldenCoast";
     const boardId = Object.keys(BOARDS).find((id) => scene === id || scene.startsWith(`${id}-`))
       ?? (scene === "maxSpeed" || scene === "turboBoost" || scene === "tailGrab" || scene === "hugeAir" ? "moonLog" : scene === "snap" || scene === "combo360" ? "mangoFish" : "foamPuff");
+    const qaMode = scene === "scoreFinal-kakiLand" ? "scoreAttack" : "endless";
     this.selectedCondition = conditionId;
-    this.selectedMode = "endless";
+    this.selectedMode = qaMode;
     this.host.dataset.condition = conditionId;
     this.selectedBoard = boardId;
     this.simulation.reset({
       board: boardId,
       condition: conditionId,
-      mode: this.selectedMode,
+      mode: qaMode,
       assists: { steering: false, landing: false },
       controlMode: this.settings.controlMode,
       worldQa: qaWorldOverride(scene),
@@ -1373,6 +1382,7 @@ export class KakiSurfGame {
     this.simulation.condition = CONDITIONS[conditionId];
     this.simulation.begin();
     this.simulation.elapsed = 24;
+    this.simulation.activeTime = scene === "scoreFinal-kakiLand" ? 72 : 24;
     this.simulation.timeRemaining = 54;
     this.simulation.wave.time = 18;
     this.simulation.wave.travel = 1320;
@@ -1381,6 +1391,25 @@ export class KakiSurfGame {
     this.simulation.score.total = scene === "neutral" ? 1240 : 6840;
     this.simulation.score.combo = scene.includes("combo") ? 3.8 : 2.4;
     this.simulation.score.comboHeat = scene.includes("combo") ? 0.88 : 0.44;
+    const lateKakiLand = [
+      "rainbowSeam-kakiLand",
+      "lateEndless-kakiLand",
+      "scoreFinal-kakiLand",
+      "aerialUpper-kakiLand",
+      "aerialSpace-kakiLand",
+      "lastRelay-kakiLand",
+      "relayComplete-kakiLand",
+    ].includes(scene);
+    this.simulation.world.presentationPhase = lateKakiLand ? 2 : scene.includes("relay") ? 1 : 0;
+    this.simulation.world.context.presentationPhase = this.simulation.world.presentationPhase;
+    if (scene === "lateEndless-kakiLand") this.simulation.endlessSet = 6;
+    if (scene === "scoreFinal-kakiLand") this.simulation.timeRemaining = 6;
+    if (conditionId === "kakiLand") {
+      // Kaki-Land's ordinary evidence should show its long, generous wall and
+      // maintained route. Late-run fixtures still demonstrate earned pressure.
+      this.simulation.wave.pressure = lateKakiLand ? 0.8 : 0.48;
+      this.simulation.wave.curlX = lateKakiLand ? 32 : -48;
+    }
     this.state = "qa";
     this.showLayer(null);
     this.elements.topControls.hidden = true;
@@ -1454,6 +1483,43 @@ export class KakiSurfGame {
       });
     };
 
+    const relayFixture = {
+      "relayStart-kakiLand": { links: 0, approval: false },
+      "relayStartLeft-kakiLand": { links: 0, approval: false },
+      "relayGate1-kakiLand": { links: 1, approval: false },
+      "relayGate2-kakiLand": { links: 2, approval: false },
+      "relayGate3-kakiLand": { links: 3, approval: false },
+      "relayComplete-kakiLand": { links: 3, approval: true },
+      "relayMobile-kakiLand": { links: 3, approval: true },
+      "relayReduced-kakiLand": { links: 3, approval: true },
+      "relayHighContrast-kakiLand": { links: 2, approval: false },
+    }[scene];
+    if (relayFixture) {
+      const relay = this.simulation.world.webringRelay;
+      const series = this.simulation.world.foamGateSeries;
+      relay.links = relayFixture.links;
+      relay.muralComplete = relayFixture.approval;
+      relay.approval = relayFixture.approval;
+      relay.phase = relayFixture.approval ? "approval" : "gates";
+      relay.phaseTime = relayFixture.approval ? 0.42 : 1.1;
+      series.cleared = relayFixture.links;
+      for (let index = 0; index < relayFixture.links; index += 1) {
+        const gate = this.simulation.world.foamGates[index];
+        gate.active = false;
+        gate.phase = "cleared";
+        gate.phaseTime = 0;
+        relay[`fragment${index}Age`] = 0.94 + index * 0.18;
+      }
+      if (relayFixture.approval) {
+        series.active = false;
+        series.phase = "complete";
+        this.simulation.world.signalHeld.active = true;
+        this.simulation.world.signalHeld.charges = 1;
+        this.simulation.world.signalHeld.remaining = 16;
+        this.simulation.world.refreshModifiers();
+      }
+    }
+
     const aerialQa = scene.match(/^aerial(Coast|Cloud|Upper|Space|Reentry)-/);
     if (aerialQa) {
       const stage = {
@@ -1498,7 +1564,153 @@ export class KakiSurfGame {
       }
     }
 
+    if (["aerialUpper-kakiLand", "aerialSpace-kakiLand"].includes(scene)) {
+      const lateCameraX = 8500;
+      const delta = lateCameraX;
+      this.simulation.cameraWorldX = lateCameraX;
+      for (const key of ["x", "previousX", "airX", "previousAirX", "tailX"]) {
+        player[key] = Number(player[key]) + delta;
+      }
+      this.simulation.wave.curlWorldX = lateCameraX + 72;
+    }
+
     switch (scene) {
+      case "rainbowSeam-kakiLand":
+        player.waveMomentum = 0.9;
+        player.speed = 118;
+        player.powerLine = true;
+        player.speedTier = "FLYING";
+        this.renderer.onEvent({ type: "powerLineEnter", payload: { potential: 1 } }, this.simulation);
+        break;
+      case "leftTravel-kakiLand":
+        player.travelDirection = -1;
+        player.motionDirection = -1;
+        player.travelVelocity = -28;
+        player.switchStance = true;
+        player.speed = 108;
+        break;
+      case "rightTravel-kakiLand":
+        player.travelDirection = 1;
+        player.motionDirection = 1;
+        player.travelVelocity = 28;
+        player.speed = 108;
+        break;
+      case "cutback-kakiLand":
+        player.travelDirection = -1;
+        player.motionDirection = -1;
+        player.travelVelocity = -34;
+        player.redirectVelocity = -22;
+        player.turnForce = 0.96;
+        player.switchStance = true;
+        player.trickPose = "cutback";
+        this.renderer.onEvent({
+          type: "directionChange",
+          payload: { from: 1, to: -1, switch: true, turnForce: 0.96 },
+        }, this.simulation);
+        break;
+      case "turbo-kakiLand":
+        player.turbo = 0.74;
+        player.turboActive = true;
+        player.turboOverdrive = 1;
+        player.waveMomentum = 1;
+        player.speed = Math.round(this.simulation.currentRideSpeedCap() * 0.98);
+        player.speedTier = "BLASTING";
+        this.renderer.onEvent({ type: "turboStart", payload: { level: player.turbo } }, this.simulation);
+        break;
+      case "smallAir-kakiLand":
+        makeAirborne("rise", "SMALL SIGNAL", 0.16);
+        player.airY = 70;
+        player.previousAirY = 70;
+        player.airVY = -24;
+        player.maxAirHeight = 18;
+        break;
+      case "mediumAir-kakiLand":
+        makeAirborne("floatingApex", "CLOUD POST", Math.PI);
+        player.airY = 45;
+        player.previousAirY = 45;
+        player.airVY = -3;
+        player.maxAirHeight = 62;
+        player.aerialAltitude = 0.38;
+        player.previousAerialAltitude = 0.38;
+        this.simulation.camera.worldY = riderFrameCameraTarget(player);
+        break;
+      case "hugeAir-kakiLand":
+      case "lastRelay-kakiLand": {
+        makeAirborne("apex", "SIGNAL ABOVE", Math.PI * 4);
+        const lateCameraX = 8500;
+        this.simulation.cameraWorldX = lateCameraX;
+        Object.assign(player, {
+          airX: lateCameraX + 230,
+          previousAirX: lateCameraX + 230,
+          x: lateCameraX + 230,
+          previousX: lateCameraX + 230,
+          tailX: lateCameraX + 220,
+          airY: -82,
+          previousAirY: -82,
+          airVY: 0,
+          maxAirHeight: 176,
+          aerialAltitude: 0.94,
+          previousAerialAltitude: 0.94,
+          aerialMilestoneTier: 4,
+          provisionalScore: 2840,
+        });
+        this.simulation.wave.curlWorldX = lateCameraX + 92;
+        this.simulation.camera.worldY = riderFrameCameraTarget(player);
+        this.simulation.camera.verticalAnchorY = this.simulation.camera.worldY;
+        this.simulation.camera.verticalTracking = true;
+        this.renderer.onEvent({
+          type: "aerialMilestone",
+          payload: { index: 4, altitude: 0.94, text: "SIGNAL ABOVE" },
+        }, this.simulation);
+        break;
+      }
+      case "wipeout-kakiLand":
+        player.state = "wipeout";
+        player.stateTime = 0.48;
+        player.airX = 216;
+        player.previousAirX = 216;
+        player.airY = 106;
+        player.previousAirY = 106;
+        player.boardAngle = -0.9;
+        player.bodyAngle = 1.2;
+        this.renderer.onEvent({ type: "wipeout", payload: { cause: "landing" } }, this.simulation);
+        break;
+      case "recovery-kakiLand":
+        player.state = "entry";
+        player.stateTime = 0.7;
+        player.x = 324;
+        player.previousX = 334;
+        player.speed = 70;
+        this.renderer.onEvent({
+          type: "callout",
+          payload: { text: "PAGE FOUND. SURFER DAMP.", subtext: "SIGNAL HELD", tone: "hint" },
+        }, this.simulation);
+        break;
+      case "dolphin-kakiLand":
+        this.renderer.onEvent({
+          type: "wildlifePhase",
+          payload: { kind: "dolphin", phase: "approach" },
+        }, this.simulation);
+        break;
+      case "shark-kakiLand":
+        this.renderer.onEvent({
+          type: "wildlifePhase",
+          payload: { kind: "shark", phase: "crossing" },
+        }, this.simulation);
+        break;
+      case "relayHighContrast-kakiLand":
+      case "highContrast-kakiLand":
+        this.renderer.applySettings({ ...this.settings, highContrast: true, waveReadAssist: "full" });
+        break;
+      case "relayReduced-kakiLand":
+      case "reducedMotion-kakiLand":
+        this.renderer.applySettings({ ...this.settings, reducedMotion: true, reducedFlash: true });
+        break;
+      case "relayMobile-kakiLand":
+      case "mobile-kakiLand":
+        this.renderer.setQualityProfile("mobile");
+        this.host.dataset.qualityProfile = "mobile";
+        break;
       case "powerLine":
         player.waveMomentum = 0.82;
         player.speed = Math.max(106, Math.round(this.simulation.currentRideSpeedCap?.() * 0.84 || 106));
@@ -2238,8 +2450,34 @@ export function qaWorldOverride(scene) {
     whaleReduced: { kind: "whale", phase: "breach", phaseTime: 0.725, screenX: 270, y: 136, direction: -1 },
     dolphinGates: { kind: "dolphin", phase: "mounted", screenX: 232, y: 132, direction: 1 },
     starSave: { kind: "shark", phase: "crossing", screenX: 222, y: 132, direction: 1 },
+    "dolphin-kakiLand": { kind: "dolphin", phase: "approach", screenX: 176, y: 128, direction: 1 },
+    "shark-kakiLand": { kind: "shark", phase: "crossing", screenX: 278, y: 132, direction: 1 },
   }[scene];
   if (wildlife) return { wildlife };
+
+  if (scene.startsWith("relay") && scene.endsWith("-kakiLand")) {
+    return {
+      webringRelay: {
+        direction: scene.includes("Left") ? -1 : 1,
+        screenX: scene.includes("Left") ? 160 : 234,
+        stationScreenX: scene.includes("Left") ? 68 : 318,
+        stationY: 72,
+        y: 128,
+        eventSeed: 0x4b414b49,
+      },
+    };
+  }
+
+  if (scene === "artists-kakiLand") {
+    return {
+      traffic: [
+        { kind: "cloudArtist", layer: "far", screenX: 86, y: 52, direction: 1, duration: 40, eventSeed: 4 },
+        { kind: "signalKeeper", layer: "far", screenX: 206, y: 45, direction: -1, duration: 40, eventSeed: 8 },
+        { kind: "guestbookGull", layer: "mid", screenX: 284, y: 61, direction: -1, duration: 40, eventSeed: 12 },
+        { kind: "buttonMenace", layer: "mid", screenX: 346, y: 48, direction: 1, duration: 40, eventSeed: 16 },
+      ],
+    };
+  }
 
   if (scene === "flockScatter") {
     return {

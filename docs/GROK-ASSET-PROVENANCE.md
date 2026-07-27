@@ -1,6 +1,6 @@
 # Grok asset provenance
 
-Date: 2026-07-20.
+Date: 2026-07-27.
 
 The offline asset build publishes 15 source families generated through the local Grok Imagine workflow for this repository; the browser manifest currently loads 13. Generation happened offline; the browser never invokes Grok or reads its session cache. Selected outputs were copied into `docs/art-source/grok` without overwriting existing production assets, visually reviewed, and converted into compact transparent atlases. The continuous side-break and travelling-break outputs are preserved here but were removed from the runtime manifest after browser review; the MVP wave silhouette is now code-native.
 
@@ -13,6 +13,15 @@ python3 tools/art/build-grok-assets.py
 ```
 
 The script reads the preserved sources, validates declared exact hashes and dimensions for contact-sensitive wave sheets, removes chroma-magenta or the continuous wave's narrow black isolation field, extracts each declared source grid, crops or preserves layout according to the family contract, removes declared source rails and blends continuation edges, downsamples with the family-specific filter, thresholds alpha, quantizes, sharpens where appropriate, repacks the stable runtime grids, and writes `assets/generated/manifest.json`. It does not modify the source sheets.
+
+Kaki-Land adds a reviewed Grok panorama master, a nonhuman Last Relay design
+reference, and a 4 x 3 decor source sheet. They are preserved under
+`docs/art-source/aerial/grok` and `docs/art-source/atlases/grok`; the offline
+Kaki-Land builder performs the camera-aware reframe, two-pixel cleanup,
+palette reduction, chroma extraction, and canonical face-grid cleanup. The
+browser never reads the Grok session cache. Exact sessions, prompts, rejection
+decisions, privacy record, and hashes are in
+[Kaki-Land visual source and provenance](./art-source/aerial/KAKI-LAND.md).
 
 ## Selected source and output record
 

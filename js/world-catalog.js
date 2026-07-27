@@ -174,6 +174,35 @@ const traffic = {
     duration: Object.freeze([5, 9]),
     animation: "jump",
   },
+  cloudArtist: {
+    layers: ["far", "mid"],
+    renderBand: "skyTraffic",
+    speed: Object.freeze([1.4, 2.6]),
+    duration: Object.freeze([30, 46]),
+    animation: "repair",
+  },
+  signalKeeper: {
+    layers: ["far"],
+    renderBand: "skyTraffic",
+    speed: Object.freeze([0.8, 1.7]),
+    duration: Object.freeze([34, 52]),
+    animation: "lamp",
+  },
+  guestbookGull: {
+    layers: ["far", "mid"],
+    renderBand: "skyTraffic",
+    speed: Object.freeze([9, 15]),
+    duration: Object.freeze([15, 24]),
+    animation: "stamp",
+    bird: true,
+  },
+  buttonMenace: {
+    layers: ["mid"],
+    renderBand: "skyTraffic",
+    speed: Object.freeze([2.2, 4]),
+    duration: Object.freeze([24, 38]),
+    animation: "shuffle",
+  },
 };
 
 for (const definition of Object.values(traffic)) {
@@ -246,6 +275,27 @@ export const CONDITION_WORLD_PROFILES = Object.freeze({
       near: Object.freeze([]),
     }),
     wildlifeWeights: Object.freeze({ dolphin: 0.48, shark: 0.52, whale: 0 }),
+  }),
+  kakiLand: Object.freeze({
+    id: "kakiLand",
+    wind: 0.34,
+    density: 0.52,
+    ambientTraffic: true,
+    specialTraffic: false,
+    carrierEnabled: false,
+    farWaterTraffic: false,
+    midWaterTraffic: false,
+    farSkyTraffic: true,
+    midSkyTraffic: true,
+    nearSkyTraffic: false,
+    interactiveWildlife: true,
+    specialEvents: false,
+    traffic: Object.freeze({
+      far: Object.freeze(["cloudArtist", "signalKeeper", "guestbookGull"]),
+      mid: Object.freeze(["cloudArtist", "guestbookGull", "buttonMenace"]),
+      near: Object.freeze([]),
+    }),
+    wildlifeWeights: Object.freeze({ dolphin: 0.7, shark: 0.3, whale: 0 }),
   }),
 });
 
@@ -371,6 +421,19 @@ export const FOAM_GATE_CONFIG = Object.freeze({
   baseDistance: 54,
   spacing: 48,
   availableFor: 7.5,
+});
+
+export const WEBRING_RELAY_CONFIG = Object.freeze({
+  gateCount: 3,
+  gateRadius: 14,
+  baseDistance: 42,
+  gateSpacing: 38,
+  stationParallax: 0.32,
+  stationY: 70,
+  approvalFor: 4.2,
+  missedFor: 2.2,
+  retryDelay: 1,
+  interval: Object.freeze([45, 90]),
 });
 
 export function conditionWorldProfile(condition) {

@@ -475,6 +475,12 @@ export class SurfSimulation {
     context.waterlineY = clamp(this.wave.crestY(airborne ? player.airX : player.x), 70, 92);
     context.curlWorldX = this.wave.contactX();
     context.curlApproaching = this.wave.pressure >= 0.56;
+    const curlGap = context.player.collisionX - context.curlWorldX;
+    context.criticalHazardTelegraph = context.upcomingWildlife === "shark"
+      || (this.wave.pressure >= 0.62 && curlGap <= 58);
+    context.presentationPhase = this.modeId === "endless"
+      ? this.endlessSet >= 4 ? 2 : this.endlessSet >= 2 ? 1 : 0
+      : this.activeTime >= 56 ? 2 : this.activeTime >= 26 ? 1 : 0;
 
     this.world.update(dt, context);
     this.world.consumeInteractions((signal) => this.handleWorldInteraction(signal));
@@ -777,10 +783,19 @@ export class SurfSimulation {
       case "sharkCollision": {
         const modifiers = this.world.getModifiers();
         if (modifiers.protectsFlow) {
-          this.world.consumePowerup("starFoam", "sharkSave");
+          const usedSignal = modifiers.starFoamCharges <= 0
+            && modifiers.signalHeldCharges > 0;
+          this.world.consumeFlowProtection("sharkSave");
           this.score.addFlow(0.06);
-          this.emit("starFoamSave", { ...payload, reason: "shark" });
-          this.emit("callout", { text: "STAR FOAM SAVE", subtext: "SHARK DEFLECTED", tone: "perfect" });
+          this.emit(usedSignal ? "signalHeldSave" : "starFoamSave", {
+            ...payload,
+            reason: "shark",
+          });
+          this.emit("callout", {
+            text: usedSignal ? "SIGNAL HELD" : "STAR FOAM SAVE",
+            subtext: "SHARK DEFLECTED",
+            tone: "perfect",
+          });
         } else {
           this.triggerWipeout("SHARK SPLASH!", "shark");
         }
@@ -808,10 +823,29 @@ export class SurfSimulation {
         this.emit("callout", { text: "WAKE RACE WON", subtext: "NO BRAKES KAKI", tone: "perfect" });
         return;
       case "foamGateCleared":
-        this.score.registerManeuver({ points: 85, multiplier: this.currentMultiplier(), combo: 0.05 });
+        if (signal.reason === "webringRelay") {
+          this.highlights.relayLinks = Math.max(this.highlights.relayLinks, signal.value);
+          this.score.registerManeuver({
+            points: 70,
+            multiplier: this.currentMultiplier(),
+            combo: 0.045,
+          });
+          this.score.addFlow(0.025);
+          this.emit("callout", {
+            text: `RELAY LINK ${Math.min(3, Math.max(1, signal.value))}`,
+            subtext: "DRAWING RECEIVED",
+            tone: "perfect",
+          });
+        } else {
+          this.score.registerManeuver({ points: 85, multiplier: this.currentMultiplier(), combo: 0.05 });
+        }
         this.emit(signal.type, payload);
         return;
       case "foamGateSeriesCompleted":
+        if (signal.reason === "webringRelay") {
+          this.emit(signal.type, payload);
+          return;
+        }
         this.score.registerManeuver({ points: 240, multiplier: this.currentMultiplier(), combo: 0.12 });
         this.emit(signal.type, payload);
         this.emit("callout", {
@@ -819,6 +853,28 @@ export class SurfSimulation {
           subtext: "SERIES CLEARED",
           tone: "perfect",
         });
+        return;
+      case "webringRelayCompleted":
+        this.highlights.galleryComplete += 1;
+        this.score.registerManeuver({
+          points: 260,
+          multiplier: this.currentMultiplier(),
+          combo: 0.12,
+        });
+        this.score.addFlow(0.1);
+        this.emit(signal.type, payload);
+        this.emit("callout", {
+          text: "GALLERY COMPLETE",
+          subtext: "SIGNAL HELD",
+          tone: "perfect",
+        });
+        return;
+      case "signalHeldAwarded":
+        this.highlights.signalHeld += 1;
+        this.emit(signal.type, payload);
+        return;
+      case "signalHeldConsumed":
+        this.emit(signal.type, payload);
         return;
       case "powerupCollected": {
         this.highlights.powerups += 1;
@@ -873,7 +929,15 @@ export class SurfSimulation {
     } else if (signal.type === "racePhase" && signal.phase === "lost") {
       this.emit("callout", { text: "PHOTO FINISH", subtext: "KEEP SURFING", tone: "hint" });
     } else if (signal.type === "foamGateSeriesPhase" && signal.phase === "available") {
-      this.emit("callout", { text: "FOAM GATES", subtext: "THREAD THE SET", tone: "perfect" });
+      if (signal.message !== "webringRelay") {
+        this.emit("callout", { text: "FOAM GATES", subtext: "THREAD THE SET", tone: "perfect" });
+      }
+    } else if (signal.type === "webringRelayPhase" && signal.reason === "available") {
+      this.emit("callout", {
+        text: "WEBRING RELAY",
+        subtext: "THE GUESTBOOK IS STILL WET.",
+        tone: "perfect",
+      });
     }
   }
 
@@ -1954,9 +2018,12 @@ export class SurfSimulation {
     const player = this.player;
     const approachSpeed = player.speed;
     if (quality === "wobble" && this.world.getModifiers().protectsFlow) {
+      const modifiers = this.world.getModifiers();
+      const usedSignal = modifiers.starFoamCharges <= 0
+        && modifiers.signalHeldCharges > 0;
       quality = "clean";
-      this.world.consumePowerup("starFoam", "landingSave");
-      this.emit("starFoamSave", { reason: "landing" });
+      this.world.consumeFlowProtection("landingSave");
+      this.emit(usedSignal ? "signalHeldSave" : "starFoamSave", { reason: "landing" });
       this.emit("callout", { text: "STAR FOAM SAVE", subtext: "FLOW PROTECTED", tone: "perfect" });
     }
     const turns = player.rotationAccum / TAU;
@@ -2931,6 +2998,9 @@ function createRunHighlights() {
     longestTube: 0,
     bestTubeScore: 0,
     bestTubeDuration: 0,
+    relayLinks: 0,
+    galleryComplete: 0,
+    signalHeld: 0,
   };
 }
 
@@ -2946,6 +3016,9 @@ function resetRunHighlights(highlights) {
   highlights.longestTube = 0;
   highlights.bestTubeScore = 0;
   highlights.bestTubeDuration = 0;
+  highlights.relayLinks = 0;
+  highlights.galleryComplete = 0;
+  highlights.signalHeld = 0;
 }
 
 function beginCarveArc(player, sign) {

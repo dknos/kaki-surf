@@ -1,4 +1,10 @@
-import { LOGICAL_HEIGHT, LOGICAL_WIDTH, PALETTES, TUNING } from "./config.js";
+import {
+  LOGICAL_HEIGHT,
+  LOGICAL_WIDTH,
+  PALETTES,
+  TUNING,
+  resolveConditionId,
+} from "./config.js";
 import { characterMoveName, characterMoveText } from "./character-catalog.js";
 import {
   AERIAL_PANORAMA,
@@ -56,6 +62,8 @@ import {
   drawWorldTraffic,
   drawWorldWildlife,
   drawWorldWildlifeContact,
+  drawWebringRelay,
+  drawAtlasFrame,
 } from "./world-visuals.js";
 import { trafficVisibilityPermission } from "./world-catalog.js";
 
@@ -63,6 +71,7 @@ const PARTICLE_COUNT = 176;
 const CALLOUT_QUEUE_LIMIT = 4;
 const CALLOUT_GAP = 0.14;
 const CALLOUT_MIN_READ_TIME = 1.05;
+const KAKI_LAND_PANORAMA_START_X = 320;
 
 /** Signed panoramic travel remains coherent through either aerial direction. */
 export function backgroundParallaxPhase(source, reducedMotion = false) {
@@ -160,6 +169,7 @@ export class KakiRenderer {
     this.pumpRelease = 0;
     this.turboSparkClock = 0;
     this.soderSharkReactionTimer = 0;
+    this.lastRelayReactionTimer = 0;
     this.lastLandingQuality = "clean";
     this.riderAnimation = createRiderAnimationState();
     this.turboPresentation = createTurboPresentationState();
@@ -203,6 +213,7 @@ export class KakiRenderer {
     this.pumpRelease = 0;
     this.turboSparkClock = 0;
     this.soderSharkReactionTimer = 0;
+    this.lastRelayReactionTimer = 0;
     this.lastLandingQuality = "clean";
     resetRiderAnimationState(this.riderAnimation);
     resetTurboPresentationState(this.turboPresentation);
@@ -353,6 +364,10 @@ export class KakiRenderer {
         if ((Number(payload.index) || 0) >= 4 && !this.settings.reducedFlash) {
           this.flash = Math.max(this.flash, 0.045);
         }
+        if ((Number(payload.index) || 0) >= 4
+          && resolveConditionId(simulation?.condition) === "kakiLand") {
+          this.lastRelayReactionTimer = Math.max(this.lastRelayReactionTimer, 2.2);
+        }
         break;
       case "aerialReentry":
         this.shake = Math.max(this.shake, 0.16);
@@ -434,6 +449,13 @@ export class KakiRenderer {
       case "foamGateSeriesCompleted":
         this.spawnSparkles(player.x, ridingY - 8, 14);
         break;
+      case "webringRelayLink":
+        this.spawnSparkles(player.x, ridingY - 12, 6);
+        break;
+      case "webringRelayCompleted":
+      case "signalHeldAwarded":
+        this.spawnSparkles(player.x, ridingY - 14, 16);
+        break;
       case "powerupCollected":
         this.spawnSparkles(player.state === "airborne" ? player.airX : player.x, player.state === "airborne" ? player.airY : ridingY, 12, player.state === "airborne" ? "rider" : "stage");
         if (!this.settings.reducedFlash) this.flash = Math.max(this.flash, 0.045);
@@ -461,6 +483,7 @@ export class KakiRenderer {
     this.pumpRelease = Math.max(0, this.pumpRelease - dt);
     this.shake = Math.max(0, this.shake - dt * 7.5);
     this.soderSharkReactionTimer = Math.max(0, this.soderSharkReactionTimer - dt);
+    this.lastRelayReactionTimer = Math.max(0, this.lastRelayReactionTimer - dt);
 
     const player = simulation.player;
     this.currentPlayer = player;
@@ -514,7 +537,7 @@ export class KakiRenderer {
   render(simulation, alpha = 1) {
     const ctx = this.ctx;
     const player = simulation.player;
-    this.conditionId = conditionIdFor(simulation, this.settings);
+    this.conditionId = rendererConditionIdFor(simulation, this.settings);
     this.palette = this.settings.highContrast ? PALETTES.contrast : paletteForCondition(this.conditionId);
     ctx.imageSmoothingEnabled = false;
     const palette = this.palette;
@@ -538,6 +561,15 @@ export class KakiRenderer {
     ctx.fillStyle = palette.skyTop;
     ctx.fillRect(-4, -4, LOGICAL_WIDTH + 8, LOGICAL_HEIGHT + 8);
     this.drawSky(simulation);
+    if (this.conditionId === "kakiLand") {
+      this.drawConditionSpaceDetails(
+        simulation,
+        Math.max(
+          Number(this.aerialBackdrop?.altitude) || 0,
+          Number(player.aerialAltitude) || 0,
+        ),
+      );
+    }
 
     // The complete surf stage shares one vertical camera. The panorama crop
     // above moved by the exact inverse amount, preserving its ocean anchor.
@@ -566,6 +598,9 @@ export class KakiRenderer {
     }
     if (trafficAllowed("near", "sky")) {
       drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky", backdropAltitude);
+    }
+    if (this.conditionId === "kakiLand") {
+      drawWebringRelay(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, stageOffset.x, stageOffset.y);
@@ -629,11 +664,18 @@ export class KakiRenderer {
 
     // Draw exactly one complete camera-continuous crop. No masks, fragments,
     // overlays, or plate swaps can expose a seam.
-    const sourceX = backgroundPanoramaTravel(
+    const travelX = backgroundPanoramaTravel(
       simulation,
       this.settings.reducedMotion,
       image.naturalWidth,
     );
+    const sourceX = this.conditionId === "kakiLand"
+      ? clamp(
+        travelX + KAKI_LAND_PANORAMA_START_X,
+        0,
+        Math.max(0, image.naturalWidth - LOGICAL_WIDTH),
+      )
+      : travelX;
     const crops = aerialBackdropCropShelves(image.naturalHeight, LOGICAL_HEIGHT);
     const sourceY = backgroundPanoramaCropY(simulation, image.naturalHeight, LOGICAL_HEIGHT);
     const previousSourceY = Number(this.lastBackdropSourceY) || crops.coast;
@@ -711,10 +753,97 @@ export class KakiRenderer {
   }
 
   drawConditionSpaceDetails(simulation, altitude) {
-    if (altitude < 0.48) return;
     const ctx = this.ctx;
     const p = this.palette;
     const travel = this.settings.reducedMotion ? 0 : Number(simulation?.cameraWorldX) || 0;
+    if (this.conditionId === "kakiLand") {
+      const phase = clamp(
+        Number(simulation?.world?.presentationPhase ?? simulation?.world?.context?.presentationPhase) || 0,
+        0,
+        2,
+      );
+      const sourceX = this.settings.reducedMotion
+        ? 0
+        : Number(this.lastBackdropSourceX) || travel * 0.08;
+      const coastShelf = aerialBackdropCropShelves().coast;
+      const sourceY = this.settings.highContrast
+        ? coastShelf * (1 - clamp(altitude, 0, 1))
+        : Number(this.lastBackdropSourceY) || coastShelf;
+      this.drawKakiLandSignalBands(sourceX, sourceY, phase);
+      const authoredStations = [
+        [480, 480, "quietRepair"],
+        [914, 460, "signalKeeper"],
+        [1322, 466, "reactionCard"],
+      ];
+      const visibleStations = this.qualityProfile.renderFarTraffic
+        ? Math.min(authoredStations.length, phase + 1)
+        : 1;
+      for (let index = 0; index < visibleStations; index += 1) {
+        const [stationSourceX, stationSourceY, frame] = authoredStations[index];
+        const stationX = stationSourceX - sourceX;
+        const stationY = stationSourceY - sourceY;
+        if (stationX < -48 || stationX > LOGICAL_WIDTH + 48
+          || stationY < -40 || stationY > LOGICAL_HEIGHT + 40) continue;
+        drawAtlasFrame(
+          ctx,
+          this.visualAssets,
+          "kakiLandDecor",
+          frame,
+          stationX,
+          stationY,
+          {
+            scale: this.qualityProfile.renderFarTraffic ? 0.94 : 0.78,
+            alpha: this.settings.highContrast ? 1 : 0.9,
+          },
+        );
+      }
+      if (altitude < 0.48) return;
+      const reveal = smoothstep(0.48, 0.84, altitude);
+      // The reviewed panorama deliberately leaves this source-space pocket
+      // open. The Relay lives in the atlas so its notice/deform/settle reaction
+      // can occur without baking a second static guardian into the backdrop.
+      const guardianX = 1120 - sourceX;
+      const guardianY = 380 - sourceY;
+      if (guardianX > -110 && guardianX < LOGICAL_WIDTH + 110
+        && guardianY > -96 && guardianY < LOGICAL_HEIGHT + 96) {
+        const reaction = this.settings.reducedMotion || this.lastRelayReactionTimer <= 0
+          ? "lastRelaySettle"
+          : this.lastRelayReactionTimer > 1.55
+            ? "lastRelayNotice"
+            : this.lastRelayReactionTimer > 0.72
+              ? "lastRelayDeform"
+              : "lastRelaySettle";
+        const drawn = drawAtlasFrame(
+          ctx,
+          this.visualAssets,
+          "kakiLandDecor",
+          reaction,
+          guardianX,
+          guardianY,
+          {
+            scale: 3.05,
+            alpha: (this.settings.highContrast ? 0.78 : 0.42) * reveal,
+          },
+        );
+        if (!drawn) drawLastRelayFallback(ctx, guardianX, guardianY, p, reveal);
+      }
+      if (phase >= 2 && this.qualityProfile.renderFarTraffic) {
+        ctx.save();
+        ctx.globalAlpha = reveal * (this.settings.highContrast ? 0.7 : 0.46);
+        for (let index = 0; index < 6; index += 1) {
+          const drift = this.settings.reducedMotion ? 0 : this.time * (2 + index * 0.25);
+          const x = wrapVisual(37 + index * 73 - sourceX * 0.12 + drift, 430) - 24;
+          const y = 24 + (index * 29) % 96;
+          ctx.fillStyle = index % 3 === 0 ? p.gold : index % 3 === 1 ? p.waterLight : p.foam;
+          ctx.fillRect(Math.round(x), y, 5, 4);
+          ctx.fillStyle = p.ink;
+          ctx.fillRect(Math.round(x + 1), y + 1, 1, 1);
+        }
+        ctx.restore();
+      }
+      return;
+    }
+    if (altitude < 0.48) return;
     const reveal = smoothstep(0.48, 0.84, altitude);
     ctx.save();
     if (this.conditionId === "twilightGlass") {
@@ -751,6 +880,41 @@ export class KakiRenderer {
       ctx.fillRect(Math.round(satelliteX + 5), 28, 3, 4);
       ctx.fillStyle = p.white;
       ctx.fillRect(Math.round(satelliteX + 2), 27, 1, 1);
+    }
+    ctx.restore();
+  }
+
+  drawKakiLandSignalBands(sourceX, sourceY, phase) {
+    const ctx = this.ctx;
+    const p = this.palette;
+    const y = 480 - sourceY;
+    if (y < -18 || y > LOGICAL_HEIGHT + 18) return;
+    const nodes = [72, 330, 650, 980, 1280, 1490];
+    const colors = this.settings.highContrast
+      ? [p.white, p.gold, p.white, p.gold, p.white]
+      : ["#8879d9", "#5b8ee8", "#45c7d1", "#69d18b", "#f1c75b"];
+    const visibleLinks = phase <= 0 ? 1 : phase < 2 ? 3 : nodes.length - 1;
+    ctx.save();
+    ctx.globalAlpha = this.settings.highContrast ? 0.82 : 0.52 + phase * 0.12;
+    for (let link = 0; link < visibleLinks; link += 1) {
+      const startX = nodes[link] - sourceX;
+      const endX = nodes[link + 1] - sourceX;
+      if (endX < -12 || startX > LOGICAL_WIDTH + 12) continue;
+      const startY = y + (link & 1) * 8;
+      const endY = y + ((link + 1) & 1) * 8;
+      const bands = phase >= 2 ? 5 : phase >= 1 ? 3 : 1;
+      for (let band = 0; band < bands; band += 1) {
+        ctx.strokeStyle = colors[band];
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(startX), Math.round(startY + band));
+        ctx.lineTo(Math.round(endX), Math.round(endY + band));
+        ctx.stroke();
+      }
+      ctx.fillStyle = p.gold;
+      ctx.fillRect(Math.round(endX - 2), Math.round(endY - 1), 5, 7);
+      ctx.fillStyle = p.ink;
+      ctx.fillRect(Math.round(endX), Math.round(endY - 2), 1, 9);
     }
     ctx.restore();
   }
@@ -1970,9 +2134,41 @@ function drawPier(ctx, x, y, color) {
   ctx.fillRect(px + 47, y - 13, 4, 6);
 }
 
-function conditionIdFor(simulation, settings) {
+function drawLastRelayFallback(ctx, x, y, palette, reveal) {
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  ctx.globalAlpha = reveal * 0.42;
+  ctx.strokeStyle = palette.gold;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(0, -20, 24, 7, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = palette.foamShade;
+  ctx.beginPath();
+  ctx.moveTo(-8, -4);
+  ctx.lineTo(-29, 4);
+  ctx.lineTo(-45, 18);
+  ctx.moveTo(8, -4);
+  ctx.lineTo(28, 4);
+  ctx.lineTo(44, 20);
+  ctx.stroke();
+  ctx.fillStyle = palette.haze;
+  ctx.fillRect(-9, -11, 18, 38);
+  ctx.fillStyle = palette.violet;
+  ctx.fillRect(-5, -3, 3, 3);
+  ctx.fillRect(3, -3, 3, 3);
+  ctx.fillStyle = palette.gold;
+  ctx.fillRect(-2, 7, 5, 2);
+  ctx.fillStyle = palette.gold;
+  ctx.fillRect(27, 3, 8, 5);
+  ctx.fillStyle = palette.ink;
+  ctx.fillRect(30, 0, 2, 11);
+  ctx.restore();
+}
+
+export function rendererConditionIdFor(simulation, settings) {
   const candidate = simulation?.condition?.id ?? simulation?.condition ?? settings?.condition ?? "goldenCoast";
-  return candidate === "twilightGlass" || candidate === "stormbreak" ? candidate : "goldenCoast";
+  return resolveConditionId(candidate);
 }
 
 function isTubeId(id) {
@@ -1981,9 +2177,7 @@ function isTubeId(id) {
 }
 
 function paletteForCondition(conditionId) {
-  if (conditionId === "twilightGlass") return PALETTES.twilightGlass ?? PALETTES.standard;
-  if (conditionId === "stormbreak") return PALETTES.stormbreak ?? PALETTES.standard;
-  return PALETTES.standard;
+  return PALETTES[resolveConditionId(conditionId)] ?? PALETTES.standard;
 }
 
 function rideSpeedCapFor(simulation) {

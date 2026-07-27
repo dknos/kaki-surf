@@ -1287,7 +1287,7 @@ input[type="range"]::-moz-range-thumb {
 
 .condition-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
 }
 
@@ -1334,6 +1334,12 @@ input[type="range"]::-moz-range-thumb {
 
 .condition-card--stormbreak > span {
   background: linear-gradient(#34475b 0 42%, #dff3d0 42% 47%, #16677a 47% 100%);
+}
+
+.condition-card--kakiLand > span {
+  background:
+    linear-gradient(90deg, #8879d9 0 20%, #5b8ee8 20% 40%, #45c7d1 40% 60%, #69d18b 60% 80%, #f1c75b 80%) 0 76% / 100% 5px no-repeat,
+    linear-gradient(#242052 0 46%, #fff0cf 46% 52%, #155f91 52% 100%);
 }
 
 .condition-card strong,
@@ -1876,6 +1882,12 @@ input[type="range"]::-moz-range-thumb {
     url("./assets/backgrounds/stormbreak-menu.png");
 }
 
+#kaki-surf-root[data-condition="kakiLand"] .title-layer {
+  background-image:
+    linear-gradient(rgb(9 12 37 / 18%), rgb(9 12 37 / 78%)),
+    url("./assets/backgrounds/kakiLand-menu.png");
+}
+
 .condition-card > span {
   border: 2px solid var(--ink);
   background-position: center;
@@ -1893,6 +1905,10 @@ input[type="range"]::-moz-range-thumb {
 
 .condition-card--stormbreak > span {
   background-image: url("./assets/backgrounds/stormbreak-menu.png");
+}
+
+.condition-card--kakiLand > span {
+  background-image: url("./assets/backgrounds/kakiLand-menu.png");
 }
 
 .board-card,
