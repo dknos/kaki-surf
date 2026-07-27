@@ -71,7 +71,7 @@ const PARTICLE_COUNT = 176;
 const CALLOUT_QUEUE_LIMIT = 4;
 const CALLOUT_GAP = 0.14;
 const CALLOUT_MIN_READ_TIME = 1.05;
-const KAKI_LAND_PANORAMA_START_X = 320;
+const KAKI_LAND_PANORAMA_START_X = 640;
 
 /** Signed panoramic travel remains coherent through either aerial direction. */
 export function backgroundParallaxPhase(source, reducedMotion = false) {
@@ -771,38 +771,49 @@ export class KakiRenderer {
         : Number(this.lastBackdropSourceY) || coastShelf;
       this.drawKakiLandSignalBands(sourceX, sourceY, phase);
       const authoredStations = [
-        [480, 480, "quietRepair"],
-        [914, 460, "signalKeeper"],
-        [1322, 466, "reactionCard"],
+        [770, 474, "quietRepair"],
+        [1048, 456, "signalKeeper"],
+        [1370, 466, "reactionCard"],
       ];
       const visibleStations = this.qualityProfile.renderFarTraffic
         ? Math.min(authoredStations.length, phase + 1)
         : 1;
-      for (let index = 0; index < visibleStations; index += 1) {
-        const [stationSourceX, stationSourceY, frame] = authoredStations[index];
-        const stationX = stationSourceX - sourceX;
-        const stationY = stationSourceY - sourceY;
-        if (stationX < -48 || stationX > LOGICAL_WIDTH + 48
-          || stationY < -40 || stationY > LOGICAL_HEIGHT + 40) continue;
-        drawAtlasFrame(
-          ctx,
-          this.visualAssets,
-          "kakiLandDecor",
-          frame,
-          stationX,
-          stationY,
-          {
-            scale: this.qualityProfile.renderFarTraffic ? 0.94 : 0.78,
-            alpha: this.settings.highContrast ? 1 : 0.9,
-          },
-        );
+      // These stations belong to the lower cloud archipelago. Let them leave
+      // the frame with their islands instead of floating through the upper
+      // starfield when the camera follows an exceptional aerial.
+      if (altitude < 0.52) {
+        for (let index = 0; index < visibleStations; index += 1) {
+          const [stationSourceX, stationSourceY, frame] = authoredStations[index];
+          const stationX = stationSourceX - sourceX;
+          const stationY = stationSourceY - sourceY;
+          if (stationX < -48 || stationX > LOGICAL_WIDTH + 48
+            || stationY < -40 || stationY > LOGICAL_HEIGHT + 40) continue;
+          drawAtlasFrame(
+            ctx,
+            this.visualAssets,
+            "kakiLandDecor",
+            frame,
+            stationX,
+            stationY,
+            {
+              scale: this.qualityProfile.renderFarTraffic ? 0.94 : 0.78,
+              alpha: this.settings.highContrast ? 1 : 0.9,
+            },
+          );
+        }
       }
       if (altitude < 0.48) return;
       const reveal = smoothstep(0.48, 0.84, altitude);
+      ctx.save();
+      ctx.fillStyle = p.deepInk;
+      ctx.globalAlpha = reveal * (this.settings.highContrast ? 0.08 : 0.14);
+      ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      ctx.restore();
+      this.drawKakiLandUpperNetwork(sourceX, sourceY, phase, reveal);
       // The reviewed panorama deliberately leaves this source-space pocket
       // open. The Relay lives in the atlas so its notice/deform/settle reaction
       // can occur without baking a second static guardian into the backdrop.
-      const guardianX = 1120 - sourceX;
+      const guardianX = 1430 - sourceX;
       const guardianY = 380 - sourceY;
       if (guardianX > -110 && guardianX < LOGICAL_WIDTH + 110
         && guardianY > -96 && guardianY < LOGICAL_HEIGHT + 96) {
@@ -821,8 +832,8 @@ export class KakiRenderer {
           guardianX,
           guardianY,
           {
-            scale: 3.05,
-            alpha: (this.settings.highContrast ? 0.78 : 0.42) * reveal,
+            scale: 2.68,
+            alpha: (this.settings.highContrast ? 0.9 : 0.72) * reveal,
           },
         );
         if (!drawn) drawLastRelayFallback(ctx, guardianX, guardianY, p, reveal);
@@ -915,6 +926,66 @@ export class KakiRenderer {
       ctx.fillRect(Math.round(endX - 2), Math.round(endY - 1), 5, 7);
       ctx.fillStyle = p.ink;
       ctx.fillRect(Math.round(endX), Math.round(endY - 2), 1, 9);
+    }
+    ctx.restore();
+  }
+
+  drawKakiLandUpperNetwork(sourceX, sourceY, phase, reveal) {
+    if (phase < 1 || reveal <= 0.01) return;
+    const ctx = this.ctx;
+    const p = this.palette;
+    const colors = this.settings.highContrast
+      ? [p.white, p.gold, p.white, p.gold, p.white]
+      : ["#8879d9", "#5b8ee8", "#45c7d1", "#69d18b", "#f1c75b"];
+    const nodes = [
+      [980, 390],
+      [1240, 372],
+      [1492, 400],
+    ];
+    const bandCount = phase >= 2 ? 5 : 3;
+    ctx.save();
+    ctx.globalAlpha = reveal * (this.settings.highContrast ? 0.72 : 0.34);
+    for (let link = 0; link < nodes.length - 1; link += 1) {
+      const startX = nodes[link][0] - sourceX;
+      const startY = nodes[link][1] - sourceY;
+      const endX = nodes[link + 1][0] - sourceX;
+      const endY = nodes[link + 1][1] - sourceY;
+      if (endX < -40 || startX > LOGICAL_WIDTH + 40) continue;
+      for (let band = 0; band < bandCount; band += 1) {
+        ctx.strokeStyle = colors[band];
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(startX), Math.round(startY + band));
+        ctx.quadraticCurveTo(
+          Math.round((startX + endX) * 0.5),
+          Math.round(Math.min(startY, endY) - 18 + band),
+          Math.round(endX),
+          Math.round(endY + band),
+        );
+        ctx.stroke();
+      }
+      ctx.fillStyle = p.gold;
+      ctx.fillRect(Math.round(endX - 3), Math.round(endY - 2), 7, 5);
+      ctx.fillStyle = p.ink;
+      ctx.fillRect(Math.round(endX), Math.round(endY - 4), 1, 9);
+    }
+    if (phase >= 2 && this.qualityProfile.renderFarTraffic) {
+      const frames = [
+        [1064, 438, p.waterLight],
+        [1426, 430, p.gold],
+        [1510, 450, p.foam],
+      ];
+      for (const [frameSourceX, frameSourceY, color] of frames) {
+        const x = frameSourceX - sourceX;
+        const y = frameSourceY - sourceY;
+        if (x < -10 || x > LOGICAL_WIDTH + 10 || y < -10 || y > LOGICAL_HEIGHT + 10) continue;
+        ctx.fillStyle = p.ink;
+        ctx.fillRect(Math.round(x - 4), Math.round(y - 3), 9, 7);
+        ctx.fillStyle = p.foam;
+        ctx.fillRect(Math.round(x - 3), Math.round(y - 2), 7, 5);
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(x - 1), Math.round(y - 1), 3, 3);
+      }
     }
     ctx.restore();
   }

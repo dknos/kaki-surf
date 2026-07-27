@@ -195,6 +195,7 @@ const traffic = {
     duration: Object.freeze([15, 24]),
     animation: "stamp",
     bird: true,
+    reactiveBird: false,
   },
   buttonMenace: {
     layers: ["mid"],

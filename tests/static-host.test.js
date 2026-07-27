@@ -246,7 +246,7 @@ test("condition aerial panoramas are tall local masters with unique art directio
   const buildSource = read(path.join(ROOT, "tools", "art", "build-aerial-panoramas.py"));
   assert.match(
     buildSource,
-    /Spec\("kaki-land", "kakiLand", "kaki-land-continuous\.png", 502 \/ 640, 64, 502\)/,
+    /Spec\("kaki-land", "kakiLand", "kaki-land-continuous\.png", 502 \/ 640, 80, 502\)/,
     "Kaki-Land retains its single authored source horizon at y=502",
   );
 });

@@ -1,0 +1,17 @@
+{
+  "condition": "kakiLand",
+  "gullId": "mid-0",
+  "gullLayer": "mid",
+  "playerReachedAirborne": true,
+  "playerCrossedGullHeight": true,
+  "samples": 147,
+  "gullYRange": [
+    69.88616576977074,
+    69.88616576977074
+  ],
+  "maximumGullVerticalDrift": 0,
+  "reactions": [],
+  "verticalVelocities": [
+    0
+  ]
+}

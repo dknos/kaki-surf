@@ -92,7 +92,7 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 The sky-to-space extension keeps the original Grok and reference-controlled Vertex/Nano comparison matrix. After live continuity review, each runtime master was rebuilt from one continuous source rather than a provider splice. Kaki-Land adds one rejected Vertex/Nano exploration plus reviewed Grok network and decor masters; a constrained edit removes the humanoid draft before deterministic native cleanup. The repair decisions, prompts, filenames, and hashes are recorded in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
 
-`tools/art/build-aerial-panoramas.py` reframes each single continuous source so its authored horizon lands at the normal-riding camera shelf, sharpens restrainedly, and quantizes to a compact indexed PNG. Kaki-Land declares a 64-color output and its verified source horizon at y=502. The `--check` mode guards isolated pasted-strip boundaries, deliberate two-pixel clusters, and the static-host budget without rewriting assets.
+`tools/art/build-aerial-panoramas.py` reframes each single continuous source so its authored horizon lands at the normal-riding camera shelf, sharpens restrainedly, and quantizes to a compact indexed PNG. Kaki-Land declares an 80-color output with native one-pixel detail and its verified source horizon at y=502. The `--check` mode guards isolated pasted-strip boundaries, deliberate pixel clusters, and the static-host budget without rewriting assets.
 
 ```console
 python3 tools/art/build-aerial-panoramas.py

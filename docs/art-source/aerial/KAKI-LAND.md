@@ -60,12 +60,21 @@ imperfect cable halo, and one visibly repaired wing. The runtime guardian is
 not baked into the panorama; it comes from the reaction atlas so
 notice/deform/settle remains state-driven.
 
-Session `019fa4c8-8f3e-7bd0-ad4f-d07aa80d37b2` generated and refined the
-4 x 3 decor sheet. Candidate 9 was selected after native review. The offline
-build removes only border-connected chroma, reduces each cell to a 64 x 48
-frame, caps each sprite to 15 opaque colors, and manually replaces generated
-Relay face marks with the canonical Kaki face grid. No generated pseudo-text
-remains readable at runtime.
+Quality review later tested four alternate panorama compositions in session
+`019fa540-fe31-7ab1-8c93-0fd703580df0`. Candidate 4 had the strongest clean
+pixel direction, but all four left the normal-riding crop too empty. They were
+rejected after native-resolution browser review, and the richer continuous
+network master remains selected.
+
+Session `019fa4c8-8f3e-7bd0-ad4f-d07aa80d37b2` generated the original 4 x 3
+decor sheet. It is preserved but superseded. Session
+`019fa544-1d8d-7362-82ae-580c62112d84` generated three stricter replacements;
+candidate 2 was selected for its harder one-pixel silhouettes, clearer props,
+and consistently nonhuman Relay. The offline build removes only
+border-connected chroma, reduces each cell to a 64 x 48 frame, caps each sprite
+to 15 opaque colors, and manually replaces generated Relay face marks with the
+canonical Kaki face grid. No generated pseudo-text remains readable at
+runtime.
 
 The selected ultra-wide production prompt was:
 
@@ -85,10 +94,16 @@ The selected nonhuman Relay reference edit prompt was:
 Use image_edit on this exact source image: /home/nemoclaw/.grok/sessions/%2Fhome%2Fnemoclaw%2Fkaki-surf/019fa4c3-df65-7021-9ef3-b6bae3644cd9/images/1.jpg. Preserve its ultra-wide composition, cloud islands, artist spirits, bridges, ocean, palette, crisp pixel-art texture, and every other scene detail. Make one surgical replacement only: remove the black humanoid angel in the upper-right and replace it with THE LAST RELAY, a clearly nonhuman floating Kaki signal guardian. It should be an asymmetrical dark navy rounded-square face-grid module with no torso, arms, legs, clothes, suitcase, or human anatomy; two paper-cream cloud wings attach directly to the module, one wing visibly repaired with coral stitches and mint tape; a thin imperfect cable/web-ring halo loops behind it; tiny cyan square eyes and a calm three-pixel expression. Keep it distant, low-contrast, mysterious, about the same overall footprint, and visibly an ordinary repaired network device rather than a person. No new text, letters, logos, symbols that resemble writing, anime, human figure, or smooth rendering. Output three edited 20:9 variants.
 ```
 
-The selected decor-sheet prompt was:
+The superseded first decor-sheet prompt was:
 
 ```text
 Production sprite-atlas source for Kaki Surf KAKI-LAND. Exact 4 columns by 3 rows of twelve equal isolated cells, no labels and no borders, every cell on the same perfectly flat solid chroma-magenta #ff00ff background for clean removal. Late-16-bit crisp pixel art, hard clusters, consistent tiny-game-sprite scale, front or clean three-quarter view, no shadows, no antialias glow, 6 to 12 colors per sprite. Row 1: quiet round blue Kaki artist repairing one pixel at a taped CRT; alarmed coral-accent artist fixing a cable; deadpan artist holding a cream card with exactly four abstract colored shapes; late-night signal keeper with one gold lamp. Row 2: collector drying three damp drawings; white guestbook gull pressing a gold approval stamp; tiny violet menace rearranging six abstract web buttons; compact cream approval stamp containing a repaired rainbow ring and no writing. Row 3: THE LAST RELAY notice pose, deform reaction pose, settle pose—same clearly nonhuman rounded-square navy face-grid device with paper wings, cable halo, one stitched wing, no anatomy—then a small cloud artist station with repaired CRT and rainbow ring. Wholly original Kaki silhouettes, warm handmade personality, no words, letters, numbers, logos, anime, humans, generic fantasy, gradients, ground plane, scenery, or overlapping cells.
+```
+
+The selected decor-sheet v2 prompt was:
+
+```text
+Game-production sprite atlas source for Kaki Surf KAKI-LAND, exact 4 columns by 3 rows of twelve equal isolated cells on one perfectly flat solid chroma-magenta #ff00ff background, no labels, no borders, no grid lines. Authentic late-16-bit pixel art with visible square pixels, hard stair-step contours, zero antialiasing, zero smooth shading, 8 to 14 flat palette colors per sprite, bold navy silhouette outlines, consistent 48x40-ish subject footprint inside each cell and generous separation. Row 1: quiet round blue Kaki artist repairing one bright pixel on a taped beige CRT; alarmed coral Kaki artist immediately repairing a snapped cable; deadpan violet Kaki artist holding a cream card with exactly four abstract colored geometric marks and no writing; night-ink signal keeper tending one tiny gold lamp. Row 2: mint collector carefully drying three damp miniature drawings; original paper-cream guestbook gull pressing one gold approval stamp; tiny violet button menace rearranging six abstract old-web badge tiles; compact cream approval stamp shaped like a repaired five-band rainbow ring. Row 3: THE LAST RELAY notice, deform, and settle poses—same clearly nonhuman rounded-square navy face-grid signal device, direct paper-cloud wings, imperfect cable halo, one wing visibly repaired with mint tape and coral stitches, no torso or limbs—then a small cloud artist station with repaired CRT and one rainbow ring. Wholly original Kaki silhouettes, one emotional read and one peculiar prop each. No words, letters, numbers, logos, pseudo-text, real avatars, humans, anime, generic fantasy angel, gradients, blur, glow, glossy 3D, ground plane, scenery, shadows, overlapping cells, watermark, or cropped subjects.
 ```
 
 ## Selected production conversion
@@ -98,7 +113,7 @@ Production sprite-atlas source for Kaki Surf KAKI-LAND. Exact 4 columns by 3 row
 - reframes the continuous panorama around one y=502 ocean anchor;
 - maps the tiled heaven into the camera's physically reachable high-air band
   without adding shelves, plate swaps, or a second backdrop;
-- reduces the artwork to 64 colors on a native two-pixel grid;
+- retains native one-pixel detail and reduces the artwork to 80 colors;
 - builds menu/card art from the same panorama and reviewed Relay silhouette;
 - packs compact frames for fictional artist functions, the cloud station,
   Approval, and the Last Relay notice/deform/settle reaction.
@@ -112,16 +127,19 @@ community screenshots, or identifiable member likenesses were used.
 | --- | --- | ---: | --- |
 | `docs/art-source/aerial/grok/kaki-land-network-master.png` | Selected Grok network master | 1280 x 576 | `6f2273079b98d5d3e6eea03e05293bd7f51bab167e4ddb40cb3a7f02b245edb0` |
 | `docs/art-source/aerial/grok/kaki-land-last-relay-concept.jpg` | Selected Relay design reference | 1280 x 576 | `5233faee85f3b7c25d7302dbe2c7f02c164bb1bb3613517af50ad07700722f5c` |
-| `docs/art-source/atlases/grok/kaki-land-decor-sheet.jpg` | Selected 4 x 3 Grok decor source | 1280 x 720 | `3b7221bbcdca68d411302437a917e8fac8059fefbab33d9944c8e3868eb1768b` |
-| `docs/art-source/aerial/imagegen/kaki-land-continuous.png` | Clean continuous build source | 1536 x 640 | `5766102880edbcdc6fb656b823ff3bb4f9d26f1323239ca2843a31f15e32d743` |
-| `assets/backgrounds/kakiLand-aerial.png` | Indexed runtime panorama | 1536 x 640 | `edcb566f4b33e43169260d7812fd2395d7d5925f2b8514565c6e263f3d4e4c83` |
-| `assets/backgrounds/kakiLand-menu.png` | Menu and condition-card art | 768 x 432 | `0f1eb6938919b6a1a4abf4f70e7654feec8a5b2fd8ae5fd4917789f88faab31e` |
-| `assets/generated/kaki-land-decor-atlas.png` | Optional artist/reaction atlas | 256 x 144 | `901f04e557a57d8e03c4f22e411030c02e95d2c3d72c9de5d023dab5fd55d235` |
+| `docs/art-source/atlases/grok/kaki-land-decor-sheet.jpg` | Superseded 4 x 3 Grok decor source | 1280 x 720 | `3b7221bbcdca68d411302437a917e8fac8059fefbab33d9944c8e3868eb1768b` |
+| `docs/art-source/atlases/grok/kaki-land-decor-sheet-v2.png` | Selected crisp 4 x 3 Grok decor source | 1280 x 720 | `ee20eef2543b734aab9dc4efd3802c04c7af46fedc621f021a63c3866fe9fee6` |
+| `docs/art-source/aerial/imagegen/kaki-land-continuous.png` | Clean continuous build source | 1536 x 640 | `685f38217fc7706d896e8634d2941050fd01797863caa75e7ce99f21cfd8886d` |
+| `assets/backgrounds/kakiLand-aerial.png` | Indexed runtime panorama | 1536 x 640 | `35766d9ba1a71686691a35de29a82da82b1064ced1071a1a01fc927574b0ed29` |
+| `assets/backgrounds/kakiLand-menu.png` | Menu and condition-card art | 768 x 432 | `b0937ab0f24be5df3d1f43b4719bc24c21e8764a9bf591b9836fb8d089535053` |
+| `assets/generated/kaki-land-decor-atlas.png` | Optional artist/reaction atlas | 256 x 144 | `fa782fe6f4ec7d12dad1da825322385cc68198e092f10cd6337a06c9ad8a72ed` |
 
-The runtime panorama is 125,257 bytes and uses 64 colors. It is non-tileable,
+The runtime panorama is 289,890 bytes and uses 80 colors. It is non-tileable,
 drawn once per frame, and never defines collision. The Last Relay remains an
 asymmetric nonhuman signal device with a Kaki face grid, paper wings, a cable
-halo, visible repair, and a state-driven reaction.
+halo, visible repair, and a state-driven reaction. The Guestbook Gull is
+deliberately non-reactive to rider altitude, so jumping does not pull its
+authored route up or down.
 
 ## Rebuild and validation
 
@@ -131,9 +149,14 @@ From the repository root:
 python3 tools/art/build-kaki-land-assets.py
 python3 tools/art/build-aerial-panoramas.py --condition kakiLand
 python3 tools/art/build-aerial-panoramas.py --check
+node tools/qa/accept-kaki-gull-stability.mjs
 ```
 
-Both commands are deterministic and offline. The first reads only the preserved
-local masters. The second performs the shared continuous reframe, palette
+The first three commands are deterministic and offline. The first reads only
+the preserved local masters. The second performs the shared continuous reframe, palette
 reduction, compression, dimension validation, continuity checks, and
-static-host size check. Rebuilding requires Pillow only at authoring time.
+static-host size check. Rebuilding requires Pillow only at authoring time. The
+final command uses the standard local static host and Chromium debugging ports
+to capture a real keyboard jump across a naturally scheduled Guestbook Gull;
+its frames and zero-drift metrics live in
+`docs/images/qa-gull-stability`.
