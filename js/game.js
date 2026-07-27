@@ -2051,6 +2051,11 @@ function gameMarkup() {
             <label class="toggle"><input type="checkbox" data-setting="steeringAssist"><span>STEERING ASSIST</span></label>
             <label class="toggle"><input type="checkbox" data-setting="landingAssist"><span>LANDING ASSIST</span></label>
           </section>
+          <section class="credits-section" aria-labelledby="credits-heading">
+            <h3 id="credits-heading">CREDITS</h3>
+            <p class="credits-byline">MADE BY <strong>@dknos</strong></p>
+            <p class="credits-copy">Thanks to Oekaki Connect for inspiring me to learn about video games, web3, and cute neo-chibi drawings.</p>
+          </section>
           <button class="secondary-button tutorial-replay" type="button" data-action="replay-tutorial" aria-pressed="false">REPLAY SURF SCHOOL</button>
           <p class="settings-note">Assists widen control and landing margins. They are labeled in play and reduce scoring without changing unlocks.</p>
         </form>

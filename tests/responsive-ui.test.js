@@ -221,6 +221,15 @@ test("settings dialog has a programmatic accessible name", () => {
   assert.match(GAME_SOURCE, /<h2 id="settings-title">SETTINGS<\/h2>/);
 });
 
+test("settings dialog includes the creator and inspiration credits", () => {
+  assert.match(GAME_SOURCE, /<section class="credits-section" aria-labelledby="credits-heading">/);
+  assert.match(GAME_SOURCE, /MADE BY <strong>@dknos<\/strong>/);
+  assert.match(
+    GAME_SOURCE,
+    /Thanks to Oekaki Connect for inspiring me to learn about video games, web3, and cute neo-chibi drawings\./,
+  );
+});
+
 test("touch users receive an explicit pause target and top controls meet the 44px minimum", () => {
   assert.match(GAME_SOURCE, /data-action="pause-run" aria-label="Pause surfing"/);
   assert.match(STYLES, /\.top-controls button\s*\{[\s\S]*?min-width:\s*44px;[\s\S]*?min-height:\s*44px;/);

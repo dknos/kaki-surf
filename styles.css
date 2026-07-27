@@ -696,6 +696,35 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.08em;
 }
 
+.credits-section {
+  background:
+    linear-gradient(90deg, rgb(12 30 51 / 54%), transparent 68%),
+    #173957;
+}
+
+.credits-byline,
+.credits-copy {
+  margin: 0;
+}
+
+.credits-byline {
+  color: var(--foam);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.credits-byline strong {
+  color: var(--gold);
+}
+
+.credits-copy {
+  max-width: 54ch;
+  margin-top: 7px;
+  color: var(--foam-shadow);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
 [data-quality-profile="mobile"] .compact-layer,
 [data-quality-profile="mobile"] .settings-dialog::backdrop {
   backdrop-filter: none;
