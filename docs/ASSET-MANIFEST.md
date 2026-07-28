@@ -32,7 +32,7 @@ all layers --> 384 x 216 Canvas --> nearest-neighbor CSS scaling
 | Preserved coast sources | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak}-strip.png` | 384 x 80 each | Original lower-art references retained for comparison |
 | Menu art | `assets/backgrounds/{goldenCoast,twilightGlass,stormbreak,kakiLand}-menu.png` | 768 x 432 each | CSS color treatment and readable menu shell |
 
-The first three lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. Kaki-Land's menu, continuous source, and decor atlas are deterministically cleaned from a reviewed local Grok panorama and a reviewed ImageGen Kemonokaki resident sheet by `tools/art/build-kaki-land-assets.py`. All four vertical masters are rebuilt from one reviewed continuous source per condition through `tools/art/build-aerial-panoramas.py`; selection and rejection decisions are documented in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
+The first three lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. Kaki-Land's menu, continuous source, and decor atlas are deterministically cleaned from a reviewed local Grok panorama, a reviewed ImageGen Kemonokaki resident sheet, and four licensed-reference ImageGen plush conversions by `tools/art/build-kaki-land-assets.py`. All four vertical masters are rebuilt from one reviewed continuous source per condition through `tools/art/build-aerial-panoramas.py`; selection and rejection decisions are documented in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
 
 ## Generated runtime atlases
 
@@ -53,7 +53,7 @@ Sixteen families are loaded at runtime and remain optional. Missing or invalid a
 | `boards` | `boards-atlas.png` | 256 x 72 | Top, rail, flex concept, underside for three boards | Existing inspectable board renderer |
 | `carrier` | `carrier-atlas.png` | 384 x 100 | Haze, festival carrier, lights, radar, crew, airshow, wake | Layered festival-fleet silhouette |
 | `uiOrnaments` | `ui-ornaments-atlas.png` | 320 x 104 | Crest, board emblems, controls, ribbon, badge, medal | Existing Canvas/CSS panels and glyphs |
-| `kakiLandDecor` | `kaki-land-decor-atlas.png` | 256 x 144 | Original kitty, dragon, lamb, moth, mouse, and ghost Kemonokaki maintenance residents; cloud station, Approval, and Last Relay reaction frames | Code-authored artists, station, stamp, and signal shrine |
+| `kakiLandDecor` | `kaki-land-decor-atlas.png` | 256 x 192 | Original Kemonokaki maintenance residents; cloud station, Approval, Last Relay reactions; Chii, Rockstar, Mermaid, and Kitty licensed-reference plush frames | Code-authored artists, station, stamp, and signal shrine; secondary plush gallery may be omitted if the optional atlas is unavailable |
 | `soderSnek` | `soder-snek-atlas.png` | 512 x 448 | Complete 56-pose Soder rider timeline | Code-authored Soder renderer |
 | `simplyTerrell` | `simply-terrell-atlas.png` | 512 x 448 | Complete 56-pose comedian-surfer timeline with balanced arms | Code-authored SimplyTerrell renderer |
 
@@ -88,14 +88,16 @@ python3 tools/art/build-aerial-panoramas.py --condition kakiLand
 ```
 
 The first command creates the continuous source, menu art, and decor atlas from
-the preserved reviewed Grok panorama and ImageGen Kemonokaki decor master, then
-retains native one-pixel detail, applies an 80-color panorama cap, chroma
-extraction, and the canonical Relay face grid. The shared
+the preserved reviewed Grok panorama, ImageGen Kemonokaki decor master, and four
+selected licensed-reference plush i2i masters. It retains native one-pixel
+detail, applies an 80-color panorama cap, removes each source's connected
+chroma field, limits each plush frame to 15 colors, adds a one-pixel silhouette
+outline, and enforces the canonical Relay face grid. The shared
 panorama build then fixes the 1536 x 640 contract, y=502 ocean anchor,
 continuity, and compression. The rejected Vertex/Nano exploration is
 reference-only and never enters these outputs.
 
-The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`; the selected Kemonokaki resident sheet is preserved under `docs/art-source/atlases/imagegen`. The retired continuous side-break source is 1280 x 720, the retired travelling-break sheet is 384 x 216, the active wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, other studies, and remaining selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. Source sheets are documentation assets and are never loaded by the browser. `tools/art/build-grok-assets.py`:
+The selected Grok sheets are preserved at their original dimensions under `docs/art-source/grok`; the selected Kemonokaki resident sheet and four 1254 x 1254 plush i2i masters are preserved under `docs/art-source/atlases/imagegen`. The four original user-supplied portraits are not checked into the repository; their filenames and SHA-256 identifiers are retained in the Kaki-Land provenance record. The retired continuous side-break source is 1280 x 720, the retired travelling-break sheet is 384 x 216, the active wave-breaker polish source is 1024 x 1024, and the staged progression, Twilight components, other studies, and remaining selected sheets retain their documented source sizes. Rejected local Qwen comparisons are preserved separately under `docs/art-source/qwen`. Source sheets are documentation assets and are never loaded by the browser. `tools/art/build-grok-assets.py`:
 
 1. reads each selected source without overwriting it;
 2. identifies and removes the chroma-magenta field while preserving coral accents; the continuous wave uses a narrow black key so its isolation field and tube opening reveal the live world without erasing saturated navy water;

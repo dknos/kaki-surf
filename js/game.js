@@ -1399,6 +1399,7 @@ export class KakiSurfGame {
       "aerialSpace-kakiLand",
       "lastRelay-kakiLand",
       "relayComplete-kakiLand",
+      "plushers-kakiLand",
     ].includes(scene);
     this.simulation.world.presentationPhase = lateKakiLand ? 2 : scene.includes("relay") ? 1 : 0;
     this.simulation.world.context.presentationPhase = this.simulation.world.presentationPhase;

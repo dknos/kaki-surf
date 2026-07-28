@@ -72,6 +72,19 @@ const CALLOUT_QUEUE_LIMIT = 4;
 const CALLOUT_GAP = 0.14;
 const CALLOUT_MIN_READ_TIME = 1.05;
 const KAKI_LAND_PANORAMA_START_X = 640;
+const KAKI_LAND_PLUSHER_GALLERY = Object.freeze([
+  Object.freeze([710, 493, "plusherChii"]),
+  Object.freeze([795, 491, "plusherRockstar"]),
+  Object.freeze([880, 492, "plusherMermaid"]),
+  Object.freeze([965, 493, "plusherKitty"]),
+]);
+const KAKI_LAND_AUTHORED_STATIONS = Object.freeze([
+  Object.freeze([1060, 474, "quietRepair"]),
+  Object.freeze([1160, 462, "alarmFixer"]),
+  Object.freeze([1260, 456, "signalKeeper"]),
+  Object.freeze([1370, 474, "collector"]),
+  Object.freeze([1480, 466, "reactionCard"]),
+]);
 
 /** Signed panoramic travel remains coherent through either aerial direction. */
 export function backgroundParallaxPhase(source, reducedMotion = false) {
@@ -763,29 +776,56 @@ export class KakiRenderer {
         2,
       );
       const sourceX = this.settings.reducedMotion
-        ? 0
-        : Number(this.lastBackdropSourceX) || travel * 0.08;
+        ? KAKI_LAND_PANORAMA_START_X
+        : Number(this.lastBackdropSourceX)
+          || KAKI_LAND_PANORAMA_START_X + travel * 0.08;
       const coastShelf = aerialBackdropCropShelves().coast;
       const sourceY = this.settings.highContrast
         ? coastShelf * (1 - clamp(altitude, 0, 1))
         : Number(this.lastBackdropSourceY) || coastShelf;
       this.drawKakiLandSignalBands(sourceX, sourceY, phase);
-      const authoredStations = [
-        [770, 474, "quietRepair"],
-        [904, 462, "alarmFixer"],
-        [1048, 456, "signalKeeper"],
-        [1196, 474, "collector"],
-        [1370, 466, "reactionCard"],
-      ];
+      const visiblePlushers = this.qualityProfile.renderFarTraffic
+        ? Math.min(KAKI_LAND_PLUSHER_GALLERY.length, 2 + phase)
+        : 1;
       const visibleStations = this.qualityProfile.renderFarTraffic
-        ? Math.min(authoredStations.length, phase * 2 + 1)
+        ? Math.min(KAKI_LAND_AUTHORED_STATIONS.length, phase * 2 + 1)
         : 1;
       // These stations belong to the lower cloud archipelago. Let them leave
       // the frame with their islands instead of floating through the upper
       // starfield when the camera follows an exceptional aerial.
       if (altitude < 0.52) {
+        for (let index = 0; index < visiblePlushers; index += 1) {
+          const [plusherSourceX, plusherSourceY, frame] = KAKI_LAND_PLUSHER_GALLERY[index];
+          const plusherX = plusherSourceX - sourceX;
+          const plusherY = plusherSourceY - sourceY;
+          if (plusherX < -48 || plusherX > LOGICAL_WIDTH + 48
+            || plusherY < -40 || plusherY > LOGICAL_HEIGHT + 40) continue;
+          // Each doll sits on a tiny paper-cloud shelf. It is panorama-anchored
+          // and never inherits rider jumps, traffic bob, or reaction motion.
+          ctx.save();
+          ctx.globalAlpha = this.settings.highContrast ? 1 : 0.86;
+          ctx.fillStyle = p.ink;
+          ctx.fillRect(Math.round(plusherX - 24), Math.round(plusherY - 3), 48, 5);
+          ctx.fillStyle = p.foam;
+          ctx.fillRect(Math.round(plusherX - 22), Math.round(plusherY - 4), 44, 4);
+          ctx.fillStyle = index % 2 === 0 ? p.waterLight : p.gold;
+          ctx.fillRect(Math.round(plusherX - 2), Math.round(plusherY - 3), 5, 2);
+          ctx.restore();
+          drawAtlasFrame(
+            ctx,
+            this.visualAssets,
+            "kakiLandDecor",
+            frame,
+            plusherX,
+            plusherY,
+            {
+              scale: this.qualityProfile.renderFarTraffic ? 1.08 : 0.9,
+              alpha: this.settings.highContrast ? 1 : 0.96,
+            },
+          );
+        }
         for (let index = 0; index < visibleStations; index += 1) {
-          const [stationSourceX, stationSourceY, frame] = authoredStations[index];
+          const [stationSourceX, stationSourceY, frame] = KAKI_LAND_AUTHORED_STATIONS[index];
           const stationX = stationSourceX - sourceX;
           const stationY = stationSourceY - sourceY;
           if (stationX < -48 || stationX > LOGICAL_WIDTH + 48

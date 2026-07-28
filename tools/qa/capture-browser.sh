@@ -13,7 +13,7 @@ scenes=(
   heroGather-twilightGlass heroPitch-twilightGlass heroOpen-twilightGlass
   heroDeep-twilightGlass heroMax-twilightGlass heroCollapse-twilightGlass
   heroTube-twilightGlass heroAir-twilightGlass maxSpeed turboBoost
-  menu-kakiLand results-kakiLand initialRide-kakiLand artists-kakiLand rainbowSeam-kakiLand
+  menu-kakiLand results-kakiLand initialRide-kakiLand artists-kakiLand plushers-kakiLand rainbowSeam-kakiLand
   leftTravel-kakiLand rightTravel-kakiLand cutback-kakiLand turbo-kakiLand
   smallAir-kakiLand mediumAir-kakiLand hugeAir-kakiLand aerialCloud-kakiLand
   aerialUpper-kakiLand aerialSpace-kakiLand lastRelay-kakiLand relayStart-kakiLand

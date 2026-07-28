@@ -211,7 +211,7 @@ test("every generated production atlas is local, dimension-checked, and compact"
   );
 });
 
-test("Kaki-Land decor is rebuilt from the reviewed original Kemonokaki resident sheet", () => {
+test("Kaki-Land decor is rebuilt from reviewed Kemonokaki and licensed-reference plush masters", () => {
   const sourcePath = path.join(
     ROOT,
     "docs",
@@ -230,11 +230,39 @@ test("Kaki-Land decor is rebuilt from the reviewed original Kemonokaki resident 
     "83db466f1ee9c67327d73df46fc1e13b9c39350462c75544edd271f9e1f9083f",
   );
 
+  const plusherSources = [
+    ["chii-plusher-i2i.png", "ba417dbb36694d33dd05a02111d7eac3fec31bbef677793b4d5d4bcdfb1f00de"],
+    ["rockstar-plusher-i2i.png", "78195c51c3657a1678609d5d977f0f10226bdeeba608f6ab9c2b8caf5347aeb7"],
+    ["mermaid-plusher-i2i.png", "08999c136f9a18bac5cd5886ec6653494dd9bec51e9b47e6355246ac9f78727e"],
+    ["kitty-plusher-i2i.png", "1e3cf7db9ad7bbaf7920d64cd790997b82c13cd7d6edf0290936514ff16b3730"],
+  ];
+  for (const [filename, expectedHash] of plusherSources) {
+    const plusherPath = path.join(
+      ROOT,
+      "docs",
+      "art-source",
+      "atlases",
+      "imagegen",
+      "plushers",
+      filename,
+    );
+    assert.ok(isFile(plusherPath), `${filename} should preserve the selected i2i source`);
+    const plusherBytes = readFileSync(plusherPath);
+    assert.equal(plusherBytes.readUInt32BE(16), 1254, `${filename} width`);
+    assert.equal(plusherBytes.readUInt32BE(20), 1254, `${filename} height`);
+    assert.equal(
+      createHash("sha256").update(plusherBytes).digest("hex"),
+      expectedHash,
+      `${filename} selected source hash`,
+    );
+  }
+
   const buildSource = read(path.join(ROOT, "tools", "art", "build-kaki-land-assets.py"));
   assert.match(
     buildSource,
     /docs\/art-source\/atlases\/imagegen\/kaki-land-kemonokaki-decor-sheet\.png/,
   );
+  assert.match(buildSource, /docs\/art-source\/atlases\/imagegen\/plushers\/chii-plusher-i2i\.png/);
   const rendererSource = read(path.join(ROOT, "js", "renderer.js"));
   for (const frame of [
     "quietRepair",
@@ -243,7 +271,16 @@ test("Kaki-Land decor is rebuilt from the reviewed original Kemonokaki resident 
     "collector",
     "reactionCard",
   ]) {
-    assert.match(rendererSource, new RegExp(`authoredStations[^]*"${frame}"`));
+    assert.match(rendererSource, new RegExp(`KAKI_LAND_AUTHORED_STATIONS[^]*"${frame}"`));
+  }
+  for (const frame of [
+    "plusherChii",
+    "plusherRockstar",
+    "plusherMermaid",
+    "plusherKitty",
+  ]) {
+    assert.match(rendererSource, new RegExp(`KAKI_LAND_PLUSHER_GALLERY[^]*"${frame}"`));
+    assert.ok(GENERATED_ASSET_MANIFEST.kakiLandDecor.frames[frame]);
   }
 });
 

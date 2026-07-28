@@ -18,11 +18,14 @@ Kaki-Land adds a reviewed Grok panorama master, a nonhuman Last Relay design
 reference, and two preserved 4 x 3 Grok decor studies under
 `docs/art-source/aerial/grok` and `docs/art-source/atlases/grok`. The Grok decor
 studies are now superseded by the selected ImageGen Kemonokaki resident sheet;
-the panorama and Relay reference remain selected. The offline Kaki-Land builder
-performs the camera-aware reframe, native one-pixel cleanup, palette reduction,
-chroma extraction, and canonical face-grid cleanup. The browser never reads the
-Grok session cache. Exact sessions, prompts, rejection decisions, public
-Kemonokaki reference record, privacy record, and hashes are in
+the panorama and Relay reference remain selected. Four user-licensed character
+portraits were separately transformed with built-in ImageGen into Chii,
+Rockstar, Mermaid, and Kitty plush masters; they are not Grok outputs. The
+offline Kaki-Land builder performs the camera-aware reframe, native one-pixel
+cleanup, palette reduction, chroma extraction, plush reduction, and canonical
+face-grid cleanup. The browser never reads a provider session cache. Exact
+sessions, prompts, rejection decisions, public Kemonokaki reference record,
+rights assertion, privacy record, and hashes are in
 [Kaki-Land visual source and provenance](./art-source/aerial/KAKI-LAND.md).
 
 ## Selected source and output record
