@@ -27,6 +27,24 @@ KEMONOKAKI_DECOR = (
     ROOT
     / "docs/art-source/atlases/imagegen/kaki-land-kemonokaki-decor-sheet.png"
 )
+PLUSHER_SOURCES = (
+    (
+        "plusherChii",
+        ROOT / "docs/art-source/atlases/imagegen/plushers/chii-plusher-i2i.png",
+    ),
+    (
+        "plusherRockstar",
+        ROOT / "docs/art-source/atlases/imagegen/plushers/rockstar-plusher-i2i.png",
+    ),
+    (
+        "plusherMermaid",
+        ROOT / "docs/art-source/atlases/imagegen/plushers/mermaid-plusher-i2i.png",
+    ),
+    (
+        "plusherKitty",
+        ROOT / "docs/art-source/atlases/imagegen/plushers/kitty-plusher-i2i.png",
+    ),
+)
 RUNTIME_SIZE = (1536, 640)
 HORIZON_Y = 502
 SOURCE_HORIZON_RATIO = 393 / 576
@@ -344,8 +362,8 @@ def draw_panorama() -> Image.Image:
 
 def draw_menu(panorama: Image.Image, atlas: Image.Image) -> Image.Image:
     # A 16:9 crop keeps the full vertical story and favors the busiest cloud
-    # handoff. Kemonokaki residents and the reactive Relay are composited from
-    # the runtime atlas so the card and gameplay share one silhouette language.
+    # handoff. The four licensed-reference plushers and reactive Relay are
+    # composited from the runtime atlas so menu and gameplay share silhouettes.
     crop_width = round(panorama.height * 16 / 9)
     crop_left = 176
     crop = panorama.convert("RGB").crop(
@@ -353,14 +371,15 @@ def draw_menu(panorama: Image.Image, atlas: Image.Image) -> Image.Image:
     )
     menu = crop.resize((768, 432), Image.Resampling.LANCZOS).convert("RGBA")
     residents = (
-        ((0, 0, 64, 48), (4, 222)),       # kitty pixel repairer
-        ((0, 48, 64, 96), (258, 246)),    # mouse drawing collector
-        ((192, 0, 256, 48), (588, 244)),  # moth signal keeper
+        ((0, 144, 64, 192), (0, 246)),      # Chii plush
+        ((64, 144, 128, 192), (118, 262)),  # Rockstar plush
+        ((128, 144, 192, 192), (526, 262)), # Mermaid plush
+        ((192, 144, 256, 192), (650, 246)), # Kitty plush
     )
     for frame_box, position in residents:
-        resident = atlas.crop(frame_box).resize((128, 96), Image.Resampling.NEAREST)
+        resident = atlas.crop(frame_box).resize((112, 84), Image.Resampling.NEAREST)
         resident_alpha = resident.getchannel("A").point(
-            lambda value: round(value * 0.88)
+            lambda value: round(value * 0.92)
         )
         resident.putalpha(resident_alpha)
         menu.alpha_composite(resident, position)
@@ -521,6 +540,98 @@ def extract_decor_cell(
     return frame
 
 
+def is_green_chroma(pixel: tuple[int, int, int]) -> bool:
+    """The selected i2i plush masters use one removable neon-green field."""
+    red, green, blue = pixel
+    return (
+        red <= 82
+        and green >= 174
+        and blue <= 108
+        and green - red >= 108
+        and green - blue >= 92
+    )
+
+
+def extract_plusher_source(
+    source_path: Path,
+    frame_size: tuple[int, int] = (64, 48),
+) -> Image.Image:
+    """Key, pixel-reduce, outline, and palette-limit one reviewed plush master."""
+    if not source_path.is_file():
+        raise FileNotFoundError(f"missing reviewed plusher source: {source_path}")
+    with Image.open(source_path) as opened:
+        source = opened.convert("RGBA")
+    rgb = source.convert("RGB")
+    source_pixels = rgb.load()
+    width, height = rgb.size
+    visited = bytearray(width * height)
+    queue: deque[tuple[int, int]] = deque()
+
+    def enqueue(x: int, y: int) -> None:
+        offset = y * width + x
+        if visited[offset] or not is_green_chroma(source_pixels[x, y]):
+            return
+        visited[offset] = 1
+        queue.append((x, y))
+
+    for x in range(width):
+        enqueue(x, 0)
+        enqueue(x, height - 1)
+    for y in range(height):
+        enqueue(0, y)
+        enqueue(width - 1, y)
+    while queue:
+        x, y = queue.popleft()
+        if x > 0:
+            enqueue(x - 1, y)
+        if x + 1 < width:
+            enqueue(x + 1, y)
+        if y > 0:
+            enqueue(x, y - 1)
+        if y + 1 < height:
+            enqueue(x, y + 1)
+
+    background = Image.new("L", source.size)
+    background.putdata([255 if value else 0 for value in visited])
+    # Erode the high-resolution subject edge before reduction so no neon
+    # fringe survives as a false silhouette color at 384 x 216.
+    background = background.filter(ImageFilter.MaxFilter(7))
+    source.putalpha(ImageChops.invert(background))
+    bounds = source.getbbox()
+    if not bounds:
+        raise RuntimeError(f"plusher source has no keyed subject: {source_path}")
+    subject = source.crop(bounds)
+    frame_width, frame_height = frame_size
+    fit = min((frame_width - 6) / subject.width, (frame_height - 4) / subject.height)
+    target = (
+        max(1, round(subject.width * fit)),
+        max(1, round(subject.height * fit)),
+    )
+    subject = subject.resize(target, Image.Resampling.LANCZOS)
+    alpha = subject.getchannel("A").point(lambda value: 255 if value >= 96 else 0)
+    opaque = Image.new("RGB", subject.size, (13, 16, 37))
+    opaque.paste(subject.convert("RGB"), mask=alpha)
+    opaque = opaque.quantize(
+        colors=15,
+        method=Image.Quantize.MEDIANCUT,
+        dither=Image.Dither.NONE,
+    ).convert("RGB")
+    reduced = opaque.convert("RGBA")
+    reduced.putalpha(alpha)
+
+    outline_alpha = alpha.filter(ImageFilter.MaxFilter(3))
+    outlined = Image.new("RGBA", reduced.size, (13, 16, 37, 0))
+    outlined.putalpha(outline_alpha)
+    outlined.alpha_composite(reduced)
+
+    frame = Image.new("RGBA", frame_size, (0, 0, 0, 0))
+    frame.alpha_composite(
+        outlined,
+        ((frame_width - target[0]) // 2, frame_height - target[1] - 1),
+    )
+    return frame
+
+
 def clean_relay_face(frame: Image.Image, phase: str) -> None:
     """Replace generated pseudo-glyphs with the canonical Kaki face grid."""
     draw = ImageDraw.Draw(frame)
@@ -557,7 +668,7 @@ def draw_atlas() -> Image.Image:
         )
     with Image.open(KEMONOKAKI_DECOR) as opened:
         sheet = opened.convert("RGB")
-    atlas = Image.new("RGBA", (256, 144), (0, 0, 0, 0))
+    atlas = Image.new("RGBA", (256, 192), (0, 0, 0, 0))
     for row in range(3):
         for column in range(4):
             frame = extract_decor_cell(sheet, column, row)
@@ -569,6 +680,11 @@ def draw_atlas() -> Image.Image:
                     ("notice", "deform", "settle")[column],
                 )
             atlas.alpha_composite(frame, (column * 64, row * 48))
+    for column, (_, source_path) in enumerate(PLUSHER_SOURCES):
+        atlas.alpha_composite(
+            extract_plusher_source(source_path),
+            (column * 64, 144),
+        )
     return atlas
 
 

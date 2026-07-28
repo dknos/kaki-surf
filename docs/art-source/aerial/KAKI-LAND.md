@@ -147,27 +147,81 @@ Both Grok candidates were rejected: one added a gradient field and readable
 `APPROVED`; the other added cell panels and readable `REPAIRED`. Neither is
 copied into the repository or runtime.
 
+## User-licensed plush i2i pass
+
+On 2026-07-28 the user supplied four 300 x 300 RGBA character portraits and
+stated that they own the corresponding Kemonokaki NFTs and hold the license
+needed to use the portraits. This record captures that rights assertion; it
+does not infer rights from NFT ownership independently. The original portraits
+are not checked into the public repository. Their exact local inputs were:
+
+| Supplied filename | Intended identity | SHA-256 |
+| --- | --- | --- |
+| `chii.png` | Chii | `2791388be17d0141b3737038bd0268383645c8663531f280436147ef1ee63f42` |
+| `rockstar.png` | Rockstar | `7132e86e1fa537f172baf1db7a66db80a6734ebeb151d78bfa00e1fbc57ae93f` |
+| `mermaid.png` | Mermaid | `a26edfcb6d9b87cd57bf1faab83fa7a7c0b8fe8226b96efdb9cc067da9c48544` |
+| `kitty.png` | Kitty | `2a23688af2dad9230d15b81902411323a8f600b284e6b06711008e89057eea47` |
+
+Each portrait was inspected locally, then edited separately with built-in
+ImageGen in generation record `019fa480-5048-7e93-9854-0c8e62d046b8`.
+Each image had one role: identity-preserving edit target. The shared prompt
+contract was:
+
+```text
+Use case: style-transfer
+Asset type: licensed character reference converted into a Kaki Surf background plush sprite source
+Primary request: transform the pictured character into one charming handmade sewn plush doll, full body, seated front or clean three-quarter view, designed to remain recognizable after reduction into late-16-bit pixel art.
+Style/medium: matte felt and short-pile fabric, extra-large soft head, tiny stuffed body, short rounded limbs, crisp silhouette, minimal shading, visible seam stitches, one repaired patch, and handcrafted Kaki warmth.
+Composition: one isolated character only, fully visible and centered with generous padding.
+Scene/backdrop: perfectly flat uniform solid #00FF00 chroma-key background with no floor, shadow, gradient, texture, glow, reflection, scenery, or lighting variation.
+Constraints: preserve identity and comic expression; change only the presentation into a plush doll; no realistic anatomy, words, letters, numbers, logos, watermark, frame, UI, duplicate, or extra object.
+Avoid: glossy 3D, plastic toy, realistic person, anime body, detailed fingers, loose fur, blurry edges, painterly background.
+```
+
+The identity locks added to that shared contract were:
+
+- Chii: long taupe-brown hair and straight fringe, pale face, navy sparkling
+  eyes, pink pointed ears, white halo, white robe, narrow red cord, quiet
+  expression.
+- Rockstar: charcoal hair with two round buns and braided fringe, red
+  underlayer and side locks, cool pale face, indigo eyes, three forehead dots,
+  white frilled blouse, black ribbon, cheerful expression.
+- Mermaid: long sea-mint hair, pink face, violet-blue eyes, cream spiral shell,
+  pink fin ears, purple starfish, striped sailor top, and one curled turquoise
+  plush tail.
+- Kitty: plum cat ears and fringe, white bow, cream face, closed eyes, two
+  bright cyan comic tears, raised paw pads, chest camera, curled tail, and
+  overwhelmed happy-crying expression.
+
+The 1254 x 1254 selected outputs are preserved under
+`docs/art-source/atlases/imagegen/plushers`. The offline build removes only the
+border-connected neon-green field, erodes its high-resolution fringe before
+reduction, fits each full silhouette into 64 x 48, limits it to 15 colors, and
+adds one dark pixel outline. No runtime image generation occurs.
+
 ## Selected production conversion
 
 `tools/art/build-kaki-land-assets.py` reads the preserved Grok panorama and
-ImageGen Kemonokaki decor master and:
+ImageGen Kemonokaki decor and plush masters and:
 
 - reframes the continuous panorama around one y=502 ocean anchor;
 - maps the tiled heaven into the camera's physically reachable high-air band
   without adding shelves, plate swaps, or a second backdrop;
 - retains native one-pixel detail and reduces the artwork to 80 colors;
-- builds menu/card art from the same panorama, three Kemonokaki residents, and
+- builds menu/card art from the same panorama, all four named plushers, and
   the reviewed Relay silhouette;
 - packs compact frames for seven original Kemonokaki maintenance residents,
   the Guestbook Gull, Approval, and the Last Relay notice/deform/settle
-  reaction.
+  reaction, then adds Chii, Rockstar, Mermaid, and Kitty as a fourth atlas row.
 
 The fictional artists are aggregate social functions only: repairer, alarm
 fixer, reaction-card holder, lamp keeper, drawing collector, approval gull, and
 button menace. The public Kemonokaki species language supplies silhouette
-traits, not member identity. No private phrases, usernames, member avatars,
-source emoji, community screenshots, existing collectible portraits, or
-identifiable member likenesses were used.
+traits, not member identity. The four named plushers are the explicit exception:
+they intentionally derive from the four user-supplied, user-licensed portraits
+listed above. No other private phrases, usernames, member avatars, source emoji,
+community screenshots, collectible portraits, or identifiable likenesses were
+used.
 
 | File | Role | Dimensions | SHA-256 |
 | --- | --- | ---: | --- |
@@ -176,17 +230,24 @@ identifiable member likenesses were used.
 | `docs/art-source/atlases/grok/kaki-land-decor-sheet.jpg` | Superseded 4 x 3 Grok decor source | 1280 x 720 | `3b7221bbcdca68d411302437a917e8fac8059fefbab33d9944c8e3868eb1768b` |
 | `docs/art-source/atlases/grok/kaki-land-decor-sheet-v2.png` | Superseded crisp 4 x 3 Grok decor source | 1280 x 720 | `ee20eef2543b734aab9dc4efd3802c04c7af46fedc621f021a63c3866fe9fee6` |
 | `docs/art-source/atlases/imagegen/kaki-land-kemonokaki-decor-sheet.png` | Selected original Kemonokaki resident sheet | 1672 x 941 | `83db466f1ee9c67327d73df46fc1e13b9c39350462c75544edd271f9e1f9083f` |
+| `docs/art-source/atlases/imagegen/plushers/chii-plusher-i2i.png` | Selected Chii plush i2i master | 1254 x 1254 | `ba417dbb36694d33dd05a02111d7eac3fec31bbef677793b4d5d4bcdfb1f00de` |
+| `docs/art-source/atlases/imagegen/plushers/rockstar-plusher-i2i.png` | Selected Rockstar plush i2i master | 1254 x 1254 | `78195c51c3657a1678609d5d977f0f10226bdeeba608f6ab9c2b8caf5347aeb7` |
+| `docs/art-source/atlases/imagegen/plushers/mermaid-plusher-i2i.png` | Selected Mermaid plush i2i master | 1254 x 1254 | `08999c136f9a18bac5cd5886ec6653494dd9bec51e9b47e6355246ac9f78727e` |
+| `docs/art-source/atlases/imagegen/plushers/kitty-plusher-i2i.png` | Selected Kitty plush i2i master | 1254 x 1254 | `1e3cf7db9ad7bbaf7920d64cd790997b82c13cd7d6edf0290936514ff16b3730` |
 | `docs/art-source/aerial/imagegen/kaki-land-continuous.png` | Clean continuous build source | 1536 x 640 | `685f38217fc7706d896e8634d2941050fd01797863caa75e7ce99f21cfd8886d` |
 | `assets/backgrounds/kakiLand-aerial.png` | Indexed runtime panorama | 1536 x 640 | `35766d9ba1a71686691a35de29a82da82b1064ced1071a1a01fc927574b0ed29` |
-| `assets/backgrounds/kakiLand-menu.png` | Menu and condition-card art | 768 x 432 | `1920ffc050d71cf378d558bcde4a576448d2760310520e06e499ac4c3e4376de` |
-| `assets/generated/kaki-land-decor-atlas.png` | Optional Kemonokaki artist/reaction atlas | 256 x 144 | `f6d2d9eacb6e50c6d196158622d57a96470e6eca565524e7641dc4bdbdfce7d1` |
+| `assets/backgrounds/kakiLand-menu.png` | Menu and condition-card art | 768 x 432 | `49d4f0441f5cb0a9462888cb79dfd3ed3e695f544f90d96dfa8f7fe024bbcfaf` |
+| `assets/generated/kaki-land-decor-atlas.png` | Optional Kemonokaki artist/reaction/plusher atlas | 256 x 192 | `769ab6168fca68ff38a6db297c293692d302f94b25965c2c79dfa38f481b5288` |
 
 The runtime panorama is 289,890 bytes and uses 80 colors. It is non-tileable,
 drawn once per frame, and never defines collision. The Last Relay remains an
 asymmetric nonhuman signal device with a Kaki face grid, paper wings, a cable
 halo, visible repair, and a state-driven reaction. The Guestbook Gull is
 deliberately non-reactive to rider altitude, so jumping does not pull its
-authored route up or down.
+authored route up or down. The four plushers are anchored to their authored
+panorama cloud shelf, never traffic-bobbed or player-reactive. Early runs show
+Chii and Rockstar, mid runs add Mermaid, and late signal convergence completes
+the gallery with Kitty; the menu contains all four.
 
 ## Rebuild and validation
 
@@ -200,10 +261,11 @@ node tools/qa/accept-kaki-gull-stability.mjs
 ```
 
 The first three commands are deterministic and offline. The first reads only
-the preserved local masters. The second performs the shared continuous reframe, palette
-reduction, compression, dimension validation, continuity checks, and
-static-host size check. Rebuilding requires Pillow only at authoring time. The
-final command uses the standard local static host and Chromium debugging ports
-to capture a real keyboard jump across a naturally scheduled Guestbook Gull;
-its frames and zero-drift metrics live in
+the preserved local masters. The second performs the shared continuous
+reframe, palette reduction, compression, dimension validation, continuity
+checks, and static-host size check. Rebuilding requires Pillow only at
+authoring time. `plushers-kakiLand` is the deterministic browser scene for the
+complete four-character gallery. The final command uses the standard local
+static host and Chromium debugging ports to capture a real keyboard jump across
+a naturally scheduled Guestbook Gull; its frames and zero-drift metrics live in
 `docs/images/qa-gull-stability`.

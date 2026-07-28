@@ -30,6 +30,7 @@ const SCENES = [
   ["heroAir-twilightGlass", "Twilight / rider-only big-air frame", "", "perfect"],
   ["initialRide-kakiLand", "Kaki-Land / initial ride"],
   ["artists-kakiLand", "Kaki-Land / Kemonokaki-maintained artist network", "wide"],
+  ["plushers-kakiLand", "Kaki-Land / licensed-reference plush gallery", "wide", "perfect"],
   ["rainbowSeam-kakiLand", "Kaki-Land / complete five-band seam", "", "perfect"],
   ["leftTravel-kakiLand", "Kaki-Land / left travel"],
   ["rightTravel-kakiLand", "Kaki-Land / right travel"],

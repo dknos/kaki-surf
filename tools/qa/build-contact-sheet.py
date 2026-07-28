@@ -44,6 +44,7 @@ SCENES = (
     ("heroAir-twilightGlass", "Twilight big-air camera pan"),
     ("initialRide-kakiLand", "Kaki-Land / initial ride"),
     ("artists-kakiLand", "Kaki-Land / Kemonokaki-maintained artist network"),
+    ("plushers-kakiLand", "Kaki-Land / licensed-reference plush gallery"),
     ("rainbowSeam-kakiLand", "Kaki-Land / complete five-band seam"),
     ("leftTravel-kakiLand", "Kaki-Land / left travel"),
     ("rightTravel-kakiLand", "Kaki-Land / right travel"),
