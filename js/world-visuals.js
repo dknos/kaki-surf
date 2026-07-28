@@ -1,7 +1,7 @@
 import { clamp, lerp, smoothstep } from "./math.js";
 import { drawPixelText } from "./pixel-font.js";
 import { drawAtlasFrame } from "./asset-drawing.js";
-import { isBoatKind, WORLD_LAYER_CONFIG } from "./world-catalog.js";
+import { isBirdKind, isBoatKind, WORLD_LAYER_CONFIG } from "./world-catalog.js";
 import { projectWorldX } from "./world-collision.js";
 import { whaleForegroundMask, whaleFrameMetadata } from "./whale-contract.js";
 
@@ -87,7 +87,7 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       config.parallax,
     );
     if (watercraft && !watercraftClearsBreaker(entity, x, simulation)) return;
-    const y = lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
+    const y = trafficPresentationY(entity, alpha, settings);
     const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
     const baseScale = layer === "far" ? 0.52 : layer === "mid" ? watercraft ? 0.58 : 0.72 : 1;
@@ -137,6 +137,11 @@ export function trafficPassMatches(renderBand, pass = "all") {
   if (pass === "background") return renderBand !== "playfieldFront";
   if (pass === "foreground") return renderBand === "playfieldFront";
   return true;
+}
+
+/** Render-space Y for passive traffic; bird flight never inherits a sine bob. */
+export function trafficPresentationY(entity, alpha = 1, settings = {}) {
+  return lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
 }
 
 export function watercraftClearsBreaker(entity, x, simulation) {
@@ -493,6 +498,10 @@ export function trafficScreenDirection(entity, world, layer) {
 
 function trafficBob(entity, settings) {
   if (settings.reducedMotion) return 0;
+  // Bird silhouettes already communicate flight through their authored wing
+  // poses and horizontal routes. A second sine-wave translation reads as if
+  // the flock is attached to the surfer's jump, especially at 384 x 216.
+  if (isBirdKind(entity.kind)) return 0;
   const seed = (entity.eventSeed & 31) * 0.17;
   if (entity.animation === "bob" || entity.animation === "heel" || entity.animation === "race") {
     return Math.sin(entity.animationTime * 3 + seed) * (entity.animation === "race" ? 1.6 : 1);

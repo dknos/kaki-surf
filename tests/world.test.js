@@ -24,6 +24,7 @@ import {
 } from "../js/world-collision.js";
 import {
   trafficPassMatches,
+  trafficPresentationY,
   trafficScreenDirection,
   trafficAtmosphereOpacity,
   watercraftClearsBreaker,
@@ -786,6 +787,31 @@ test("Guestbook Gull stays on its authored route when Kaki jumps past it", () =>
   assert.equal(gull.vy, 0);
   assert.equal(gull.reaction, "");
   assert.equal(gull.dodged, false);
+});
+
+test("bird presentation has no ambient vertical bob during a jump", () => {
+  const gull = {
+    kind: "guestbookGull",
+    previousY: 61,
+    y: 61,
+    animation: "stamp",
+    animationTime: 0,
+    eventSeed: 12,
+  };
+  const flock = {
+    kind: "gullFlock",
+    previousY: 74,
+    y: 74,
+    animation: "flap",
+    animationTime: 0,
+    eventSeed: 8,
+  };
+  for (const animationTime of [0, 0.25, 0.5, 0.75, 1, 1.5, 2]) {
+    gull.animationTime = animationTime;
+    flock.animationTime = animationTime;
+    assert.equal(trafficPresentationY(gull, 0.5), 61);
+    assert.equal(trafficPresentationY(flock, 0.5), 74);
+  }
 });
 
 test("pelican and gull couriers telegraph one fair pooled pickup with no miss penalty", () => {

@@ -73,10 +73,10 @@ const CALLOUT_GAP = 0.14;
 const CALLOUT_MIN_READ_TIME = 1.05;
 const KAKI_LAND_PANORAMA_START_X = 640;
 const KAKI_LAND_PLUSHER_GALLERY = Object.freeze([
-  Object.freeze([710, 493, "plusherChii"]),
-  Object.freeze([795, 491, "plusherRockstar"]),
-  Object.freeze([880, 492, "plusherMermaid"]),
-  Object.freeze([965, 493, "plusherKitty"]),
+  Object.freeze([38, 72, "plusherChii"]),
+  Object.freeze([105, 72, "plusherRockstar"]),
+  Object.freeze([279, 72, "plusherMermaid"]),
+  Object.freeze([346, 72, "plusherKitty"]),
 ]);
 const KAKI_LAND_AUTHORED_STATIONS = Object.freeze([
   Object.freeze([1060, 474, "quietRepair"]),
@@ -101,6 +101,18 @@ export function backgroundPanoramaTravel(
   const maximum = Math.max(0, Number(imageWidth) - LOGICAL_WIDTH);
   const travel = (Number(source?.camera?.worldX ?? source?.cameraWorldX) || 0) * 0.08;
   return clamp(travel, 0, maximum);
+}
+
+/**
+ * The licensed Kemonokaki dolls occupy a self-contained signal gallery rather
+ * than a physical point on the vertical surf stage. Their screen anchors stay
+ * fixed while the camera reveals the upper panorama, so jumping cannot make
+ * the gallery drift or disappear.
+ */
+export function kakiLandPlusherScreenPosition(index) {
+  const entry = KAKI_LAND_PLUSHER_GALLERY[index];
+  if (!entry) return null;
+  return Object.freeze({ x: entry[0], y: entry[1], frame: entry[2] });
 }
 
 /** One camera-continuous crop: coast + signed worldY, never a shelf swap. */
@@ -784,9 +796,6 @@ export class KakiRenderer {
         ? coastShelf * (1 - clamp(altitude, 0, 1))
         : Number(this.lastBackdropSourceY) || coastShelf;
       this.drawKakiLandSignalBands(sourceX, sourceY, phase);
-      const visiblePlushers = this.qualityProfile.renderFarTraffic
-        ? Math.min(KAKI_LAND_PLUSHER_GALLERY.length, 2 + phase)
-        : 1;
       const visibleStations = this.qualityProfile.renderFarTraffic
         ? Math.min(KAKI_LAND_AUTHORED_STATIONS.length, phase * 2 + 1)
         : 1;
@@ -794,36 +803,6 @@ export class KakiRenderer {
       // the frame with their islands instead of floating through the upper
       // starfield when the camera follows an exceptional aerial.
       if (altitude < 0.52) {
-        for (let index = 0; index < visiblePlushers; index += 1) {
-          const [plusherSourceX, plusherSourceY, frame] = KAKI_LAND_PLUSHER_GALLERY[index];
-          const plusherX = plusherSourceX - sourceX;
-          const plusherY = plusherSourceY - sourceY;
-          if (plusherX < -48 || plusherX > LOGICAL_WIDTH + 48
-            || plusherY < -40 || plusherY > LOGICAL_HEIGHT + 40) continue;
-          // Each doll sits on a tiny paper-cloud shelf. It is panorama-anchored
-          // and never inherits rider jumps, traffic bob, or reaction motion.
-          ctx.save();
-          ctx.globalAlpha = this.settings.highContrast ? 1 : 0.86;
-          ctx.fillStyle = p.ink;
-          ctx.fillRect(Math.round(plusherX - 24), Math.round(plusherY - 3), 48, 5);
-          ctx.fillStyle = p.foam;
-          ctx.fillRect(Math.round(plusherX - 22), Math.round(plusherY - 4), 44, 4);
-          ctx.fillStyle = index % 2 === 0 ? p.waterLight : p.gold;
-          ctx.fillRect(Math.round(plusherX - 2), Math.round(plusherY - 3), 5, 2);
-          ctx.restore();
-          drawAtlasFrame(
-            ctx,
-            this.visualAssets,
-            "kakiLandDecor",
-            frame,
-            plusherX,
-            plusherY,
-            {
-              scale: this.qualityProfile.renderFarTraffic ? 1.08 : 0.9,
-              alpha: this.settings.highContrast ? 1 : 0.96,
-            },
-          );
-        }
         for (let index = 0; index < visibleStations; index += 1) {
           const [stationSourceX, stationSourceY, frame] = KAKI_LAND_AUTHORED_STATIONS[index];
           const stationX = stationSourceX - sourceX;
@@ -844,7 +823,10 @@ export class KakiRenderer {
           );
         }
       }
-      if (altitude < 0.48) return;
+      if (altitude < 0.48) {
+        this.drawKakiLandPlusherGallery();
+        return;
+      }
       const reveal = smoothstep(0.48, 0.84, altitude);
       ctx.save();
       ctx.fillStyle = p.deepInk;
@@ -894,6 +876,9 @@ export class KakiRenderer {
         }
         ctx.restore();
       }
+      // The ordinary gallery workers remain in front of the enormous,
+      // low-contrast Relay, preserving the intended sacred-background scale.
+      this.drawKakiLandPlusherGallery();
       return;
     }
     if (altitude < 0.48) return;
@@ -935,6 +920,52 @@ export class KakiRenderer {
       ctx.fillRect(Math.round(satelliteX + 2), 27, 1, 1);
     }
     ctx.restore();
+  }
+
+  drawKakiLandPlusherGallery() {
+    const ctx = this.ctx;
+    const p = this.palette;
+    // The four licensed-reference dolls are primary Kaki-Land residents, not
+    // expendable far traffic. Their compact cloud gallery is stable in every
+    // run phase and quality profile, and remains behind gameplay.
+    for (let index = 0; index < KAKI_LAND_PLUSHER_GALLERY.length; index += 1) {
+      const { x: plusherX, y: plusherY, frame } = kakiLandPlusherScreenPosition(index);
+      const scale = this.qualityProfile.renderFarTraffic ? 0.76 : 0.66;
+      const shelfHalfWidth = this.qualityProfile.renderFarTraffic ? 25 : 22;
+      ctx.save();
+      ctx.globalAlpha = this.settings.highContrast ? 1 : 0.9;
+      ctx.fillStyle = p.ink;
+      ctx.fillRect(
+        Math.round(plusherX - shelfHalfWidth),
+        Math.round(plusherY - 5),
+        shelfHalfWidth * 2,
+        7,
+      );
+      ctx.fillStyle = p.foam;
+      ctx.fillRect(
+        Math.round(plusherX - shelfHalfWidth + 2),
+        Math.round(plusherY - 7),
+        shelfHalfWidth * 2 - 4,
+        6,
+      );
+      ctx.fillRect(Math.round(plusherX - 14), Math.round(plusherY - 10), 12, 4);
+      ctx.fillRect(Math.round(plusherX + 3), Math.round(plusherY - 9), 11, 3);
+      ctx.fillStyle = index % 2 === 0 ? p.waterLight : p.gold;
+      ctx.fillRect(Math.round(plusherX - 2), Math.round(plusherY - 5), 5, 2);
+      ctx.restore();
+      drawAtlasFrame(
+        ctx,
+        this.visualAssets,
+        "kakiLandDecor",
+        frame,
+        plusherX,
+        plusherY,
+        {
+          scale,
+          alpha: this.settings.highContrast ? 1 : 0.96,
+        },
+      );
+    }
   }
 
   drawKakiLandSignalBands(sourceX, sourceY, phase) {
