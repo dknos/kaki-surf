@@ -69,7 +69,18 @@ const WHALE_VISUAL_FRAMES = Object.freeze({
   depart: Object.freeze(["whale", "departure"]),
 });
 
-export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha = 1, settings = {}, pass = "all", backdropAltitude = 0) {
+export function drawWorldTraffic(
+  ctx,
+  simulation,
+  assets,
+  palette,
+  layer,
+  alpha = 1,
+  settings = {},
+  pass = "all",
+  backdropAltitude = 0,
+  verticalOffsetY = 0,
+) {
   const world = simulation?.world;
   if (!world?.forEachTraffic) return;
   const config = WORLD_LAYER_CONFIG[layer];
@@ -87,7 +98,7 @@ export function drawWorldTraffic(ctx, simulation, assets, palette, layer, alpha 
       config.parallax,
     );
     if (watercraft && !watercraftClearsBreaker(entity, x, simulation)) return;
-    const y = trafficPresentationY(entity, alpha, settings);
+    const y = trafficPresentationY(entity, alpha, settings, verticalOffsetY);
     const visualDirection = trafficScreenDirection(entity, world, layer);
     const frame = trafficFrame(entity);
     const baseScale = layer === "far" ? 0.52 : layer === "mid" ? watercraft ? 0.58 : 0.72 : 1;
@@ -140,8 +151,10 @@ export function trafficPassMatches(renderBand, pass = "all") {
 }
 
 /** Render-space Y for passive traffic; bird flight never inherits a sine bob. */
-export function trafficPresentationY(entity, alpha = 1, settings = {}) {
-  return lerp(entity.previousY, entity.y, alpha) + trafficBob(entity, settings);
+export function trafficPresentationY(entity, alpha = 1, settings = {}, verticalOffsetY = 0) {
+  return lerp(entity.previousY, entity.y, alpha)
+    + trafficBob(entity, settings)
+    + (Number(verticalOffsetY) || 0);
 }
 
 export function watercraftClearsBreaker(entity, x, simulation) {

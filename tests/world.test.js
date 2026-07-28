@@ -789,7 +789,7 @@ test("Guestbook Gull stays on its authored route when Kaki jumps past it", () =>
   assert.equal(gull.dodged, false);
 });
 
-test("bird presentation has no ambient vertical bob during a jump", () => {
+test("bird presentation has no ambient bob and can share Kaki-Land's vertical world camera", () => {
   const gull = {
     kind: "guestbookGull",
     previousY: 61,
@@ -811,6 +811,8 @@ test("bird presentation has no ambient vertical bob during a jump", () => {
     flock.animationTime = animationTime;
     assert.equal(trafficPresentationY(gull, 0.5), 61);
     assert.equal(trafficPresentationY(flock, 0.5), 74);
+    assert.equal(trafficPresentationY(gull, 0.5, {}, 96), 157);
+    assert.equal(trafficPresentationY(flock, 0.5, {}, 96), 170);
   }
 });
 

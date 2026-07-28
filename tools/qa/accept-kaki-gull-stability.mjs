@@ -92,12 +92,17 @@ async function sample() {
     return {
       lifecycle: snapshot?.lifecycle,
       playerState: snapshot?.state,
-      playerScreenY: camera?.naturalPlayerY,
+      playerScreenY: camera?.playerScreenY,
       cameraWorldY: camera?.cameraWorldY,
+      backdropSourceY: camera?.backdropSourceY,
       gull: gull ? {
         id: gull.id,
         layer: gull.layer,
         y: gull.y,
+        renderY: gull.y - (Number(camera?.cameraWorldY) || 0),
+        panoramaAnchorY: gull.y
+          - (Number(camera?.cameraWorldY) || 0)
+          + (Number(camera?.backdropSourceY) || 0),
         previousY: gull.previousY,
         vy: gull.vy,
         reaction: gull.reaction,
@@ -187,7 +192,7 @@ while (Date.now() - flightStarted < 5_000) {
   const value = await sample();
   samples.push(value);
   if (!crossingCaptured && value.gull
-    && Math.abs(Number(value.playerScreenY) - Number(value.gull.y)) < 4) {
+    && Math.abs(Number(value.playerScreenY) - Number(value.gull.renderY)) < 4) {
     crossingCaptured = true;
     await capture("02-player-crossing-gull");
   }
@@ -202,16 +207,25 @@ await capture("03-after-landing");
 const gullSamples = [before, ...samples].map((value) => value.gull).filter(Boolean);
 if (!gullSamples.length) throw new Error("Guestbook Gull disappeared before it could be measured");
 const yValues = gullSamples.map((gull) => Number(gull.y));
+const renderYValues = gullSamples.map((gull) => Number(gull.renderY));
+const panoramaAnchorValues = gullSamples.map((gull) => Number(gull.panoramaAnchorY));
 const report = {
   condition: "kakiLand",
   gullId: before.gull.id,
   gullLayer: before.gull.layer,
   playerReachedAirborne: samples.some((value) => value.playerState === "airborne"),
   playerCrossedGullHeight: samples.some((value) =>
-    Math.abs(Number(value.playerScreenY) - Number(value.gull?.y)) < 4),
+    Math.abs(Number(value.playerScreenY) - Number(value.gull?.renderY)) < 4),
   samples: gullSamples.length,
   gullYRange: [Math.min(...yValues), Math.max(...yValues)],
+  renderedGullYRange: [Math.min(...renderYValues), Math.max(...renderYValues)],
+  panoramaAnchorYRange: [
+    Math.min(...panoramaAnchorValues),
+    Math.max(...panoramaAnchorValues),
+  ],
   maximumGullVerticalDrift: Math.max(...yValues) - Math.min(...yValues),
+  maximumPanoramaAnchorDrift:
+    Math.max(...panoramaAnchorValues) - Math.min(...panoramaAnchorValues),
   reactions: [...new Set(gullSamples.map((gull) => gull.reaction).filter(Boolean))],
   verticalVelocities: [...new Set(gullSamples.map((gull) => Number(gull.vy)))],
 };
@@ -221,6 +235,11 @@ if (!report.playerReachedAirborne) throw new Error("Real keyboard input never la
 if (!report.playerCrossedGullHeight) throw new Error("The jump never crossed the gull's authored height");
 if (report.maximumGullVerticalDrift > 1e-6) {
   throw new Error(`Guestbook Gull drifted vertically by ${report.maximumGullVerticalDrift}`);
+}
+if (report.maximumPanoramaAnchorDrift > 1e-6) {
+  throw new Error(
+    `Guestbook Gull detached from the panorama by ${report.maximumPanoramaAnchorDrift}`,
+  );
 }
 if (report.reactions.length) {
   throw new Error(`Guestbook Gull inherited jump reactions: ${report.reactions.join(", ")}`);
