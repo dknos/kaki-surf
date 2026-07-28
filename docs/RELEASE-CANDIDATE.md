@@ -2,7 +2,7 @@
 
 Date: 2026-07-28.
 
-This checkpoint is a local release candidate. Nothing was pushed, deployed, tagged, or published.
+This candidate was deployed to GitHub Pages after explicit authorization. No tag or GitHub Release was created.
 
 ## Baseline
 
@@ -63,4 +63,4 @@ Keyboard operation, High Contrast, Reduced Motion, Reduced Flash, save migration
 
 ## Deployment state
 
-The live Pages configuration serves `main` from the repository root. The live JavaScript revision was verified as `0eafe063f83a3418f457e1e601ff507da7c8646e` before this candidate. Candidate metadata and assets resolve locally with correct case and MIME types, but their public URLs cannot be verified until an authorized push and Pages deployment. The remaining ship action is therefore a deliberate release/deployment plus the physical-device matrix above.
+The live Pages configuration serves `main` from the repository root. Release tree `190823dd697a5ea311eca3d7b69d012762686590` was deployed through Pages build `1120175846` from commit `0ad898bcc92b1f71bac65ec4e8fafc0151723f6e`. The public 2.8.4 configuration, renderer, world seams, manifest, icons, social card, and entry page matched their local SHA-256 values. A cache-busted live Chromium run launched Kaki-Land in High Contrast, completed a real jump, reported zero Gull world-Y or panorama-anchor drift, and recorded no page, runtime, console, network, or HTTP failure. Physical-device checks remain as listed above.
