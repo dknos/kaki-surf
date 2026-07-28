@@ -6,6 +6,10 @@ const baseUrl = process.env.KAKI_SURF_QA_URL
   ?? `http://127.0.0.1:9876/index.html?gullStability=${Date.now()}`;
 const outputDir = process.env.KAKI_SURF_GULL_QA_DIR
   ?? path.resolve("docs/images/qa-gull-stability");
+const accessMode = process.env.KAKI_SURF_GULL_ACCESS_MODE ?? "full";
+if (!["full", "mobile", "highContrast", "reducedMotion"].includes(accessMode)) {
+  throw new Error(`Unknown Kaki-Land Gull access mode: ${accessMode}`);
+}
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const pages = await fetch(`${cdpHost}/json/list`).then((response) => response.json());
@@ -152,6 +156,22 @@ for (let attempt = 0; attempt < 300; attempt += 1) {
 browserFailures.length = 0;
 
 await evaluate(`(() => {
+  const accessMode = ${JSON.stringify(accessMode)};
+  const values = {
+    highContrast: accessMode === "highContrast",
+    reducedMotion: accessMode === "reducedMotion",
+    qualityMode: accessMode === "mobile" ? "mobile" : "full",
+  };
+  for (const [key, value] of Object.entries(values)) {
+    const control = document.querySelector('[data-setting="' + key + '"]');
+    if (!control) throw new Error("Missing " + key + " setting");
+    if (control.type === "checkbox") control.checked = value;
+    else control.value = value;
+    control.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  return values;
+})()`);
+await evaluate(`(() => {
   const game = globalThis.kakiSurf;
   game.start({
     immediate: true,
@@ -211,6 +231,7 @@ const renderYValues = gullSamples.map((gull) => Number(gull.renderY));
 const panoramaAnchorValues = gullSamples.map((gull) => Number(gull.panoramaAnchorY));
 const report = {
   condition: "kakiLand",
+  accessMode,
   gullId: before.gull.id,
   gullLayer: before.gull.layer,
   playerReachedAirborne: samples.some((value) => value.playerState === "airborne"),

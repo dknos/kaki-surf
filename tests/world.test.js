@@ -365,6 +365,32 @@ test("condition traffic permissions encode the curated passive coast bands", () 
   assert.equal(trafficVisibilityPermission("twilightGlass", "mid", "water"), false);
   assert.equal(trafficVisibilityPermission("twilightGlass", "far", "sky"), true);
   assert.equal(trafficVisibilityPermission("twilightGlass", "near", "sky"), false);
+  assert.equal(
+    trafficVisibilityPermission("twilightGlass", "near", "sky", true),
+    true,
+    "forced browser QA can show a requested near-sky fixture",
+  );
+  assert.equal(
+    trafficVisibilityPermission("twilightGlass", "near", "water", true),
+    false,
+    "forced browser QA cannot move ordinary craft into the player lane",
+  );
+});
+
+test("QA visibility resets with the world and cannot leak into production runs", () => {
+  const world = new WorldSimulation({ seed: 0x51a1, condition: "goldenCoast" });
+  assert.equal(world.qaVisibility, false);
+  world.reset({
+    condition: "goldenCoast",
+    qa: {
+      traffic: [{ kind: "bannerPlane", layer: "near", screenX: 196, y: 43 }],
+    },
+  });
+  assert.equal(world.qaVisibility, true);
+  assert.equal(world.snapshot().traffic.near[0]?.kind, "bannerPlane");
+  world.reset({ condition: "goldenCoast" });
+  assert.equal(world.qaVisibility, false);
+  assert.deepEqual(world.snapshot().traffic.near, []);
 });
 
 test("the passive dolphin breach uses one continuous water anchor before interaction", () => {

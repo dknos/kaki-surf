@@ -1,6 +1,6 @@
 # Known limitations
 
-The implementation includes complete Endless Surf and Score Attack loops, simplified default controls plus optional Advanced controls, carried-energy surfing, condition-specific coast-to-space aerials, bidirectional/switch surfing, a rideable tube, three boards and four conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 178-state browser QA matrix, and a static-host adapter. The broader commercial-arcade roadmap still has product work as well as physical-lab validation.
+The implementation includes complete Endless Surf and Score Attack loops, simplified default controls plus optional Advanced controls, carried-energy surfing, condition-specific coast-to-space aerials, bidirectional/switch surfing, a rideable tube, three boards and four conditions, a seeded wildlife/traffic/powerup world, local generated atlases with fallbacks, access settings, a synchronized 182-state browser QA matrix, and a static-host adapter. The broader commercial-arcade roadmap still has product work as well as physical-lab validation.
 
 ## Current limitations
 

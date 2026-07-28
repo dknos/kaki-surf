@@ -10,10 +10,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const profiles = [
   { name: "desktop-1280x720", width: 1280, height: 720, active: "simpleKeyboard", mobile: false },
+  { name: "desktop-1920x1080", width: 1920, height: 1080, active: "simpleKeyboard", mobile: false },
   { name: "laptop-1366x768", width: 1366, height: 768, active: "simpleKeyboard", mobile: false },
   { name: "tablet-1024x768", width: 1024, height: 768, active: "touch", mobile: true },
   { name: "phone-portrait-390x844", width: 390, height: 844, active: "touch", mobile: true },
+  { name: "phone-landscape-812x375", width: 812, height: 375, active: "touch", mobile: true },
   { name: "phone-landscape-844x390", width: 844, height: 390, active: "touch", mobile: true },
+  { name: "phone-landscape-915x412", width: 915, height: 412, active: "touch", mobile: true },
 ];
 const states = [
   ["menu", "menu"],

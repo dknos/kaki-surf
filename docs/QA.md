@@ -1,8 +1,8 @@
 # QA matrix
 
-Date: 2026-07-27.
+Date: 2026-07-28.
 
-This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 178 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, four-condition comparison, Kaki-Land’s complete Webring Relay sequence and access modes, and whale takeoff/apex/return.
+This document distinguishes automated truth from browser-capture evidence. The deterministic gallery contains 182 checked-in browser states, including Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, four-condition comparison, Kaki-Land’s complete Webring Relay sequence and resident/access variants, and whale takeoff/apex/return.
 
 ## Automated gate
 
@@ -14,7 +14,7 @@ npm run check
 git diff --check
 ```
 
-Current result: **352/352 tests pass** and **41 JavaScript modules pass syntax checking**.
+Current result: **360/360 tests pass** and **41 JavaScript modules pass syntax checking**.
 
 ## Browser capture matrix
 
@@ -61,7 +61,7 @@ Current result: **352/352 tests pass** and **41 JavaScript modules pass syntax c
 
 ## Contact-sheet result
 
-The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 178 identifiers. Every gallery capture is 1280 x 720; rebuild the assembled contact sheet deterministically with:
+The gallery scene list, capture script, contact-sheet source, and checked-in capture directory match at 182 identifiers. Every gallery capture is 1280 x 720; rebuild the assembled contact sheet deterministically with:
 
 ```console
 python3 tools/qa/build-contact-sheet.py
@@ -71,8 +71,8 @@ Future scene changes must update `js/qa-gallery.js`, `tools/qa/capture-browser.s
 
 The vertical-camera temporal evidence is rebuilt with `node tools/qa/accept-world-camera.mjs` while a CDP Chromium instance and local static server are running. It uses real keyboard input for ordinary-right, maximum-right, ordinary-left, and Reduced-Motion maximum launches; captures riding, lip, launch at 0/100/250 ms, apex, descent, re-entry, touchdown, and 300 ms after landing; and records logical-canvas stage, HUD, horizon, rider, and backdrop anchors in `docs/images/qa-world-camera/metrics.json`. The separate `capture-chase.mjs` evidence continues to prove horizontal break/camera behavior.
 
-The Kaki-Land real-keyboard chase is checked in under `docs/images/qa-kaki-land-chase`. It began in an ordinary Endless run with zero wipeouts, advanced the break from x20.71 to x108.06 during the protected opening, sent it offscreen at x-59.04 during the right-going lead, committed a left reversal with the camera still forward, and showed the break pursue back to x20.01.
+The Kaki-Land real-keyboard chase is checked in under `docs/images/qa-kaki-land-chase`. It began in an ordinary Endless run with zero wipeouts, advanced the break from x20.52 to x108.78 during the protected opening, sent it offscreen at x-58.60 during the right-going lead, committed a left reversal with the camera still forward, and showed the break pursue back to x20.34.
 
-The final temporal pass measured zero stage/HUD/horizon displacement for ordinary-right and both maximum runs. Ordinary-left retained one logical pixel of intentional default impact shake, with no camera-derived displacement. A maximum-right camera signal reached 98.09 pixels—the retired world transform would have dropped the whole stage by that amount—but the actual stage stayed at zero. Ordinary-right used no rider offset or backdrop transition. Maximum and Reduced-Motion maximum kept the qualified board anchor at y=68, reported zero excess screen motion beyond the physical path, returned rider framing to zero before touchdown, and reached the visually coastal backdrop before contact. The stateful atmospheric controller peaked at 7.42 source pixels per rendered frame under capture load and returned to zero by 300 ms after landing.
+The final temporal pass measured zero stage, HUD, horizon, or panorama movement for ordinary right and left launches. Maximum and Reduced-Motion maximum launches used the same continuous stage camera, peaking at 24.42 and 24.47 logical pixels respectively while the HUD remained fixed; the panorama counter-crop returned to its coastal source before touchdown and stayed there 300 ms after landing. The recorded ocean-anchor error remained zero, both runs landed, and the maximum per-frame rendered panorama movement was 3.88 pixels in Full and 2.61 pixels in Reduced Motion.
 
 This checkpoint is local: it verifies checked-in files, native tests, and local Chromium captures. It does not claim that the GitHub Pages CDN has received or served the same revision; deployment verification belongs to the release step after push.

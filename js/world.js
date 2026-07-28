@@ -97,6 +97,11 @@ export class WorldSimulation {
     this.lastCameraWorldX = 0;
     this.wipeoutReactionLatched = false;
     this.qaQuiet = Boolean(qa?.quiet);
+    // Forced gallery fixtures may deliberately exercise entities outside a
+    // condition's production scheduler. Presentation reads this marker only
+    // to make that requested evidence visible; ordinary runs remain catalog-
+    // gated and keep the same spawn weights and lane permissions.
+    this.qaVisibility = Boolean(qa);
     this.streams = createStreams(this.seed, this.conditionId);
     resetStepContext(this.context);
 

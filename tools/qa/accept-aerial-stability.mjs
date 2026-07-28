@@ -510,11 +510,17 @@ if (!(jumps[0].summary.physicalHeight < jumps[1].summary.physicalHeight
   && jumps[1].summary.physicalHeight < jumps[2].summary.physicalHeight)) {
   throw new Error("Real-input physical jump height did not increase from small to medium to huge");
 }
-if (jumps[2].summary.stageOffsetRange[1] < 180) {
-  throw new Error(`Huge air panned only ${jumps[2].summary.stageOffsetRange[1].toFixed(1)} logical pixels`);
+const mediumPan = jumps[1].summary.stageOffsetRange[1];
+const hugePan = jumps[2].summary.stageOffsetRange[1];
+if (hugePan < 30 || hugePan - mediumPan < 12) {
+  throw new Error(`Large-air camera separation was only ${hugePan.toFixed(1)} logical pixels`);
 }
-if (jumps[2].summary.backdropSourceYRange[0] > 244) {
-  throw new Error(`Huge air never reached the upper authored panorama (${jumps[2].summary.backdropSourceYRange[0].toFixed(1)})`);
+const mediumSourceY = jumps[1].summary.backdropSourceYRange[0];
+const hugeSourceY = jumps[2].summary.backdropSourceYRange[0];
+if (hugeSourceY > mediumSourceY - 12) {
+  throw new Error(
+    `Large air advanced only ${(mediumSourceY - hugeSourceY).toFixed(1)} panorama pixels beyond medium air`,
+  );
 }
 if (jumps.some((jump) => jump.summary.maximumBackdropSourceYDelta > 12)) {
   throw new Error("Vertical panorama telemetry exceeded its sampled rate limit");

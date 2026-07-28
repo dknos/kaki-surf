@@ -34,6 +34,25 @@ all layers --> 384 x 216 Canvas --> nearest-neighbor CSS scaling
 
 The first three lower environment sources were generated offline, curated, then cropped and palette-reduced by `tools/art/build-background-assets.py`. Kaki-Land's menu, continuous source, and decor atlas are deterministically cleaned from a reviewed local Grok panorama, a reviewed ImageGen Kemonokaki resident sheet, and four licensed-reference ImageGen plush conversions by `tools/art/build-kaki-land-assets.py`. All four vertical masters are rebuilt from one reviewed continuous source per condition through `tools/art/build-aerial-panoramas.py`; selection and rejection decisions are documented in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
 
+## Install and share presentation
+
+| Asset | Dimensions | Bytes | Source |
+| --- | ---: | ---: | --- |
+| `assets/icons/apple-touch-icon.png` | 180 × 180 | 595 | Code-authored K/wave mark |
+| `assets/icons/icon-192.png` | 192 × 192 | 621 | Code-authored K/wave mark |
+| `assets/icons/icon-512.png` | 512 × 512 | 1,712 | Code-authored K/wave mark |
+| `assets/icons/icon-maskable-512.png` | 512 × 512 | 1,713 | Safe-zone variant of the same mark |
+| `assets/social/kaki-surf-social-card.png` | 1200 × 630 | 50,502 | Checked-in `neutral.png` production gameplay capture plus code-authored title rail |
+
+These files are rebuilt deterministically with:
+
+```console
+python3 tools/art/build-release-assets.py
+python3 tools/art/build-release-assets.py --check
+```
+
+The builder uses nearest-neighbor scaling for the icon mark, retains the actual game capture as the social image, and writes no runtime dependency. The social card's SHA-256 is `b56cc3eef3e4fac21ec99218d93cc7b4c36dddbfff09d862901ca4144f8a9e6e`.
+
 ## Generated runtime atlases
 
 Sixteen families are loaded at runtime and remain optional. Missing or invalid art falls back independently; one bad family cannot block launch or suppress another family. The continuous side-break and six-cell travelling-break outputs remain in the offline build for provenance, but browser review rejected both as active MVP silhouettes and they are absent from `js/asset-manifest.js`.

@@ -1,6 +1,6 @@
 # Visual audit
 
-Date: 2026-07-27.
+Date: 2026-07-28.
 
 ## Baseline reviewed before this pass
 
@@ -54,7 +54,7 @@ Exact provenance and prompts are in [Grok asset provenance](./GROK-ASSET-PROVENA
 
 ## Final visual status
 
-The completed production matrix contains 178 deterministic 1280 x 720 Chromium captures. It includes the isolated Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, the original altitude tiers, Kaki-Land’s high-air network and Last Relay reveal, every Webring Relay beat, access variants, and whale takeoff/apex/return. The refreshed 1200 x 15954 [production contact sheet](./images/qa-contact-sheet.png) contains the full set. Six additional focused responsive captures cover the tube and air fixtures at 1280 x 720, 844 x 390, and 390 x 844.
+The completed production matrix contains 182 deterministic 1280 x 720 Chromium captures. It includes the isolated Core Surf Lab, left/right and downhill mirror pairs, carried uphill motion, reversal, launch/landing, the original altitude tiers, Kaki-Land’s high-air network and Last Relay reveal, every Webring Relay beat, resident/access variants, and whale takeoff/apex/return. The refreshed 1200 x 16218 [production contact sheet](./images/qa-contact-sheet.png) contains the full set. Forty lifecycle captures cover menu, active play, pause, results, and options at eight desktop/mobile viewports; six additional focused responsive captures cover the tube and air fixtures at 1280 x 720, 844 x 390, and 390 x 844.
 
 The final review confirmed:
 
@@ -74,6 +74,6 @@ The final review confirmed:
 - Fleet Airshow remains horizon spectacle while its generated foam gates stay distinct from hazards;
 - a temporarily absent dolphin atlas produced a readable local fallback and no launch failure.
 
-The review also drove concrete iteration: the rider now has one path vector, continuous base-speed attraction was replaced by carried energy, all board-contact effects were consolidated into a historical trajectory wake, and the wave gained collision-queried crest, trough, contour, pocket, and power-seam structure. Whale frames composite rear spray, body, rider, foreground water, and contact foam around one water anchor. Kaki-Land review moved the Last Relay into the reachable high-air crop, kept the early cloud station visible at ordinary ride height, changed the shark evidence to a readable near miss, and lowered the Relay artist so the completed mural and Approval stamp clear the HUD. The canonical gallery is the 178-scene matrix described above; this remains local browser evidence until a release is pushed and GitHub Pages is verified.
+The review also drove concrete iteration: the rider now has one path vector, continuous base-speed attraction was replaced by carried energy, all board-contact effects were consolidated into a historical trajectory wake, and the wave gained collision-queried crest, trough, contour, pocket, and power-seam structure. Whale frames composite rear spray, body, rider, foreground water, and contact foam around one water anchor. Kaki-Land review moved the Last Relay into the reachable high-air crop, kept the early cloud station visible at ordinary ride height, changed the shark evidence to a readable near miss, and lowered the Relay artist so the completed mural and Approval stamp clear the HUD. The release-candidate pass aligned the High Contrast fallback with the canonical panorama crop and added dedicated Full, Mobile, High Contrast, and Reduced Motion resident/Gull evidence. The canonical gallery is the 182-scene matrix described above; this remains local browser evidence until a release is pushed and GitHub Pages is verified.
 
 See [QA matrix](./QA.md) for the scene coverage and [Validation results](./TEST-RESULTS.md) for automated and browser totals.

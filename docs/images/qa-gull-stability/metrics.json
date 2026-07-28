@@ -1,15 +1,25 @@
 {
   "condition": "kakiLand",
+  "accessMode": "full",
   "gullId": "mid-0",
   "gullLayer": "mid",
   "playerReachedAirborne": true,
   "playerCrossedGullHeight": true,
-  "samples": 151,
+  "samples": 149,
   "gullYRange": [
     69.88616576977074,
     69.88616576977074
   ],
+  "renderedGullYRange": [
+    69.88616576977074,
+    143.48090634012362
+  ],
+  "panoramaAnchorYRange": [
+    493.88616576977074,
+    493.88616576977074
+  ],
   "maximumGullVerticalDrift": 0,
+  "maximumPanoramaAnchorDrift": 0,
   "reactions": [],
   "verticalVelocities": [
     0

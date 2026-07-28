@@ -442,7 +442,8 @@ export function conditionWorldProfile(condition) {
   return CONDITION_WORLD_PROFILES[id] ?? CONDITION_WORLD_PROFILES.goldenCoast;
 }
 
-export function trafficVisibilityPermission(condition, layer, medium) {
+export function trafficVisibilityPermission(condition, layer, medium, forcedQa = false) {
+  if (forcedQa) return !(layer === "near" && medium === "water");
   const profile = conditionWorldProfile(condition);
   if (layer === "near" && medium === "water") return false;
   const key = `${layer}${medium === "water" ? "Water" : "Sky"}Traffic`;

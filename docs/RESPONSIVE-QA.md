@@ -1,16 +1,19 @@
 # Responsive QA
 
-Date: 2026-07-27.
+Date: 2026-07-28.
 
 The responsive browser matrix is separate from the canonical 1280 × 720 renderer gallery. It covers shell layout and lifecycle UI at these CSS viewports:
 
 | Profile | Viewport | Active scene |
 | --- | ---: | --- |
 | Desktop | 1280 × 720 | Keyboard first-run teaching |
+| Desktop Full HD | 1920 × 1080 | Keyboard first-run teaching |
 | Laptop | 1366 × 768 | Keyboard first-run teaching |
 | Tablet | 1024 × 768 | Touch controls |
 | Phone portrait | 390 × 844 | Landscape gate |
+| Short phone landscape | 812 × 375 | Touch controls |
 | Phone landscape | 844 × 390 | Touch controls |
+| Wide phone landscape | 915 × 412 | Touch controls |
 
 Each profile captures menu, active play, pause, results, and options. Files are written to `docs/images/qa-responsive`; the script never writes to `docs/images/qa` or rebuilds the production contact sheet.
 
@@ -56,13 +59,13 @@ the defaults with `KAKI_SURF_CDP_URL`, `KAKI_SURF_QA_URL`, and
 
 ## Current measured pass
 
-A fresh Chrome DevTools Protocol audit applied true mobile device metrics. At 844 × 390, Simple measured 68 px Trick, 76 px Action, and 152 × 44 px Turbo targets; Advanced Q/E/F/T each measured 52 × 52 px. Neither layout had any overlap. Real 80 ms Simple and Advanced F touches each traversed `QUEUED` to `VARIAL` and produced exactly one completed manifest entry plus one 12 ms vibration request. Blur and portrait rotation cleared a held pre-takeoff queue, the portrait gate became active, and returning to 844 × 390 resumed with no queued action. The probe reported zero console, runtime, network, or HTTP errors.
+A fresh Chrome DevTools Protocol audit applied true mobile device metrics at device scale factor 2. At 844 × 390, Simple measured 68 px Trick, 76 px Action, and 152 × 44 px Turbo targets; Advanced Q/E/F/T each measured 52 × 52 px. Neither layout had any overlap, including the 667 × 375 short-landscape check. Real Simple and Advanced F touches each traversed `QUEUED` to `VARIAL` and produced exactly one completed manifest entry. Blur and portrait rotation cleared a held pre-takeoff queue, the portrait gate became active, and returning to 844 × 390 resumed with no queued action. The probe reported zero console, runtime, network, or HTTP errors.
 
 The portrait menu and Settings remain scrollable so a player can choose a run before the landscape request. Gameplay itself no longer maintains a second, squeezed portrait control layout.
 
 The 2026-07-20 hero-tube rerun captured 25 shell states to a temporary review directory and passed at 1280 x 720, 844 x 390, and 390 x 844. The crest clears the top HUD, Kaki/board remain centered inside the pocket, the bottom Tube panel clears Speed/Flow, the gravity front stays readable, and neither the whitewater edge nor the playfield clips. Because the active-scene override replaces the ordinary mobile fixture, this focused rerun validates composition only; the separate lifecycle matrix above remains the touch-control evidence.
 
-The Endless-mode rerun repeated all 25 lifecycle captures after adding the two-card mode selector. At 390 x 844, Endless/Score Attack and the gold start action appear before the optional board/condition stack; at 844 x 390 the full selector, start row, boards, sessions, and control legend remain visible together. The in-canvas SET panel stays inside the existing center HUD slot. Results retain two compact columns, while Best Trick and Best Tube use a full-width row so long values do not collide.
+The release-candidate rerun captured all five lifecycle states at eight viewports, for 40 current shell captures. At 390 x 844, Endless/Score Attack and the gold start action appear before the optional board/condition stack; short-landscape menus and Settings remain scrollable so every selector is reachable without compressing the 16:9 game. The in-canvas SET panel stays inside the existing center HUD slot. Results retain two compact columns, while Best Trick and Best Tube use a full-width row so long values do not collide.
 
 The browser evidence above is local to the checked-out static build. Physical iOS/Android safe areas, browser chrome, multi-touch behavior, and post-deployment GitHub Pages caching remain outside this automated capture pass.
 

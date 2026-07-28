@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { BOARDS, FIXED_STEP } from "../js/config.js";
+import { BOARDS, FIXED_STEP, PALETTES } from "../js/config.js";
 import {
   AIR_PROJECTION,
   projectAirY,
@@ -433,6 +433,43 @@ test("aerial panorama follows camera worldY continuously without using altitude 
   assert.deepEqual([high, descending, extreme], [400, 344, 292]);
   assert.equal(backgroundPanoramaCropY({ conditionId: "twilightGlass", player: { aerialAltitude: 1 } }), coast);
   assert.equal(backgroundPanoramaCropY({ conditionId: "stormbreak", camera: { worldY: -500 } }), 0);
+});
+
+test("High Contrast fallback keeps Kaki-Land sky life on the canonical camera crop", () => {
+  const renderer = Object.create(KakiRenderer.prototype);
+  Object.assign(renderer, {
+    ctx: {
+      fillStyle: "",
+      globalAlpha: 1,
+      fillRect() {},
+    },
+    settings: { highContrast: true, reducedMotion: false },
+    conditionId: "kakiLand",
+    palette: PALETTES.contrast,
+    aerialBackdrop: {
+      altitude: 0,
+      previousAltitude: 0,
+      frameDelta: 0,
+      maximumFrameDelta: 0,
+      blend: { coastToCloud: 0, cloudToUpper: 0, upperToSpace: 0 },
+    },
+    lastBackdropSourceX: 0,
+    lastBackdropSourceY: 424,
+  });
+
+  renderer.drawAerialFallback({ camera: { worldX: 200, worldY: 0 } });
+  assert.equal(renderer.lastBackdropSourceX, 656);
+  assert.equal(renderer.lastBackdropSourceY, 424);
+  assert.equal(renderer.aerialBackdrop.altitude, 0);
+
+  renderer.drawAerialFallback({ camera: { worldX: 200, worldY: -72 } });
+  assert.equal(renderer.lastBackdropSourceX, 656);
+  assert.equal(renderer.lastBackdropSourceY, 352);
+  assert.equal(renderer.backgroundSourceY(), 352);
+  assert.ok(Math.abs(renderer.aerialBackdrop.altitude - 72 / 424) < 1e-9);
+
+  renderer.lastBackdropSourceY = 0;
+  assert.equal(renderer.backgroundSourceY(), 0, "the uppermost authored row cannot alias the coast");
 });
 
 test("Kaki-Land plushers stay panorama-anchored and leave through viewport edges without a shelf cutoff", () => {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -51,6 +51,80 @@ test("installable mobile launches declare fullscreen landscape presentation", ()
   assert.equal(manifest.orientation, "landscape");
 });
 
+test("release share metadata and install artwork are complete, local, and reproducible", () => {
+  const tags = parseHtml(read(INDEX_PATH));
+  const canonical = tags.find((tag) => tag.name === "link" && relTokens(tag).has("canonical"));
+  const appleIcon = tags.find((tag) => tag.name === "link" && relTokens(tag).has("apple-touch-icon"));
+  const meta = (attribute, value) =>
+    tags.find((tag) => tag.name === "meta" && tag.attributes[attribute] === value)?.attributes.content;
+  const publicRoot = "https://dknos.github.io/kaki-surf/";
+  const socialUrl = `${publicRoot}assets/social/kaki-surf-social-card.png`;
+
+  assert.equal(canonical?.attributes.href, publicRoot);
+  assert.equal(meta("property", "og:type"), "website");
+  assert.equal(meta("property", "og:title"), "Kaki Surf — Plush Pocket Arcade");
+  assert.equal(meta("property", "og:url"), publicRoot);
+  assert.equal(meta("property", "og:image"), socialUrl);
+  assert.equal(meta("property", "og:image:width"), "1200");
+  assert.equal(meta("property", "og:image:height"), "630");
+  assert.ok(meta("property", "og:image:alt"));
+  assert.equal(meta("name", "twitter:card"), "summary_large_image");
+  assert.equal(meta("name", "twitter:image"), socialUrl);
+  assert.ok(meta("name", "twitter:description"));
+  assert.ok(meta("name", "description")?.includes("four living breaks"));
+
+  assert.ok(appleIcon);
+  assertLocalFileReference(INDEX_PATH, appleIcon.attributes.href, "Apple touch icon");
+  assertPng(path.join(ROOT, "assets", "icons", "apple-touch-icon.png"), 180, 180, 8 * 1024);
+  assertPng(path.join(ROOT, "assets", "social", "kaki-surf-social-card.png"), 1200, 630, 200 * 1024);
+
+  const manifest = JSON.parse(read(path.join(ROOT, "manifest.webmanifest")));
+  const pngIcons = manifest.icons.filter((icon) => icon.type === "image/png");
+  assert.deepEqual(
+    pngIcons.map((icon) => [icon.sizes, icon.purpose]),
+    [["192x192", "any"], ["512x512", "any"], ["512x512", "maskable"]],
+  );
+  for (const icon of pngIcons) {
+    const [width, height] = icon.sizes.split("x").map(Number);
+    assertPng(resolveLocalReference(path.join(ROOT, "manifest.webmanifest"), icon.src), width, height, 16 * 1024);
+  }
+
+  const releaseAssetCheck = spawnSync(
+    "python3",
+    ["tools/art/build-release-assets.py", "--check"],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  assert.equal(
+    releaseAssetCheck.status,
+    0,
+    `release artwork validation failed:\n${releaseAssetCheck.stdout}${releaseAssetCheck.stderr}`,
+  );
+});
+
+test("deterministic gallery scene lists and checked-in captures stay synchronized", () => {
+  const gallerySource = read(path.join(ROOT, "js", "qa-gallery.js"));
+  const contactSource = read(path.join(ROOT, "tools", "qa", "build-contact-sheet.py"));
+  const captureSource = read(path.join(ROOT, "tools", "qa", "capture-browser.sh"));
+  const galleryScenes = [...gallerySource.matchAll(/^  \["([^"]+)"/gm)].map((match) => match[1]);
+  const contactScenes = [...contactSource.matchAll(/^    \("([^"]+)"/gm)].map((match) => match[1]);
+  const captureBlock = captureSource.match(/scenes=\(\n([^]*?)\n\)/)?.[1] ?? "";
+  const captureScenes = captureBlock.match(/[A-Za-z0-9][A-Za-z0-9-]*/g) ?? [];
+  const checkedInScenes = readdirSync(path.join(ROOT, "docs", "images", "qa"))
+    .filter((filename) => filename.endsWith(".png"))
+    .map((filename) => filename.slice(0, -4));
+
+  for (const [label, scenes] of [
+    ["gallery", galleryScenes],
+    ["contact sheet", contactScenes],
+    ["capture script", captureScenes],
+    ["checked-in captures", checkedInScenes],
+  ]) {
+    assert.equal(new Set(scenes).size, scenes.length, `${label} cannot contain duplicate scene IDs`);
+    assert.equal(scenes.length, 182, `${label} scene count`);
+    assert.deepEqual([...new Set(scenes)].sort(), [...new Set(galleryScenes)].sort(), `${label} scene IDs`);
+  }
+});
+
 test("every native module import resolves to a local source file", () => {
   const entries = [
     ...moduleEntries(INDEX_PATH),
@@ -78,6 +152,7 @@ test("runtime entries contain no remote asset or API URLs", () => {
 
   for (const pagePath of pagePaths) {
     for (const reference of htmlReferences(parseHtml(read(pagePath)))) {
+      if (isCanonicalReference(reference)) continue;
       assert.equal(isRemoteReference(reference.value), false, `${relative(pagePath)} references ${reference.value}`);
     }
   }
@@ -115,7 +190,7 @@ test("browser entry points do not depend on bundler or generated build output", 
   const pagePaths = [INDEX_PATH, QA_PATH];
   const entryAssets = pagePaths.flatMap((pagePath) =>
     htmlReferences(parseHtml(read(pagePath)))
-      .filter((reference) => !isEmbeddedReference(reference.value))
+      .filter((reference) => !isEmbeddedReference(reference.value) && !isCanonicalReference(reference))
       .map((reference) => resolveLocalReference(pagePath, reference.value)),
   );
   const graph = buildModuleGraph(pagePaths.flatMap(moduleEntries));
@@ -336,6 +411,15 @@ function isFile(file) {
   return existsSync(file) && statSync(file).isFile();
 }
 
+function assertPng(file, width, height, maximumBytes) {
+  assert.ok(isFile(file), `${relative(file)} should exist`);
+  const bytes = readFileSync(file);
+  assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `${relative(file)} PNG signature`);
+  assert.equal(bytes.readUInt32BE(16), width, `${relative(file)} width`);
+  assert.equal(bytes.readUInt32BE(20), height, `${relative(file)} height`);
+  assert.ok(bytes.byteLength < maximumBytes, `${relative(file)} should remain compact`);
+}
+
 function parseHtml(source) {
   const tags = [];
   const tagPattern = /<!--[^]*?-->|<([a-z][\w:-]*)\b([^>]*)>/gi;
@@ -369,7 +453,7 @@ function htmlReferences(tags) {
   for (const tag of tags) {
     for (const attribute of ["src", "href", "poster"]) {
       const value = tag.attributes[attribute];
-      if (value) references.push({ tag: tag.name, attribute, value });
+      if (value) references.push({ tag: tag.name, attribute, value, rel: tag.attributes.rel ?? "" });
     }
   }
   return references;
@@ -394,9 +478,15 @@ function stylesheetEntries(pagePaths) {
 
 function assertAllPageAssetsExist(pagePath, tags) {
   for (const reference of htmlReferences(tags)) {
-    if (isEmbeddedReference(reference.value)) continue;
+    if (isEmbeddedReference(reference.value) || isCanonicalReference(reference)) continue;
     assertLocalFileReference(pagePath, reference.value, `${reference.tag} ${reference.attribute}`);
   }
+}
+
+function isCanonicalReference(reference) {
+  return reference.tag === "link"
+    && reference.attribute === "href"
+    && new Set(reference.rel.toLowerCase().split(/\s+/).filter(Boolean)).has("canonical");
 }
 
 function assertLocalFileReference(owner, reference, label) {

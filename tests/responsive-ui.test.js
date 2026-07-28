@@ -219,6 +219,8 @@ test("short landscape uses a continuous stick, large actions, and dynamic viewpo
   assert.match(STYLES, /\.touch-controls button\.is-queued[\s\S]*?animation:\s*trick-intent-pulse/);
   assert.match(STYLES, /\.touch-controls button\.is-trick-active/);
   assert.match(STYLES, /\.touch-controls button\.is-release/);
+  assert.match(STYLES, /--crest:\s*#[0-9a-f]{6};/i,
+    "active touch feedback must resolve its contrast token");
 });
 
 test("simulation trick events persist queued, active, and release states until resolution", () => {

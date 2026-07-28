@@ -584,9 +584,12 @@ export class KakiRenderer {
       simulation.world?.profile ?? this.conditionId,
       layer,
       medium,
+      simulation.world?.qaVisibility === true,
     );
-    const carrierAllowed = simulation.world?.profile?.specialEvents === true
-      && simulation.world?.profile?.carrierEnabled === true;
+    const carrierAllowed = simulation.world?.qaVisibility === true
+      ? simulation.world?.carrier?.active === true
+      : simulation.world?.profile?.specialEvents === true
+        && simulation.world?.profile?.carrierEnabled === true;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.fillStyle = palette.skyTop;
@@ -712,7 +715,9 @@ export class KakiRenderer {
       : travelX;
     const crops = aerialBackdropCropShelves(image.naturalHeight, LOGICAL_HEIGHT);
     const sourceY = backgroundPanoramaCropY(simulation, image.naturalHeight, LOGICAL_HEIGHT);
-    const previousSourceY = Number(this.lastBackdropSourceY) || crops.coast;
+    const previousSourceY = Number.isFinite(Number(this.lastBackdropSourceY))
+      ? Number(this.lastBackdropSourceY)
+      : crops.coast;
     const frameDelta = Math.abs(sourceY - previousSourceY);
     this.lastBackdropSourceX = sourceX;
     this.lastBackdropSourceY = sourceY;
@@ -731,7 +736,35 @@ export class KakiRenderer {
   drawAerialFallback(simulation) {
     const ctx = this.ctx;
     const p = this.palette;
-    const altitude = 0;
+    // High Contrast and optional-image failure still consume the canonical
+    // camera crop. Keeping the synthetic source coordinates current lets
+    // Kaki-Land residents and passive sky life share the same transform as
+    // the raster panorama without making an asset authoritative.
+    const crops = aerialBackdropCropShelves();
+    const travelX = backgroundPanoramaTravel(simulation, this.settings?.reducedMotion ?? false);
+    const sourceX = this.conditionId === "kakiLand"
+      ? clamp(
+        travelX + KAKI_LAND_PANORAMA_START_X,
+        0,
+        Math.max(0, AERIAL_PANORAMA.width - LOGICAL_WIDTH),
+      )
+      : travelX;
+    const sourceY = backgroundPanoramaCropY(simulation);
+    const previousSourceY = Number.isFinite(Number(this.lastBackdropSourceY))
+      ? Number(this.lastBackdropSourceY)
+      : crops.coast;
+    const frameDelta = Math.abs(sourceY - previousSourceY);
+    this.lastBackdropSourceX = sourceX;
+    this.lastBackdropSourceY = sourceY;
+    this.aerialBackdrop = {
+      altitude: crops.coast > 0 ? (crops.coast - sourceY) / crops.coast : 0,
+      previousAltitude: crops.coast > 0 ? (crops.coast - previousSourceY) / crops.coast : 0,
+      frameDelta: crops.coast > 0 ? frameDelta / crops.coast : 0,
+      maximumFrameDelta: Math.max(Number(this.aerialBackdrop?.maximumFrameDelta) || 0,
+        crops.coast > 0 ? frameDelta / crops.coast : 0),
+      blend: { coastToCloud: 0, cloudToUpper: 0, upperToSpace: 0 },
+    };
+    const altitude = this.aerialBackdrop.altitude;
     const space = smoothstep(0.68, 0.96, altitude);
     const cloud = smoothstep(0.1, 0.3, altitude) * (1 - smoothstep(0.58, 0.82, altitude));
     ctx.fillStyle = p.skyTop;
@@ -801,9 +834,9 @@ export class KakiRenderer {
         : Number(this.lastBackdropSourceX)
           || KAKI_LAND_PANORAMA_START_X + travel * 0.08;
       const coastShelf = aerialBackdropCropShelves().coast;
-      const sourceY = this.settings.highContrast
-        ? coastShelf * (1 - clamp(altitude, 0, 1))
-        : Number(this.lastBackdropSourceY) || coastShelf;
+      const sourceY = Number.isFinite(Number(this.lastBackdropSourceY))
+        ? Number(this.lastBackdropSourceY)
+        : coastShelf;
       this.drawKakiLandSignalBands(sourceX, sourceY, phase);
       const visibleStations = this.qualityProfile.renderFarTraffic
         ? Math.min(KAKI_LAND_AUTHORED_STATIONS.length, phase * 2 + 1)
@@ -1454,7 +1487,9 @@ export class KakiRenderer {
   }
 
   backgroundSourceY() {
-    return Number(this.lastBackdropSourceY) || aerialBackdropCropShelves().coast;
+    return Number.isFinite(Number(this.lastBackdropSourceY))
+      ? Number(this.lastBackdropSourceY)
+      : aerialBackdropCropShelves().coast;
   }
 
   turboSnapshot() {

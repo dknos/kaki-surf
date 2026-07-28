@@ -130,6 +130,12 @@ await waitFor(
   "game load",
 );
 await evaluate(`(() => {
+  const controlMode = document.querySelector('[data-setting="controlMode"]');
+  controlMode.value = "simple";
+  controlMode.dispatchEvent(new Event("change", { bubbles: true }));
+  const landingAssist = document.querySelector('[data-setting="landingAssist"]');
+  landingAssist.checked = false;
+  landingAssist.dispatchEvent(new Event("change", { bubbles: true }));
   globalThis.kakiSurf.start({
     immediate: true,
     board: "foamPuff",

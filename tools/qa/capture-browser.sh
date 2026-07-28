@@ -20,7 +20,8 @@ scenes=(
   relayStartLeft-kakiLand relayGate1-kakiLand relayGate2-kakiLand relayGate3-kakiLand
   relayComplete-kakiLand dolphin-kakiLand shark-kakiLand wipeout-kakiLand recovery-kakiLand
   lateEndless-kakiLand scoreFinal-kakiLand relayHighContrast-kakiLand
-  relayReduced-kakiLand relayMobile-kakiLand
+  relayReduced-kakiLand relayMobile-kakiLand highContrast-kakiLand
+  reducedMotion-kakiLand mobile-kakiLand
   pumpCompression pumpRelease powerLine smallAir launch hugeAir clockwiseSpin counterSpin
   aerialCoast-goldenCoast aerialCloud-goldenCoast aerialUpper-goldenCoast aerialSpace-goldenCoast aerialReentry-goldenCoast
   aerialCoast-twilightGlass aerialCloud-twilightGlass aerialUpper-twilightGlass aerialSpace-twilightGlass aerialReentry-twilightGlass
