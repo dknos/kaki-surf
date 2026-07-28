@@ -211,6 +211,42 @@ test("every generated production atlas is local, dimension-checked, and compact"
   );
 });
 
+test("Kaki-Land decor is rebuilt from the reviewed original Kemonokaki resident sheet", () => {
+  const sourcePath = path.join(
+    ROOT,
+    "docs",
+    "art-source",
+    "atlases",
+    "imagegen",
+    "kaki-land-kemonokaki-decor-sheet.png",
+  );
+  assert.ok(isFile(sourcePath), "the reviewed Kemonokaki source sheet should be preserved");
+  const bytes = readFileSync(sourcePath);
+  assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(bytes.readUInt32BE(16), 1672);
+  assert.equal(bytes.readUInt32BE(20), 941);
+  assert.equal(
+    createHash("sha256").update(bytes).digest("hex"),
+    "83db466f1ee9c67327d73df46fc1e13b9c39350462c75544edd271f9e1f9083f",
+  );
+
+  const buildSource = read(path.join(ROOT, "tools", "art", "build-kaki-land-assets.py"));
+  assert.match(
+    buildSource,
+    /docs\/art-source\/atlases\/imagegen\/kaki-land-kemonokaki-decor-sheet\.png/,
+  );
+  const rendererSource = read(path.join(ROOT, "js", "renderer.js"));
+  for (const frame of [
+    "quietRepair",
+    "alarmFixer",
+    "signalKeeper",
+    "collector",
+    "reactionCard",
+  ]) {
+    assert.match(rendererSource, new RegExp(`authoredStations[^]*"${frame}"`));
+  }
+});
+
 test("condition aerial panoramas are tall local masters with unique art direction", () => {
   const hashes = new Set();
   for (const conditionId of CONDITION_IDS) {
