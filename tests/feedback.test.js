@@ -13,6 +13,7 @@ import {
   backgroundPanoramaCropY,
   backgroundPanoramaTravel,
   backgroundParallaxPhase,
+  kakiLandPlusherScreenPosition,
   KakiRenderer,
   riderScreenProjection,
 } from "../js/renderer.js";
@@ -432,6 +433,26 @@ test("aerial panorama follows camera worldY continuously without using altitude 
   assert.deepEqual([high, descending, extreme], [400, 344, 292]);
   assert.equal(backgroundPanoramaCropY({ conditionId: "twilightGlass", player: { aerialAltitude: 1 } }), coast);
   assert.equal(backgroundPanoramaCropY({ conditionId: "stormbreak", camera: { worldY: -500 } }), 0);
+});
+
+test("Kaki-Land plusher gallery remains present at fixed screen anchors through aerial camera travel", () => {
+  const positions = Array.from({ length: 4 }, (_, index) => kakiLandPlusherScreenPosition(index));
+  assert.deepEqual(positions, [
+    { x: 38, y: 72, frame: "plusherChii" },
+    { x: 105, y: 72, frame: "plusherRockstar" },
+    { x: 279, y: 72, frame: "plusherMermaid" },
+    { x: 346, y: 72, frame: "plusherKitty" },
+  ]);
+  assert.equal(kakiLandPlusherScreenPosition(4), null);
+  for (const cameraWorldY of [0, -24, -80, -132, -424]) {
+    const sourceY = backgroundPanoramaCropY({ camera: { worldY: cameraWorldY } });
+    assert.ok(sourceY >= 0 && sourceY <= 424);
+    assert.deepEqual(
+      Array.from({ length: 4 }, (_, index) => kakiLandPlusherScreenPosition(index)),
+      positions,
+      "vertical panorama travel cannot mutate or hide the signal gallery",
+    );
+  }
 });
 
 test("aerial presentation has no independent cloud blend controller", () => {
