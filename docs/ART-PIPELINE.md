@@ -4,7 +4,7 @@ Environment art and modular sprite sheets are produced offline and checked into 
 
 ## Generated environment sources
 
-The original three source images were created with the built-in image-generation tool at 1672 x 941 RGB. Golden Coast is the composition master. Twilight Glass and Stormbreak use the Golden Coast image as a reference so the coast, pier, lifeguard tower, palms, and horizon remain spatially consistent. Kaki-Land is an additive fourth art contract: a rejected Vertex/Nano exploration is retained for provenance, then reviewed Grok panorama and decor masters are cleaned deterministically by `tools/art/build-kaki-land-assets.py`.
+The original three source images were created with the built-in image-generation tool at 1672 x 941 RGB. Golden Coast is the composition master. Twilight Glass and Stormbreak use the Golden Coast image as a reference so the coast, pier, lifeguard tower, palms, and horizon remain spatially consistent. Kaki-Land is an additive fourth art contract: a rejected Vertex/Nano exploration is retained for provenance, then a reviewed Grok panorama and reviewed ImageGen Kemonokaki resident sheet are cleaned deterministically by `tools/art/build-kaki-land-assets.py`.
 
 | Condition | Source role | Source filename | SHA-256 |
 | --- | --- | --- | --- |
@@ -90,7 +90,7 @@ The 384 x 80 crops end at the coast rather than duplicating a foreground ocean. 
 
 ## Vertical aerial panorama build
 
-The sky-to-space extension keeps the original Grok and reference-controlled Vertex/Nano comparison matrix. After live continuity review, each runtime master was rebuilt from one continuous source rather than a provider splice. Kaki-Land adds one rejected Vertex/Nano exploration plus reviewed Grok network and decor masters; a constrained edit removes the humanoid draft before deterministic native cleanup. The repair decisions, prompts, filenames, and hashes are recorded in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
+The sky-to-space extension keeps the original Grok and reference-controlled Vertex/Nano comparison matrix. After live continuity review, each runtime master was rebuilt from one continuous source rather than a provider splice. Kaki-Land adds one rejected Vertex/Nano exploration, a reviewed Grok network master, and a reviewed ImageGen Kemonokaki decor master; a constrained edit removes the humanoid draft before deterministic native cleanup. The repair decisions, prompts, filenames, and hashes are recorded in [Vertical aerial source selection](./art-source/aerial/README.md) and [Kaki-Land visual provenance](./art-source/aerial/KAKI-LAND.md).
 
 `tools/art/build-aerial-panoramas.py` reframes each single continuous source so its authored horizon lands at the normal-riding camera shelf, sharpens restrainedly, and quantizes to a compact indexed PNG. Kaki-Land declares an 80-color output with native one-pixel detail and its verified source horizon at y=502. The `--check` mode guards isolated pasted-strip boundaries, deliberate pixel clusters, and the static-host budget without rewriting assets.
 

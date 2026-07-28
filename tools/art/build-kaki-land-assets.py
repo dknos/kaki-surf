@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clean Kaki-Land's reviewed Grok masters into native runtime art.
+"""Clean Kaki-Land's reviewed source masters into native runtime art.
 
 The selected source images remain checked in beside their provenance. This
 deterministic offline pass reframes the continuous panorama around the shared
@@ -23,7 +23,10 @@ MENU = ROOT / "assets/backgrounds/kakiLand-menu.png"
 ATLAS = ROOT / "assets/generated/kaki-land-decor-atlas.png"
 NANO_REFERENCE = ROOT / "docs/art-source/aerial/nano/kaki-land-1.png"
 GROK_PANORAMA = ROOT / "docs/art-source/aerial/grok/kaki-land-network-master.png"
-GROK_DECOR = ROOT / "docs/art-source/atlases/grok/kaki-land-decor-sheet-v2.png"
+KEMONOKAKI_DECOR = (
+    ROOT
+    / "docs/art-source/atlases/imagegen/kaki-land-kemonokaki-decor-sheet.png"
+)
 RUNTIME_SIZE = (1536, 640)
 HORIZON_Y = 502
 SOURCE_HORIZON_RATIO = 393 / 576
@@ -341,14 +344,26 @@ def draw_panorama() -> Image.Image:
 
 def draw_menu(panorama: Image.Image, atlas: Image.Image) -> Image.Image:
     # A 16:9 crop keeps the full vertical story and favors the busiest cloud
-    # handoff. The reactive Relay is composited from the same runtime atlas so
-    # card art and gameplay share one silhouette language.
+    # handoff. Kemonokaki residents and the reactive Relay are composited from
+    # the runtime atlas so the card and gameplay share one silhouette language.
     crop_width = round(panorama.height * 16 / 9)
     crop_left = 176
     crop = panorama.convert("RGB").crop(
         (crop_left, 0, crop_left + crop_width, panorama.height),
     )
     menu = crop.resize((768, 432), Image.Resampling.LANCZOS).convert("RGBA")
+    residents = (
+        ((0, 0, 64, 48), (4, 222)),       # kitty pixel repairer
+        ((0, 48, 64, 96), (258, 246)),    # mouse drawing collector
+        ((192, 0, 256, 48), (588, 244)),  # moth signal keeper
+    )
+    for frame_box, position in residents:
+        resident = atlas.crop(frame_box).resize((128, 96), Image.Resampling.NEAREST)
+        resident_alpha = resident.getchannel("A").point(
+            lambda value: round(value * 0.88)
+        )
+        resident.putalpha(resident_alpha)
+        menu.alpha_composite(resident, position)
     relay = atlas.crop((128, 96, 192, 144)).resize(
         (192, 144),
         Image.Resampling.NEAREST,
@@ -428,7 +443,7 @@ def is_chroma(pixel: tuple[int, int, int]) -> bool:
     )
 
 
-def extract_grok_cell(
+def extract_decor_cell(
     sheet: Image.Image,
     column: int,
     row: int,
@@ -479,7 +494,7 @@ def extract_grok_cell(
     cell.putalpha(ImageChops.invert(background))
     bounds = cell.getbbox()
     if not bounds:
-        raise RuntimeError(f"Grok decor cell {column},{row} has no keyed subject")
+        raise RuntimeError(f"Kemonokaki decor cell {column},{row} has no keyed subject")
     subject = cell.crop(bounds)
     frame_width, frame_height = frame_size
     fit = min((frame_width - 4) / subject.width, (frame_height - 4) / subject.height)
@@ -524,15 +539,30 @@ def clean_relay_face(frame: Image.Image, phase: str) -> None:
         draw.rectangle((30, 30, 34, 31), fill="#ffd166")
 
 
+def clean_reaction_card(frame: Image.Image) -> None:
+    """Enforce the canonical four-symbol card after source reduction."""
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle((41, 4, 61, 40), fill="#17152f")
+    draw.rectangle((43, 6, 59, 38), fill="#fff0cf")
+    draw.rectangle((45, 10, 48, 13), fill="#ef665f")
+    draw.ellipse((53, 9, 57, 13), fill="#45c7d1")
+    draw.polygon(((46, 20), (42, 26), (50, 26)), fill="#f1c75b")
+    draw.polygon(((55, 20), (59, 24), (55, 28), (51, 24)), fill="#69d18b")
+
+
 def draw_atlas() -> Image.Image:
-    if not GROK_DECOR.is_file():
-        raise FileNotFoundError(f"missing reviewed Grok decor sheet: {GROK_DECOR}")
-    with Image.open(GROK_DECOR) as opened:
+    if not KEMONOKAKI_DECOR.is_file():
+        raise FileNotFoundError(
+            f"missing reviewed Kemonokaki decor sheet: {KEMONOKAKI_DECOR}"
+        )
+    with Image.open(KEMONOKAKI_DECOR) as opened:
         sheet = opened.convert("RGB")
     atlas = Image.new("RGBA", (256, 144), (0, 0, 0, 0))
     for row in range(3):
         for column in range(4):
-            frame = extract_grok_cell(sheet, column, row)
+            frame = extract_decor_cell(sheet, column, row)
+            if row == 0 and column == 2:
+                clean_reaction_card(frame)
             if row == 2 and column < 3:
                 clean_relay_face(
                     frame,

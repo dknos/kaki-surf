@@ -1,10 +1,11 @@
 # Kaki-Land visual source and provenance
 
 Kaki-Land uses one reviewed Grok-derived 1536 x 640 panorama, one 768 x 432
-menu image, and one optional 256 x 144 decor atlas. Grok was used offline for
-source exploration and production source sheets. The checked-in conversion is
-deterministic; the browser does not call an image model, generate pixels, fetch
-a CDN, or depend on these rasters for gameplay geometry.
+menu image, and one optional 256 x 144 decor atlas. Grok and built-in ImageGen
+were used offline for source exploration and production source sheets. The
+checked-in conversion is deterministic; the browser does not call an image
+model, generate pixels, fetch a CDN, or depend on these rasters for gameplay
+geometry.
 
 ## Vertex/Nano exploration
 
@@ -70,7 +71,8 @@ Session `019fa4c8-8f3e-7bd0-ad4f-d07aa80d37b2` generated the original 4 x 3
 decor sheet. It is preserved but superseded. Session
 `019fa544-1d8d-7362-82ae-580c62112d84` generated three stricter replacements;
 candidate 2 was selected for its harder one-pixel silhouettes, clearer props,
-and consistently nonhuman Relay. The offline build removes only
+and consistently nonhuman Relay. It is now also preserved but superseded by
+the Kemonokaki resident pass below. The offline build removes only
 border-connected chroma, reduces each cell to a 64 x 48 frame, caps each sprite
 to 15 opaque colors, and manually replaces generated Relay face marks with the
 canonical Kaki face grid. No generated pseudo-text remains readable at
@@ -106,33 +108,78 @@ The selected decor-sheet v2 prompt was:
 Game-production sprite atlas source for Kaki Surf KAKI-LAND, exact 4 columns by 3 rows of twelve equal isolated cells on one perfectly flat solid chroma-magenta #ff00ff background, no labels, no borders, no grid lines. Authentic late-16-bit pixel art with visible square pixels, hard stair-step contours, zero antialiasing, zero smooth shading, 8 to 14 flat palette colors per sprite, bold navy silhouette outlines, consistent 48x40-ish subject footprint inside each cell and generous separation. Row 1: quiet round blue Kaki artist repairing one bright pixel on a taped beige CRT; alarmed coral Kaki artist immediately repairing a snapped cable; deadpan violet Kaki artist holding a cream card with exactly four abstract colored geometric marks and no writing; night-ink signal keeper tending one tiny gold lamp. Row 2: mint collector carefully drying three damp miniature drawings; original paper-cream guestbook gull pressing one gold approval stamp; tiny violet button menace rearranging six abstract old-web badge tiles; compact cream approval stamp shaped like a repaired five-band rainbow ring. Row 3: THE LAST RELAY notice, deform, and settle poses—same clearly nonhuman rounded-square navy face-grid signal device, direct paper-cloud wings, imperfect cable halo, one wing visibly repaired with mint tape and coral stitches, no torso or limbs—then a small cloud artist station with repaired CRT and one rainbow ring. Wholly original Kaki silhouettes, one emotional read and one peculiar prop each. No words, letters, numbers, logos, pseudo-text, real avatars, humans, anime, generic fantasy angel, gradients, blur, glow, glossy 3D, ground plane, scenery, shadows, overlapping cells, watermark, or cropped subjects.
 ```
 
+## Kemonokaki resident pass
+
+On 2026-07-28 the public [Kemonokaki site](https://www.kemonokaki.net/) was
+reviewed as the explicit character reference requested for Kaki-Land. It
+describes Kemonokaki as hand-drawn neo-chibi kemonomimi across 19 species
+groups. The production sheet does not reproduce any collectible portrait,
+hairstyle, outfit, token frame, username, or site image. It translates the
+aggregate species language into seven original maintenance residents: kitty,
+dragon, lamb, moth, mouse, ghost, and a second kitty station keeper. No
+downloaded site artwork ships in the repository.
+
+The selected built-in ImageGen output is preserved unchanged at
+`docs/art-source/atlases/imagegen/kaki-land-kemonokaki-decor-sheet.png`.
+Generation record: `019fa480-5048-7e93-9854-0c8e62d046b8`. Image 1 was the
+superseded Kaki-Land sheet as a layout reference; Image 2 was a temporary
+contact sheet of the public species grid as a style/species reference only.
+
+The selected prompt was:
+
+```text
+Use case: stylized-concept
+Asset type: production source sheet for a 384x216 pixel-art game background decor atlas
+Input images: Image 1 is the existing Kaki-Land 4-column by 3-row atlas source and defines the exact cell layout, poses, props, framing, and flat chroma-magenta background. Image 2 is the official public Kemonokaki species overview and is a style/species reference only; do not reproduce any exact portrait, hairstyle, outfit, token, or frame.
+Primary request: redraw Image 1 so Kaki-Land's anonymous round background artists are unmistakably original Kemonokaki residents while preserving every cell's job. Exact 4 columns by 3 rows, twelve isolated cells, no labels, no borders, wide gutters, perfectly flat uniform #d10072 chroma-magenta field. Row 1: blue kitty Kemonokaki repairing one pixel at a taped beige CRT; coral dragon Kemonokaki with tiny horns and tail immediately repairing a snapped cable; violet lamb Kemonokaki holding a cream reaction card with exactly four abstract colored shapes; dark moth Kemonokaki with small antennae and folded wings tending one gold lamp. Row 2: mint mouse Kemonokaki carefully drying three damp drawings; keep the paper-cream Guestbook Gull and approval stamp action; tiny violet ghost Kemonokaki rearranging six abstract old-web badge tiles; keep the repaired five-band rainbow approval stamp. Row 3: preserve THE LAST RELAY as the same clearly nonhuman rounded-square navy face-grid network device in notice, deform, and settle poses, then a repaired CRT cloud station maintained by a small cream kitty Kemonokaki. Every Kemonokaki has a huge neo-chibi head, tiny body, large dark sparkling eyes readable after reduction, one clear species silhouette feature, one emotional read, and one prop. Transform the reference language into crisp late-16-bit game sprites with bold navy outlines, hard stair-step contours, visible square pixel clusters, 8-14 flat colors per sprite, consistent 48x40-ish subject footprint. Wholly original fictional composites only.
+Color palette: night ink, Kaki blue, cyan, mint, paper cream, memory violet, signal gold, restrained coral and pink.
+Constraints: preserve the exact twelve-cell semantic order and all props; no exact copied portrait or outfit; no readable words, letters, numbers, pseudo-text, logos, NFT frames, humans, generic anime bodies, gradients, blur, glow, glossy 3D, scenery, shadows, ground plane, grid lines, watermark, overlaps, or cropped subjects.
+```
+
+The same resident brief was also explored through local Grok session
+`019fa94e-3533-7532-8210-6def44a72929`:
+
+```text
+Production source sheet for Kaki Surf KAKI-LAND background residents, exact 4 columns by 3 rows of twelve isolated cells on one perfectly flat uniform chroma-magenta #D10072 field, no borders or labels. Translate the public Kemonokaki neo-chibi kemonomimi language into wholly original late-16-bit game sprites: huge cute heads, tiny bodies, sparkling dark eyes, bold navy outlines, one clear species silhouette and one prop each, never copy an existing collectible portrait, hairstyle or outfit. Row 1: blue kitty repairs one bright pixel at taped beige CRT; coral baby dragon with horns and tail fixes snapped cable; violet lamb holds cream card with exactly four abstract color shapes; dark moth with antennae and folded wings tends gold lamp. Row 2: mint mouse dries three damp drawings; paper-cream Guestbook Gull stamps an open book; tiny violet ghost rearranges six abstract old-web badge tiles; repaired five-band rainbow approval stamp. Row 3: same nonhuman navy rounded-square face-grid Last Relay device in notice, deform, settle poses with cream routing wings, cable halo, one repaired wing; final cell cream kitty maintaining repaired CRT and rainbow ring on cloud. Crisp hard square pixel clusters, consistent 48x40-ish silhouette per cell after reduction, 8-14 flat colors, generous gutters. Kaki palette: night ink, blue, cyan, mint, paper cream, violet, gold, restrained coral and pink. No exact token copies, readable text, letters, numbers, pseudo-text, logos, NFT portrait frames, humans, generic anime bodies, gradients, blur, glow, glossy 3D, scenery, shadows, grid lines, watermark, overlaps or crops.
+```
+
+Both Grok candidates were rejected: one added a gradient field and readable
+`APPROVED`; the other added cell panels and readable `REPAIRED`. Neither is
+copied into the repository or runtime.
+
 ## Selected production conversion
 
-`tools/art/build-kaki-land-assets.py` reads the preserved Grok masters and:
+`tools/art/build-kaki-land-assets.py` reads the preserved Grok panorama and
+ImageGen Kemonokaki decor master and:
 
 - reframes the continuous panorama around one y=502 ocean anchor;
 - maps the tiled heaven into the camera's physically reachable high-air band
   without adding shelves, plate swaps, or a second backdrop;
 - retains native one-pixel detail and reduces the artwork to 80 colors;
-- builds menu/card art from the same panorama and reviewed Relay silhouette;
-- packs compact frames for fictional artist functions, the cloud station,
-  Approval, and the Last Relay notice/deform/settle reaction.
+- builds menu/card art from the same panorama, three Kemonokaki residents, and
+  the reviewed Relay silhouette;
+- packs compact frames for seven original Kemonokaki maintenance residents,
+  the Guestbook Gull, Approval, and the Last Relay notice/deform/settle
+  reaction.
 
 The fictional artists are aggregate social functions only: repairer, alarm
 fixer, reaction-card holder, lamp keeper, drawing collector, approval gull, and
-button menace. No private phrases, usernames, member avatars, source emoji,
-community screenshots, or identifiable member likenesses were used.
+button menace. The public Kemonokaki species language supplies silhouette
+traits, not member identity. No private phrases, usernames, member avatars,
+source emoji, community screenshots, existing collectible portraits, or
+identifiable member likenesses were used.
 
 | File | Role | Dimensions | SHA-256 |
 | --- | --- | ---: | --- |
 | `docs/art-source/aerial/grok/kaki-land-network-master.png` | Selected Grok network master | 1280 x 576 | `6f2273079b98d5d3e6eea03e05293bd7f51bab167e4ddb40cb3a7f02b245edb0` |
 | `docs/art-source/aerial/grok/kaki-land-last-relay-concept.jpg` | Selected Relay design reference | 1280 x 576 | `5233faee85f3b7c25d7302dbe2c7f02c164bb1bb3613517af50ad07700722f5c` |
 | `docs/art-source/atlases/grok/kaki-land-decor-sheet.jpg` | Superseded 4 x 3 Grok decor source | 1280 x 720 | `3b7221bbcdca68d411302437a917e8fac8059fefbab33d9944c8e3868eb1768b` |
-| `docs/art-source/atlases/grok/kaki-land-decor-sheet-v2.png` | Selected crisp 4 x 3 Grok decor source | 1280 x 720 | `ee20eef2543b734aab9dc4efd3802c04c7af46fedc621f021a63c3866fe9fee6` |
+| `docs/art-source/atlases/grok/kaki-land-decor-sheet-v2.png` | Superseded crisp 4 x 3 Grok decor source | 1280 x 720 | `ee20eef2543b734aab9dc4efd3802c04c7af46fedc621f021a63c3866fe9fee6` |
+| `docs/art-source/atlases/imagegen/kaki-land-kemonokaki-decor-sheet.png` | Selected original Kemonokaki resident sheet | 1672 x 941 | `83db466f1ee9c67327d73df46fc1e13b9c39350462c75544edd271f9e1f9083f` |
 | `docs/art-source/aerial/imagegen/kaki-land-continuous.png` | Clean continuous build source | 1536 x 640 | `685f38217fc7706d896e8634d2941050fd01797863caa75e7ce99f21cfd8886d` |
 | `assets/backgrounds/kakiLand-aerial.png` | Indexed runtime panorama | 1536 x 640 | `35766d9ba1a71686691a35de29a82da82b1064ced1071a1a01fc927574b0ed29` |
-| `assets/backgrounds/kakiLand-menu.png` | Menu and condition-card art | 768 x 432 | `b0937ab0f24be5df3d1f43b4719bc24c21e8764a9bf591b9836fb8d089535053` |
-| `assets/generated/kaki-land-decor-atlas.png` | Optional artist/reaction atlas | 256 x 144 | `fa782fe6f4ec7d12dad1da825322385cc68198e092f10cd6337a06c9ad8a72ed` |
+| `assets/backgrounds/kakiLand-menu.png` | Menu and condition-card art | 768 x 432 | `1920ffc050d71cf378d558bcde4a576448d2760310520e06e499ac4c3e4376de` |
+| `assets/generated/kaki-land-decor-atlas.png` | Optional Kemonokaki artist/reaction atlas | 256 x 144 | `f6d2d9eacb6e50c6d196158622d57a96470e6eca565524e7641dc4bdbdfce7d1` |
 
 The runtime panorama is 289,890 bytes and uses 80 colors. It is non-tileable,
 drawn once per frame, and never defines collision. The Last Relay remains an

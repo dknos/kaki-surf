@@ -772,11 +772,13 @@ export class KakiRenderer {
       this.drawKakiLandSignalBands(sourceX, sourceY, phase);
       const authoredStations = [
         [770, 474, "quietRepair"],
+        [904, 462, "alarmFixer"],
         [1048, 456, "signalKeeper"],
+        [1196, 474, "collector"],
         [1370, 466, "reactionCard"],
       ];
       const visibleStations = this.qualityProfile.renderFarTraffic
-        ? Math.min(authoredStations.length, phase + 1)
+        ? Math.min(authoredStations.length, phase * 2 + 1)
         : 1;
       // These stations belong to the lower cloud archipelago. Let them leave
       // the frame with their islands instead of floating through the upper
