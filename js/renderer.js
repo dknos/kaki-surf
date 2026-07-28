@@ -73,10 +73,10 @@ const CALLOUT_GAP = 0.14;
 const CALLOUT_MIN_READ_TIME = 1.05;
 const KAKI_LAND_PANORAMA_START_X = 640;
 const KAKI_LAND_PLUSHER_GALLERY = Object.freeze([
-  Object.freeze([38, 72, "plusherChii"]),
-  Object.freeze([105, 72, "plusherRockstar"]),
-  Object.freeze([279, 72, "plusherMermaid"]),
-  Object.freeze([346, 72, "plusherKitty"]),
+  Object.freeze([710, 493, "plusherChii"]),
+  Object.freeze([795, 491, "plusherRockstar"]),
+  Object.freeze([880, 492, "plusherMermaid"]),
+  Object.freeze([965, 493, "plusherKitty"]),
 ]);
 const KAKI_LAND_AUTHORED_STATIONS = Object.freeze([
   Object.freeze([1060, 474, "quietRepair"]),
@@ -104,15 +104,21 @@ export function backgroundPanoramaTravel(
 }
 
 /**
- * The licensed Kemonokaki dolls occupy a self-contained signal gallery rather
- * than a physical point on the vertical surf stage. Their screen anchors stay
- * fixed while the camera reveals the upper panorama, so jumping cannot make
- * the gallery drift or disappear.
+ * Project one licensed Kemonokaki doll from the same source-space crop as the
+ * panorama. This keeps it registered to its cloud island in both axes.
  */
-export function kakiLandPlusherScreenPosition(index) {
+export function kakiLandPlusherScreenPosition(
+  index,
+  sourceX = KAKI_LAND_PANORAMA_START_X,
+  sourceY = aerialBackdropCropShelves().coast,
+) {
   const entry = KAKI_LAND_PLUSHER_GALLERY[index];
   if (!entry) return null;
-  return Object.freeze({ x: entry[0], y: entry[1], frame: entry[2] });
+  return Object.freeze({
+    x: entry[0] - sourceX,
+    y: entry[1] - sourceY,
+    frame: entry[2],
+  });
 }
 
 /** One camera-continuous crop: coast + signed worldY, never a shelf swap. */
@@ -615,14 +621,17 @@ export class KakiRenderer {
     ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const backdropAltitude = this.aerialBackdrop?.altitude ?? 0;
+    const kakiLandSkyOffsetY = this.conditionId === "kakiLand"
+      ? -(Number(simulation.camera?.worldY) || 0)
+      : 0;
     if (this.qualityProfile.renderFarTraffic && trafficAllowed("far", "sky")) {
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky", backdropAltitude);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "far", alpha, this.settings, "sky", backdropAltitude, kakiLandSkyOffsetY);
     }
     if (trafficAllowed("mid", "sky")) {
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky", backdropAltitude);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "mid", alpha, this.settings, "sky", backdropAltitude, kakiLandSkyOffsetY);
     }
     if (trafficAllowed("near", "sky")) {
-      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky", backdropAltitude);
+      drawWorldTraffic(ctx, simulation, this.visualAssets, palette, "near", alpha, this.settings, "sky", backdropAltitude, kakiLandSkyOffsetY);
     }
     if (this.conditionId === "kakiLand") {
       drawWebringRelay(ctx, simulation, this.visualAssets, palette, alpha, this.settings);
@@ -824,7 +833,7 @@ export class KakiRenderer {
         }
       }
       if (altitude < 0.48) {
-        this.drawKakiLandPlusherGallery();
+        this.drawKakiLandPlusherGallery(sourceX, sourceY);
         return;
       }
       const reveal = smoothstep(0.48, 0.84, altitude);
@@ -878,7 +887,7 @@ export class KakiRenderer {
       }
       // The ordinary gallery workers remain in front of the enormous,
       // low-contrast Relay, preserving the intended sacred-background scale.
-      this.drawKakiLandPlusherGallery();
+      this.drawKakiLandPlusherGallery(sourceX, sourceY);
       return;
     }
     if (altitude < 0.48) return;
@@ -922,18 +931,35 @@ export class KakiRenderer {
     ctx.restore();
   }
 
-  drawKakiLandPlusherGallery() {
+  drawKakiLandPlusherGallery(sourceX, sourceY) {
     const ctx = this.ctx;
     const p = this.palette;
     // The four licensed-reference dolls are primary Kaki-Land residents, not
-    // expendable far traffic. Their compact cloud gallery is stable in every
-    // run phase and quality profile, and remains behind gameplay.
+    // expendable far traffic. They remain attached to their authored cloud
+    // route and leave the viewport continuously with the panorama.
     for (let index = 0; index < KAKI_LAND_PLUSHER_GALLERY.length; index += 1) {
-      const { x: plusherX, y: plusherY, frame } = kakiLandPlusherScreenPosition(index);
-      const scale = this.qualityProfile.renderFarTraffic ? 0.76 : 0.66;
+      const { x: plusherX, y: plusherY, frame } = kakiLandPlusherScreenPosition(
+        index,
+        sourceX,
+        sourceY,
+      );
+      if (plusherX < -48 || plusherX > LOGICAL_WIDTH + 48
+        || plusherY < -40 || plusherY > LOGICAL_HEIGHT + 40) continue;
+      const horizontalFade = Math.min(
+        smoothstep(-48, 8, plusherX),
+        1 - smoothstep(LOGICAL_WIDTH - 8, LOGICAL_WIDTH + 48, plusherX),
+      );
+      const verticalFade = 1 - smoothstep(
+        LOGICAL_HEIGHT - 28,
+        LOGICAL_HEIGHT + 40,
+        plusherY,
+      );
+      const galleryAlpha = clamp(horizontalFade * verticalFade, 0, 1);
+      if (galleryAlpha <= 0.01) continue;
+      const scale = this.qualityProfile.renderFarTraffic ? 0.82 : 0.7;
       const shelfHalfWidth = this.qualityProfile.renderFarTraffic ? 25 : 22;
       ctx.save();
-      ctx.globalAlpha = this.settings.highContrast ? 1 : 0.9;
+      ctx.globalAlpha = galleryAlpha * (this.settings.highContrast ? 1 : 0.9);
       ctx.fillStyle = p.ink;
       ctx.fillRect(
         Math.round(plusherX - shelfHalfWidth),
@@ -962,7 +988,7 @@ export class KakiRenderer {
         plusherY,
         {
           scale,
-          alpha: this.settings.highContrast ? 1 : 0.96,
+          alpha: galleryAlpha * (this.settings.highContrast ? 1 : 0.96),
         },
       );
     }
